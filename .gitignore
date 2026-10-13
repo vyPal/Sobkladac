@@ -1,0 +1,10 @@
+/obj/
+/ifj26
+*.o
+*.d
+/compile_commands.json
+/.cache/
+*.zip
+.vscode/
+.idea/
+*.swp
