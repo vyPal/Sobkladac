@@ -3,8 +3,9 @@
  * Project: IFJ26 compiler
  * @author Jakub Palacky <xpalacj00>
  */
-#include <stdio.h>
+
+#include "common.h"
 
 int main(void) {
-  return 0;
+  die(0, 0, NULL);
 }
