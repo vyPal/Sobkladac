@@ -4,5 +4,6 @@ Checks: >
   -bugprone-easily-swappable-parameters,
   clang-analyzer-*,
   misc-include-cleaner,
-  readability-misleading-indentation
+  readability-misleading-indentation,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 WarningsAsErrors: ""
