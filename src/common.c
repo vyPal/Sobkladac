@@ -50,7 +50,7 @@ void *arena_realloc(void *p, size_t o, size_t n) {
   size_t no = (n + 15) & ~(size_t)15;
 
   if (head && head->data + head->used == (uint8_t *)p + ro &&
-      head->data + head->size >= (uint8_t *)p + no - ro) {
+      (uint8_t *)p + no <= head->data + head->size) {
     head->used += no - ro;
     return p;
   }
