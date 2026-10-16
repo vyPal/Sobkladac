@@ -10,8 +10,8 @@
  *  - `die()` method for killing program with exit code and freeing arena
  */
 
-#ifndef ARENA_H
-#define ARENA_H
+#ifndef COMMON_H
+#define COMMON_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -44,4 +44,4 @@ void *arena_zalloc(size_t n);
 void *arena_realloc(void *p, size_t o, size_t n);
 void *arena_strndup(const char *s, size_t n);
 
-#endif  // !ARENA_H
+#endif  // !COMMON_H
