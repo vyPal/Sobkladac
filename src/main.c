@@ -7,5 +7,5 @@
 #include "common.h"
 
 int main(void) {
-  die(0, 0, NULL);
+  die(ERR_OK, 0, NULL);
 }
