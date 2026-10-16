@@ -47,7 +47,7 @@ void *arena_realloc(void *p, size_t o, size_t n) {
     return arena_alloc(n);
 
   size_t ro = (o + 15) & ~(size_t)15;
-  size_t no = (o + 15) & ~(size_t)15;
+  size_t no = (n + 15) & ~(size_t)15;
 
   if (head && head->data + head->used == (uint8_t *)p + ro &&
       head->data + head->size >= (uint8_t *)p + no - ro) {
@@ -56,18 +56,20 @@ void *arena_realloc(void *p, size_t o, size_t n) {
   }
 
   void *new = arena_alloc(n);
-  memcpy(new, p, o);
+  memcpy(new, p, o < n ? o : n);
   return new;
 }
 
-void *arena_strndup(const char *s, size_t n) {
-  void *p = arena_alloc(n);
-  strncpy(p, s, n);
+char *arena_strndup(const char *s, size_t n) {
+  char *p = arena_alloc(n + 1);
+  memcpy(p, s, n);
+  p[n] = '\0';
   return p;
 }
 
 void arena_cleanup(void) {
   arena_chunk_t *current = head;
+  head = NULL;
   while (current != NULL) {
     arena_chunk_t *next = current->next;
     free(current);

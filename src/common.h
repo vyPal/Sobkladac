@@ -42,6 +42,6 @@ typedef struct arena_chunk_t {
 void *arena_alloc(size_t n);
 void *arena_zalloc(size_t n);
 void *arena_realloc(void *p, size_t o, size_t n);
-void *arena_strndup(const char *s, size_t n);
+char *arena_strndup(const char *s, size_t n);
 
 #endif  // !COMMON_H
