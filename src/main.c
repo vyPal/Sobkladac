@@ -7,5 +7,6 @@
 #include "common.h"
 
 int main(void) {
-  die(ERR_OK, 0, "");
+  arena_cleanup();
+  return ERR_OK;
 }
