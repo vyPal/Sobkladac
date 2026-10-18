@@ -3,8 +3,10 @@
  * Project: IFJ26 compiler
  * @author Jakub Palacky <xpalacj00>
  */
-#include <stdio.h>
+
+#include "common.h"
 
 int main(void) {
-  return 0;
+  arena_cleanup();
+  return ERR_OK;
 }
