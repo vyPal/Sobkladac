@@ -1,5 +1,6 @@
 /**
  * @file common.h
+ * Project: IFJ26 compiler
  * @brief Common utilities
  * @author Jakub Palacky <xpalacj00>
  *
