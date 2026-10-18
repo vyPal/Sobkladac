@@ -15,7 +15,6 @@
 #define COMMON_H
 
 #include <stddef.h>
-#include <stdint.h>
 
 /// Compiler exit codes according to specification
 enum {
@@ -49,16 +48,6 @@ enum {
  */
 void die(int code, int line, const char *fmt, ...)
     __attribute__((__noreturn__, __format__(__printf__, 3, 4)));
-
-/**
- * @brief Internal data structure for arena allocator
- */
-typedef struct arena_chunk_t {
-  struct arena_chunk_t *next;  ///< Pointer to next chunk
-  size_t size;                 ///< Maximum size of this chunk's data in bytes
-  size_t used;                 ///< Currently used bytes
-  uint8_t data[];              ///< Actual data
-} arena_chunk_t;
 
 /**
  * @brief Allocates n bytes in the arena allocator
