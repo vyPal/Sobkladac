@@ -16,6 +16,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+/// Definitions for testing arena allocator when using ASan
+// AI-BEGIN [claude-opus-5-5, Claude Code]
+// Prompt: "how do asan's poisoning macros work?"
+// Context: follow-up to an AI review of the arena; sketch adapted by us
+#ifdef __SANITIZE_ADDRESS__
+#include <sanitizer/asan_interface.h>
+#else
+#define ASAN_POISON_MEMORY_REGION(a, s) ((void)(a), (void)(s))
+#define ASAN_UNPOISON_MEMORY_REGION(a, s) ((void)(a), (void)(s))
+#endif
+// AI-END
+
 /**
  * @brief Internal data structure for arena allocator
  */
@@ -40,6 +52,7 @@ static size_t align_up(size_t n) {
 static arena_chunk_t *head;
 
 void *arena_alloc(size_t n) {
+  size_t req = n;
   n = align_up(n);
 
   if (!head || n > head->size - head->used) {
@@ -48,6 +61,7 @@ void *arena_alloc(size_t n) {
     arena_chunk_t *c = malloc(sizeof(arena_chunk_t) + size);
     if (!c)
       die(ERR_INTERNAL, 0, "out of memory");
+    ASAN_POISON_MEMORY_REGION(c->data, size);
     // If chunk is oversized (nothing else will fit in it anyway) insert it into the chunk list
     // without making it the new head so that we don't waste space that could still be available in
     // the current head
@@ -55,6 +69,7 @@ void *arena_alloc(size_t n) {
       c->used = c->size = size;
       c->next = head->next;
       head->next = c;
+      ASAN_UNPOISON_MEMORY_REGION(c->data, size);
       return c->data;
     }
     c->next = head;
@@ -65,6 +80,7 @@ void *arena_alloc(size_t n) {
 
   void *p = head->data + head->used;
   head->used += n;
+  ASAN_UNPOISON_MEMORY_REGION(p, req);
   return p;
 }
 
@@ -83,14 +99,21 @@ void *arena_realloc(void *p, size_t o, size_t n) {
 
   if (head && head->data + head->used == (uint8_t *)p + ro &&
       no <= head->size - (head->used - ro)) {
+    if (n > o)
+      ASAN_UNPOISON_MEMORY_REGION(p, n);
+    else if (n < o)
+      ASAN_POISON_MEMORY_REGION((uint8_t *)p + n, o - n);
     head->used += no - ro;
     return p;
   }
-  if (n < o)
+  if (n < o) {
+    ASAN_POISON_MEMORY_REGION((uint8_t *)p + n, o - n);
     return p;
+  }
 
   void *new = arena_alloc(n);
   memcpy(new, p, o < n ? o : n);
+  ASAN_POISON_MEMORY_REGION(p, o);
   return new;
 }
 
