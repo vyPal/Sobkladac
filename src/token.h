@@ -91,21 +91,21 @@ void setValue(struct Token *token, union Value *value, int line);
  * @param token Token to get the type for.
  * @return Type of the token.
  */
-enum TkType getTkType(struct Token *token);
+enum TkType getTkType(const struct Token *token);
 
 /**
  * @brief Gets the value stored in a token.
  * @param token Token to get the value from.
  * @return Pointer to the token's value.
  */
-union Value *getValue(struct Token *token);
+union Value *getValue(const struct Token *token);
 
 /**
  * @brief Gets the line number of a token.
  * @param token Token to get the line number from.
  * @return Line number of the token.
  */
-int getLine(struct Token *token);
+int getLine(const struct Token *token);
 
 // STRING FUNCTIONS
 
@@ -122,14 +122,14 @@ struct String *newString(char *string, int length);
  * @param string String to retrieve the contents from.
  * @return Pointer to the string contents.
  */
-char *getString(struct String *string);
+char *getString(const struct String *string);
 
 /**
  * @brief Gets the length of a string.
  * @param string String to get the length of.
  * @return Length of the string.
  */
-int getStringLenght(struct String *string);
+int getStringLenght(const struct String *string);
 
 // LINKED LIST FUNCTIONS
 

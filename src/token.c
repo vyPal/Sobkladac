@@ -35,15 +35,15 @@ void setValue(struct Token *token, union Value *value, int line) {
   token->line = line;
 }
 
-enum TkType getTkType(struct Token *token) {
+enum TkType getTkType(const struct Token *token) {
   return token->type;
 }
 
-union Value *getValue(struct Token *token) {
+union Value *getValue(const struct Token *token) {
   return token->value;
 }
 
-int getLine(struct Token *token) {
+int getLine(const struct Token *token) {
   return token->line;
 }
 
@@ -57,11 +57,11 @@ struct String *newString(char *text, int length) {
   return string;
 }
 
-char *getString(struct String *string) {
+char *getString(const struct String *string) {
   return string->string;
 }
 
-int getStringLenght(struct String *string) {
+int getStringLenght(const struct String *string) {
   return string->length;
 }
 
