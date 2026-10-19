@@ -11,22 +11,13 @@
 #include "common.c"
 
 struct Token *newToken(enum TkType type) {
-    struct Token *token = arena_alloc(sizeof(Token));
+    struct Token *token = arena_alloc(sizeof(struct Token));
     token->type = type;
-    token->varType = None;
     token->varIndex = -1;
-    token->strLenght = -1;
     return token;
 };
 
-void setValue(struct Token *token, enum VarType varType, union Value value) {
-    token->varType = varType;
-    // hash value and set the index
-};
-
-void setValueString(struct Token *token, enum VarType varType, union Value value, int strLenght) {
-    token->varType = varType;
-    token->strLenght = strLenght;
+void setValue(struct Token *token, union Value value) {
     // hash value and set the index
 };
 
@@ -34,20 +25,26 @@ enum TkType getTkType(struct Token *token) {
     return token->type;
 };
 
-enum VarType getVarType(struct Token *token) {
-    return token->varType;
-};
-
 int getIndex(struct Token *token) {
     return token->varIndex;
 };
 
-int getStrLenght(struct Token *token) {
-    return token->strLenght;
+struct String *newString(char *text, int length) {
+    struct String *string =  arena_alloc(sizeof(struct String));
+    string->string = text;
+    string->length = length;
+};
+
+char *getString(struct String *string) {
+    return string->string;
+};
+
+int getStringLenght(struct String *string) {
+    return string->length;
 };
 
 struct LinkedTlist *newTlist() {
-    struct LinkedTlist *list = arena_alloc(sizeof(LinkedTlist));
+    struct LinkedTlist *list = arena_alloc(sizeof(struct LinkedTlist));
     list->next = NULL;
     list->token = NULL;
     return list;

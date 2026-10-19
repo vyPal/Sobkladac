@@ -40,42 +40,39 @@ enum TkType {
 } TkType;
 
 /** 
- * @brief Enumeration of variable types. 
-*/
-enum VarType {
-    None,
-    Int,
-    Double,
-    String
-} VarType;
-
-/** 
  * @brief Union for storing values of different types.
  */
 union Value {
     int i;
     double d;
-    char *string;
+    struct String s;
 } Value;
 
 /** 
  * @brief Structure for representing a lexical token.
  */
-struct Token {
+typedef struct Token {
     enum TkType type;
-    enum VarType varType;
     int varIndex;
-    int strLenght;
-} Token;
+};
+
+/** 
+ * @brief Structure for representing a string.
+ */
+typedef struct String {
+    char *string;
+    int length;
+};
 
 /** 
  * @brief Structure for representing a linked list of tokens.
  */
-struct LinkedTlist {
+typedef struct LinkedTlist {
     struct Token *token;
     struct LinkedTlist *next;
-} LinkedTlist;
+};
 
+// TOKEN FUNCTIONS
 /**
  * @brief Creates a new token with the specified type.
  * @param type Type of the token to create.
@@ -89,16 +86,7 @@ struct Token *newToken(enum TkType type);
  * @param varType Type of the variable.
  * @param value Value to set.
  */
-void setValue(struct Token *token, enum VarType varType, union Value value);
-
-/**
- * @brief Sets the string value of a token.
- * @param token Token to set the string value for.
- * @param varType Type of the variable.
- * @param value String value to set.
- * @param strLenght Length of the string.
- */
-void setValueString(struct Token *token, enum VarType varType, union Value value, int strLenght);
+void setValue(struct Token *token, union Value value);
 
 /**
  * @brief Gets the type of a token.
@@ -108,25 +96,21 @@ void setValueString(struct Token *token, enum VarType varType, union Value value
 enum TkType getTkType(struct Token *token);
 
 /**
- * @brief Gets the variable type of a token.
- * @param token Token to get the variable type for.
- * @return Variable type of the token.
- */
-enum VarType getVarType(struct Token *token);
-
-/**
  * @brief Gets the index of a token.
  * @param token Token to get the index for.
  * @return Index of the token.
  */
 int getIndex(struct Token *token);
 
-/**
- * @brief Gets the string length of a token.
- * @param token Token to get the string length for.
- * @return String length of the token.
- */
-int getStrLenght(struct Token *token);
+// STRING FUNCTIONS
+
+struct String *newString(char *string, int length);
+
+char *getString(struct String *string);
+
+int getStringLenght(struct String *string);
+
+// LINKED LIST FUNCTIONS
 
 /**
  * @brief Creates a new token list.
