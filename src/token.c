@@ -3,101 +3,101 @@
  * Project: IFJ26 compiler
  * @brief implementation of lexical token functions
  * @author Vojtech Vitek <xvitekv00>
- * 
+ *
  * This file implements the functions for creating and manipulating lexical tokens.
  */
 
 #include "token.h"
+
 #include "common.h"
 
 typedef struct Token {
-    enum TkType type;
-    union Value *value;
+  enum TkType type;
+  union Value *value;
 } Token;
 
 typedef struct LinkedTlist {
-    struct Token *token;
-    struct LinkedTlist *next;
+  struct Token *token;
+  struct LinkedTlist *next;
 } LinkedTlist;
 
 struct Token *newToken(enum TkType type) {
-    struct Token *token = arena_alloc(sizeof(struct Token));
-    token->type = type;
-    token->value = NULL;
-    return token;
+  struct Token *token = arena_alloc(sizeof(struct Token));
+  token->type = type;
+  token->value = NULL;
+  return token;
 }
 
 void setValue(struct Token *token, union Value *value) {
-    token->value = arena_alloc(sizeof(union Value));
-    token->value = value;
+  token->value = arena_alloc(sizeof(union Value));
+  token->value = value;
 }
 
 enum TkType getTkType(struct Token *token) {
-    return token->type;
+  return token->type;
 }
 
 union Value *getValue(struct Token *token) {
-    return token->value;
+  return token->value;
 }
 
 // STRING FUNCTIONS
 
 struct String *newString(char *text, int length) {
-    struct String *string =  arena_alloc(sizeof(struct String));
-    string->string = text;
-    string->length = length;
+  struct String *string = arena_alloc(sizeof(struct String));
+  string->string = text;
+  string->length = length;
 
-    return string;
+  return string;
 }
 
 char *getString(struct String *string) {
-    return string->string;
+  return string->string;
 }
 
 int getStringLenght(struct String *string) {
-    return string->length;
+  return string->length;
 }
 
 // LIST FUNCTIONS
 
 struct LinkedTlist *newTlist() {
-    struct LinkedTlist *list = arena_alloc(sizeof(struct LinkedTlist));
-    list->next = NULL;
-    list->token = NULL;
-    return list;
+  struct LinkedTlist *list = arena_alloc(sizeof(struct LinkedTlist));
+  list->next = NULL;
+  list->token = NULL;
+  return list;
 }
 
-struct LinkedTlist *addTokenEnd(struct Token *token, struct LinkedTlist *last) {
-    if (last == NULL) {
-        last = newTlist();
-        last->token = token;
-        return last;
-    }
+struct LinkedTlist *pushToken(struct Token *token, struct LinkedTlist *last) {
+  if (last == NULL) {
+    last = newTlist();
+    last->token = token;
+    return last;
+  }
 
-    last->next = newTlist();
-    last->next->token = token;
-    return last->next;
+  last->next = newTlist();
+  last->next->token = token;
+  return last->next;
 }
 
 struct Token *popToken(struct LinkedTlist *list) {
-    if (list == NULL)
-        return NULL;
+  if (list == NULL)
+    return NULL;
 
-    struct Token *returnTk = list->token;
+  struct Token *returnTk = list->token;
 
-    if (list->next != NULL) {
-        list->token = getNextToken(list);
-        list->next = list->next->next;
-    }
-    else {
-        list->token = NULL;
-    }
-    
-    return returnTk;
+  if (list->next != NULL) {
+    list->token = getNextToken(list);
+    list->next = list->next->next;
+  } else {
+    list->token = NULL;
+  }
+
+  return returnTk;
 }
 
 struct Token *getNextToken(struct LinkedTlist *list) {
-    if (list->next == NULL || list == NULL)
-        return NULL;
-    return list->next->token;
+  if (list->next == NULL || list == NULL)
+    return NULL;
+  return list->next->token;
 }

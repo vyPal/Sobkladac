@@ -3,73 +3,69 @@
  * Project: IFJ26 compiler
  * @brief Lexical token structure and functions
  * @author Vojtech Vitek <xvitekv00>
- * 
- * This file defines the structure of a lexical token and provides functions to create and manipulate tokens.
+ *
+ * This file defines the structure of a lexical token and provides functions to create and
+ * manipulate tokens.
  */
 
- /**
-  * @brief Enumeration of token types.
-  */
+#ifndef _TOKEN_H
+#define _TOKEN_H
+
+/**
+ * @brief Enumeration of token types.
+ */
 enum TkType {
-    Ident,      // *char
-    Number,     // int
-    Decimal,    // double
-    StringTk,   // *char
-    // operators
-    Plus,       // +
-    Minus,      // -
-    Multiply,   // *
-    Divide,     // /
-    Bigger,     // >
-    Smaller,    // <
-    Equal,      // ==
-    Sequal,     // <=
-    Bequal,     // >=
-    NotEqual,   // !=
-    // others
-    Colon,      // :
-    Semicolon,  // ;
-    Comma,      // ,
-    Assign,     // =
-    Pipe,       // |
-    Lbracket,   // (
-    Rbracket,   // )
-    NewLine,    // \n
-    Indent,     // tab
-    AtMain      // @main
+  Ident,     // *char
+  Number,    // int
+  Decimal,   // double
+  StringTk,  // *char
+  // operators
+  Plus,      // +
+  Minus,     // -
+  Multiply,  // *
+  Divide,    // /
+  Bigger,    // >
+  Smaller,   // <
+  Equal,     // ==
+  Sequal,    // <=
+  Bequal,    // >=
+  NotEqual,  // !=
+  // others
+  Colon,      // :
+  Semicolon,  // ;
+  Comma,      // ,
+  Assign,     // =
+  Pipe,       // |
+  Lbracket,   // (
+  Rbracket,   // )
+  NewLine,    // \n
+  Indent,     // tab
+  AtMain      // @main
 } TkType;
 
-/** 
+/**
  * @brief Structure for representing a string.
  */
 typedef struct String {
-    char *string;
-    int length;
+  char *string;
+  int length;
 } String;
 
-/** 
- * @brief Structure for representing a string.
- */
-typedef struct String {
-    char *string;
-    int length;
-} String;
-
-/** 
+/**
  * @brief Union for storing values of different types.
  */
 union Value {
-    int i;
-    double d;
-    struct String s;
+  int i;
+  double d;
+  struct String s;
 } Value;
 
-/** 
+/**
  * @brief Structure for representing a lexical token.
  */
 typedef struct Token Token;
 
-/** 
+/**
  * @brief Structure for representing a linked list of tokens.
  */
 typedef struct LinkedTlist LinkedTlist;
@@ -126,7 +122,7 @@ struct LinkedTlist *newTlist();
  * @param last Last node in the token list.
  * @return Pointer to the last node in the token list.
  */
-struct LinkedTlist *addTokenEnd(struct Token *token, struct LinkedTlist *last);
+struct LinkedTlist *pushToken(struct Token *token, struct LinkedTlist *last);
 
 /**
  * @brief Removes and returns the first token from a token list.
@@ -141,3 +137,5 @@ struct Token *popToken(struct LinkedTlist *list);
  * @return Pointer to the next token.
  */
 struct Token *getNextToken(struct LinkedTlist *list);
+
+#endif  // _TOKEN_H
