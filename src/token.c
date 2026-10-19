@@ -29,7 +29,6 @@ struct Token *newToken(enum TkType type) {
 }
 
 void setValue(struct Token *token, union Value *value) {
-  token->value = arena_alloc(sizeof(union Value));
   token->value = value;
 }
 
@@ -87,7 +86,7 @@ struct Token *popToken(struct LinkedTlist *list) {
   struct Token *returnTk = list->token;
 
   if (list->next != NULL) {
-    list->token = getNextToken(list);
+    list->token = list->next->token;
     list->next = list->next->next;
   } else {
     list->token = NULL;
@@ -96,8 +95,16 @@ struct Token *popToken(struct LinkedTlist *list) {
   return returnTk;
 }
 
-struct Token *getNextToken(struct LinkedTlist *list) {
-  if (list->next == NULL || list == NULL)
+struct Token *lookAheadToken(struct LinkedTlist *list, int n) {
+  if (list == NULL || n <= 0)
     return NULL;
-  return list->next->token;
+
+  for (int i = 0; i < n && list != NULL; i++) {
+    list = list->next;
+  }
+
+  if (list == NULL)
+    return NULL;
+
+  return list->token;
 }

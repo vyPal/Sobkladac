@@ -39,7 +39,7 @@ enum TkType {
   Lbracket,   // (
   Rbracket,   // )
   NewLine,    // \n
-  Indent,     // tab
+  Indent,     // int (number of spaces)
   AtMain      // @main
 } TkType;
 
@@ -81,7 +81,6 @@ struct Token *newToken(enum TkType type);
 /**
  * @brief Sets the value of a token.
  * @param token Token to set the value for.
- * @param varType Type of the variable.
  * @param value Value to set.
  */
 void setValue(struct Token *token, union Value *value);
@@ -94,18 +93,34 @@ void setValue(struct Token *token, union Value *value);
 enum TkType getTkType(struct Token *token);
 
 /**
- * @brief Gets the index of a token.
- * @param token Token to get the index for.
- * @return Index of the token.
+ * @brief Gets the value stored in a token.
+ * @param token Token to get the value from.
+ * @return Pointer to the token's value.
  */
 union Value *getValue(struct Token *token);
 
 // STRING FUNCTIONS
 
+/**
+ * @brief Creates a string with the specified contents and length.
+ * @param string String contents.
+ * @param length Length of the string.
+ * @return Pointer to the new string.
+ */
 struct String *newString(char *string, int length);
 
+/**
+ * @brief Gets the contents of a string.
+ * @param string String to retrieve the contents from.
+ * @return Pointer to the string contents.
+ */
 char *getString(struct String *string);
 
+/**
+ * @brief Gets the length of a string.
+ * @param string String to get the length of.
+ * @return Length of the string.
+ */
 int getStringLenght(struct String *string);
 
 // LINKED LIST FUNCTIONS
@@ -132,10 +147,11 @@ struct LinkedTlist *pushToken(struct Token *token, struct LinkedTlist *last);
 struct Token *popToken(struct LinkedTlist *list);
 
 /**
- * @brief Gets the next token from a token list.
- * @param list Token list to get the token from.
- * @return Pointer to the next token.
+ * @brief Looks ahead in the token list and returns the nth token without removing it.
+ * @param list Token list to look ahead in.
+ * @param n Number of tokens to look ahead.
+ * @return Pointer to the nth token in the list.
  */
-struct Token *getNextToken(struct LinkedTlist *list);
+struct Token *lookAheadToken(struct LinkedTlist *list, int n);
 
 #endif  // _TOKEN_H
