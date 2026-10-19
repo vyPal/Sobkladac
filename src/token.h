@@ -48,6 +48,14 @@ typedef struct String {
 } String;
 
 /** 
+ * @brief Structure for representing a string.
+ */
+typedef struct String {
+    char *string;
+    int length;
+} String;
+
+/** 
  * @brief Union for storing values of different types.
  */
 union Value {
