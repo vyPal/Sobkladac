@@ -19,6 +19,7 @@ DEPS := $(OBJS:.o=.d) $(OBJ_DIR)/unit.d
 
 DEV_CFLAGS := $(STD) -Wall -Wextra -pedantic -Werror -g -O0 -I$(SRC_DIR)
 ASAN_FLAGS := -fsanitize=address,undefined -fno-omit-frame-pointer
+TEST_FLAGS := --report-error
 
 FORMAT_FILES := $(wildcard $(SRC_DIR)/*.c $(SRC_DIR)/*.h $(TEST_DIR)/*.c $(TEST_DIR)/*.h)
 
@@ -35,12 +36,12 @@ test-build: $(TEST_OBJS)
 	$(CC) $(CFLAGS) $^ -o $(TEST_TARGET) $(LDFLAGS)
 
 test: test-build
-	./$(TEST_TARGET)
+	./$(TEST_TARGET) $(TEST_FLAGS)
 
 test-asan:
 	$(MAKE) clean
 	$(MAKE) test-build CFLAGS="$(DEV_CFLAGS) $(ASAN_FLAGS)" LDFLAGS="$(ASAN_FLAGS)"
-	./$(TEST_TARGET)
+	./$(TEST_TARGET) $(TEST_FLAGS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
