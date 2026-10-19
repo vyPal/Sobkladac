@@ -50,7 +50,7 @@ int getLine(const struct Token *token) {
 
 // STRING FUNCTIONS
 
-struct String *newString(const char *text, size_t length) {
+struct String *newString(char *text, size_t length) {
   struct String *string = arena_alloc(sizeof(struct String));
   string->string = text;
   string->length = length;
@@ -108,7 +108,7 @@ struct Token *popToken(struct LinkedTlist *list) {
   return returnTk;
 }
 
-struct Token *lookAheadToken(struct LinkedTlist *list, int n) {
+struct Token *lookAheadToken(const struct LinkedTlist *list, int n) {
   if (list == NULL || n < 0)
     return NULL;
 

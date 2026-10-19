@@ -118,7 +118,7 @@ int getLine(const struct Token *token);
  * @param length Length of the string.
  * @return Pointer to the new string.
  */
-struct String *newString(const char *string, size_t length);
+struct String *newString(char *string, size_t length);
 
 /**
  * @brief Gets the contents of a string.
@@ -167,6 +167,6 @@ struct Token *popToken(struct LinkedTlist *list);
  * @param n Number of tokens to look ahead, head of the list is 0.
  * @return Pointer to the nth token in the list.
  */
-struct Token *lookAheadToken(struct LinkedTlist *list, int n);
+struct Token *lookAheadToken(const struct LinkedTlist *list, int n);
 
 #endif  // TOKEN_H
