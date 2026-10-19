@@ -1,3 +1,12 @@
+/**
+ * @file unit.c
+ * Project: IFJ26 compiler
+ * @brief Simple test runner
+ * @author Jakub Palacky <xpalacj00>
+ *
+ * Collection of basic unit tests
+ */
+
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
