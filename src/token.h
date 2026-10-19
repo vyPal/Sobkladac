@@ -118,7 +118,7 @@ int getLine(const struct Token *token);
  * @param length Length of the string.
  * @return Pointer to the new string.
  */
-struct String *newString(const char *string, size_t length);
+struct String *newString(char *string, size_t length);
 
 /**
  * @brief Gets the contents of a string.

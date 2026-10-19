@@ -6,3 +6,5 @@
  *
  * This file implements the functions for creating and manipulating lexical tokens.
  */
+
+#include "lexer.h"
