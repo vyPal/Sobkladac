@@ -49,10 +49,10 @@ struct Token {
 
 struct Token *newToken(enum TkType type);
 
-void setValue(enum VarType VarType, union Value value);
+void setValue(struct Token *token, enum VarType varType, union Value value);
 
-enum TkType getTkType(struct Token* token);
+enum TkType getTkType(struct Token *token);
 
-enum VarType getVarType(struct Token* token);
+enum VarType getVarType(struct Token *token);
 
-union Value getValue(struct Token* token);
+int getIndex(struct Token *token);
