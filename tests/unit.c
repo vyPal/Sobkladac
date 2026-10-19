@@ -22,7 +22,7 @@ tstsuite("Arena allocator", ) {
   tstcase("Zero allocation", ) {
     size_t size = 30;
     char *p = arena_zalloc(size);
-    tstassert(p != NULL, "arena_zalloc must return pointer");
+    tstcheck(p != NULL, "arena_zalloc must return pointer");
 
     int all_zero = 1;
     for (size_t i = 0; i < size; i++) {
