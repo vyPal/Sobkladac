@@ -166,4 +166,4 @@ struct Token *popToken(struct LinkedTlist *list);
  */
 struct Token *lookAheadToken(struct LinkedTlist *list, int n);
 
-#endif  // _TOKEN_H
+#endif  // TOKEN_H
