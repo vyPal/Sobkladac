@@ -14,7 +14,7 @@ enum TkType {
     Ident,      // *char
     Number,     // int
     Decimal,    // double
-    String,     // *char
+    StringTk,     // *char
     // operators
     Plus,       // +
     Minus,      // -
@@ -40,6 +40,14 @@ enum TkType {
 } TkType;
 
 /** 
+ * @brief Structure for representing a string.
+ */
+typedef struct String {
+    char *string;
+    int length;
+} String;
+
+/** 
  * @brief Union for storing values of different types.
  */
 union Value {
@@ -54,15 +62,7 @@ union Value {
 typedef struct Token {
     enum TkType type;
     int varIndex;
-};
-
-/** 
- * @brief Structure for representing a string.
- */
-typedef struct String {
-    char *string;
-    int length;
-};
+} Token;
 
 /** 
  * @brief Structure for representing a linked list of tokens.
@@ -70,7 +70,7 @@ typedef struct String {
 typedef struct LinkedTlist {
     struct Token *token;
     struct LinkedTlist *next;
-};
+} LinkedTlist;
 
 // TOKEN FUNCTIONS
 /**

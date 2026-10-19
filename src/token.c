@@ -15,40 +15,42 @@ struct Token *newToken(enum TkType type) {
     token->type = type;
     token->varIndex = -1;
     return token;
-};
+}
 
 void setValue(struct Token *token, union Value value) {
     // hash value and set the index
-};
+}
 
 enum TkType getTkType(struct Token *token) {
     return token->type;
-};
+}
 
 int getIndex(struct Token *token) {
     return token->varIndex;
-};
+}
 
 struct String *newString(char *text, int length) {
     struct String *string =  arena_alloc(sizeof(struct String));
     string->string = text;
     string->length = length;
-};
+
+    return string;
+}
 
 char *getString(struct String *string) {
     return string->string;
-};
+}
 
 int getStringLenght(struct String *string) {
     return string->length;
-};
+}
 
 struct LinkedTlist *newTlist() {
     struct LinkedTlist *list = arena_alloc(sizeof(struct LinkedTlist));
     list->next = NULL;
     list->token = NULL;
     return list;
-};
+}
 
 struct LinkedTlist *addTokenEnd(struct Token *token, struct LinkedTlist *last) {
     if (last == NULL) {
@@ -60,7 +62,7 @@ struct LinkedTlist *addTokenEnd(struct Token *token, struct LinkedTlist *last) {
     last->next = newTlist();
     last->next->token = token;
     return last->next;
-};
+}
 
 struct Token *popToken(struct LinkedTlist *list) {
     if (list == NULL)
@@ -77,10 +79,10 @@ struct Token *popToken(struct LinkedTlist *list) {
     }
     
     return returnTk;
-};
+}
 
 struct Token *getNextToken(struct LinkedTlist *list) {
     if (list->next == NULL || list == NULL)
         return NULL;
     return list->next->token;
-};
+}
