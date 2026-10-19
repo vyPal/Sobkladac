@@ -12,12 +12,12 @@ void ht_destroy(HashTable *table);
 
 bool ht_insert(HashTable *table, char *key, int value);
 
-int ht_get(HashTable *table, char *key); // -1 == key not found
+int ht_get(HashTable *table, char *key);  // -1 == key not found
 
 bool ht_remove(HashTable *table, char *key);
 
-size_t ht_size(HashTable *table);
+size_t ht_size(const HashTable *table);
 
-size_t ht_capacity(HashTable *table);
+size_t ht_capacity(const HashTable *table);
 
-#endif // HASHTABLE_H
+#endif  // HASHTABLE_H
