@@ -79,4 +79,4 @@ check: format-check cppcheck
 build-check: check dev
 
 clean:
-	rm -rf $(OBJ_DIR) $(TARGET)
+	rm -rf $(OBJ_DIR) $(TARGET) $(TEST_TARGET)

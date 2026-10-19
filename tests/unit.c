@@ -24,6 +24,8 @@ tstsuite("Arena allocator", ) {
     char *p = arena_zalloc(size);
     tstcheck(p != NULL, "arena_zalloc must return pointer");
 
+    tstcheck(((uintptr_t)p % 16) == 0, "Allocated memory must be 16-byte aligned");
+
     int all_zero = 1;
     for (size_t i = 0; i < size; i++) {
       if (p[i] != '\0') {
@@ -45,6 +47,8 @@ tstsuite("Arena allocator", ) {
     tstcheck(p2 != NULL, "Reallocation to larger size should succeed");
     tstcheck(strcmp(p2, "Hello") == 0, "Data must be preserved when expanding memory");
 
+    tstcheck(((uintptr_t)p2 % 16) == 0, "Allocated memory must be 16-byte aligned");
+
     char *p3 = arena_realloc(p2, 32, 8);
     tstcheck(p3 != NULL, "Reallocation to smaller size should succeed");
     tstcheck(strncmp(p3, "Hello", 5) == 0, "Data must be preserved when shrinking memory");
@@ -60,6 +64,8 @@ tstsuite("Arena allocator", ) {
 
     char *dup = arena_strndup(orig, 8);
     tstcheck(dup != NULL, "arena_strndup should return non-NULL pointer");
+
+    tstcheck(((uintptr_t)dup % 16) == 0, "Allocated memory must be 16-byte aligned");
 
     tstcheck(strcmp(dup, "compiler") == 0,
              "String content and NUL terminator must match the specified length");
