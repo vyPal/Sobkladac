@@ -8,8 +8,8 @@
  * manipulate tokens.
  */
 
-#ifndef _TOKEN_H
-#define _TOKEN_H
+#ifndef TOKEN_H
+#define TOKEN_H
 
 /**
  * @brief Enumeration of token types.
