@@ -54,16 +54,25 @@ struct LinkedTlist *newTlist() {
 };
 
 struct LinkedTlist *addTokenEnd(struct Token *token, struct LinkedTlist *last) {
+    if (last == NULL) {
+        last = newTlist();
+        last->token = token;
+        return last;
+    }
+
     last->next = newTlist();
     last->next->token = token;
     return last->next;
 };
 
 struct Token *popToken(struct LinkedTlist *list) {
+    if (list == NULL)
+        return NULL;
+
     struct Token *returnTk = list->token;
 
     if (list->next != NULL) {
-        list->token = nextToken(list);
+        list->token = getNextToken(list);
         list->next = list->next->next;
     }
     else {
@@ -73,8 +82,8 @@ struct Token *popToken(struct LinkedTlist *list) {
     return returnTk;
 };
 
-struct Token *nextToken(struct LinkedTlist *list) {
-    if (list->next == NULL)
+struct Token *getNextToken(struct LinkedTlist *list) {
+    if (list->next == NULL || list == NULL)
         return NULL;
     return list->next->token;
 };

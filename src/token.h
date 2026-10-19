@@ -7,6 +7,9 @@
  * This file defines the structure of a lexical token and provides functions to create and manipulate tokens.
  */
 
+ /**
+  * @brief Enumeration of token types.
+  */
 enum TkType {
     Ident,      // *char
     Number,     // int
@@ -36,6 +39,9 @@ enum TkType {
     AtMain      // @main
 } TkType;
 
+/** 
+ * @brief Enumeration of variable types. 
+*/
 enum VarType {
     None,
     Int,
@@ -43,12 +49,18 @@ enum VarType {
     String
 } VarType;
 
+/** 
+ * @brief Union for storing values of different types.
+ */
 union Value {
     int i;
     double d;
     char *string;
 } Value;
 
+/** 
+ * @brief Structure for representing a lexical token.
+ */
 struct Token {
     enum TkType type;
     enum VarType varType;
@@ -56,6 +68,9 @@ struct Token {
     int strLenght;
 } Token;
 
+/** 
+ * @brief Structure for representing a linked list of tokens.
+ */
 struct LinkedTlist {
     struct Token *token;
     struct LinkedTlist *next;
@@ -139,4 +154,4 @@ struct Token *popToken(struct LinkedTlist *list);
  * @param list Token list to get the token from.
  * @return Pointer to the next token.
  */
-struct Token *nextToken(struct LinkedTlist *list);
+struct Token *getNextToken(struct LinkedTlist *list);
