@@ -2,20 +2,21 @@
  * @file token.c
  * Project: IFJ26 compiler
  * @brief implementation of lexical token functions
- * @author Vojtěch Vítek <xvitekv00>
+ * @author Vojtech Vitek <xvitekv00>
  * 
  * This file implements the functions for creating and manipulating lexical tokens.
  */
 
 #include "token.h"
+#include "common.c"
 
 struct Token *newToken(enum TkType type) {
-    struct Token token;
-    token.type = type;
-    token.varType = None;
-    token.varIndex = -1;
-    token.strLenght = -1;
-    return &token;
+    struct Token *token = arena_alloc(sizeof(Token));
+    token->type = type;
+    token->varType = None;
+    token->varIndex = -1;
+    token->strLenght = -1;
+    return token;
 };
 
 void setValue(struct Token *token, enum VarType varType, union Value value) {
@@ -43,4 +44,37 @@ int getIndex(struct Token *token) {
 
 int getStrLenght(struct Token *token) {
     return token->strLenght;
+};
+
+struct LinkedTlist *newTlist() {
+    struct LinkedTlist *list = arena_alloc(sizeof(LinkedTlist));
+    list->next = NULL;
+    list->token = NULL;
+    return list;
+};
+
+struct LinkedTlist *addTokenEnd(struct Token *token, struct LinkedTlist *last) {
+    last->next = newTlist();
+    last->next->token = token;
+    return last->next;
+};
+
+struct Token *popToken(struct LinkedTlist *list) {
+    struct Token *returnTk = list->token;
+
+    if (list->next != NULL) {
+        list->token = nextToken(list);
+        list->next = list->next->next;
+    }
+    else {
+        list->token = NULL;
+    }
+    
+    return returnTk;
+};
+
+struct Token *nextToken(struct LinkedTlist *list) {
+    if (list->next == NULL)
+        return NULL;
+    return list->next->token;
 };
