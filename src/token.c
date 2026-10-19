@@ -14,6 +14,7 @@
 typedef struct Token {
   enum TkType type;
   union Value *value;
+  int line;
 } Token;
 
 typedef struct LinkedTlist {
@@ -25,11 +26,13 @@ struct Token *newToken(enum TkType type) {
   struct Token *token = arena_alloc(sizeof(struct Token));
   token->type = type;
   token->value = NULL;
+  token->line = -1;
   return token;
 }
 
-void setValue(struct Token *token, union Value *value) {
+void setValue(struct Token *token, union Value *value, int line) {
   token->value = value;
+  token->line = line;
 }
 
 enum TkType getTkType(struct Token *token) {
@@ -38,6 +41,10 @@ enum TkType getTkType(struct Token *token) {
 
 union Value *getValue(struct Token *token) {
   return token->value;
+}
+
+int getLine(struct Token *token) {
+  return token->line;
 }
 
 // STRING FUNCTIONS

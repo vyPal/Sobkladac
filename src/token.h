@@ -82,8 +82,9 @@ struct Token *newToken(enum TkType type);
  * @brief Sets the value of a token.
  * @param token Token to set the value for.
  * @param value Value to set.
+ * @param line Number of line the token is on.
  */
-void setValue(struct Token *token, union Value *value);
+void setValue(struct Token *token, union Value *value, int line);
 
 /**
  * @brief Gets the type of a token.
@@ -98,6 +99,13 @@ enum TkType getTkType(struct Token *token);
  * @return Pointer to the token's value.
  */
 union Value *getValue(struct Token *token);
+
+/**
+ * @brief Gets the line number of a token.
+ * @param token Token to get the line number from.
+ * @return Line number of the token.
+ */
+int getLine(struct Token *token);
 
 // STRING FUNCTIONS
 
