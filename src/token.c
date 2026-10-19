@@ -9,6 +9,8 @@
 
 #include "token.h"
 
+#include <stddef.h>
+
 #include "common.h"
 
 typedef struct Token {
