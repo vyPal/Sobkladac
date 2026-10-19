@@ -14,7 +14,7 @@ enum TkType {
     Ident,      // *char
     Number,     // int
     Decimal,    // double
-    StringTk,     // *char
+    StringTk,   // *char
     // operators
     Plus,       // +
     Minus,      // -
@@ -59,18 +59,12 @@ union Value {
 /** 
  * @brief Structure for representing a lexical token.
  */
-typedef struct Token {
-    enum TkType type;
-    union Value *value;
-} Token;
+typedef struct Token Token;
 
 /** 
  * @brief Structure for representing a linked list of tokens.
  */
-typedef struct LinkedTlist {
-    struct Token *token;
-    struct LinkedTlist *next;
-} LinkedTlist;
+typedef struct LinkedTlist LinkedTlist;
 
 // TOKEN FUNCTIONS
 /**
@@ -100,7 +94,7 @@ enum TkType getTkType(struct Token *token);
  * @param token Token to get the index for.
  * @return Index of the token.
  */
-union Value getValue(struct Token *token);
+union Value *getValue(struct Token *token);
 
 // STRING FUNCTIONS
 

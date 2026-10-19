@@ -8,7 +8,17 @@
  */
 
 #include "token.h"
-#include "common.c"
+#include "common.h"
+
+typedef struct Token {
+    enum TkType type;
+    union Value *value;
+} Token;
+
+typedef struct LinkedTlist {
+    struct Token *token;
+    struct LinkedTlist *next;
+} LinkedTlist;
 
 struct Token *newToken(enum TkType type) {
     struct Token *token = arena_alloc(sizeof(struct Token));
@@ -30,6 +40,8 @@ union Value *getValue(struct Token *token) {
     return token->value;
 }
 
+// STRING FUNCTIONS
+
 struct String *newString(char *text, int length) {
     struct String *string =  arena_alloc(sizeof(struct String));
     string->string = text;
@@ -45,6 +57,8 @@ char *getString(struct String *string) {
 int getStringLenght(struct String *string) {
     return string->length;
 }
+
+// LIST FUNCTIONS
 
 struct LinkedTlist *newTlist() {
     struct LinkedTlist *list = arena_alloc(sizeof(struct LinkedTlist));
