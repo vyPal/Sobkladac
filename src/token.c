@@ -81,6 +81,11 @@ struct LinkedTlist *pushToken(struct Token *token, struct LinkedTlist *last) {
     return last;
   }
 
+  if (last->token == NULL) {
+    last->token = token;
+    return last;
+  }
+
   last->next = newTlist();
   last->next->token = token;
   return last->next;

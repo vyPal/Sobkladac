@@ -41,7 +41,7 @@ enum TkType {
   NewLine,    // \n
   Indent,     // int (number of spaces)
   AtMain      // @main
-} TkType;
+};
 
 /**
  * @brief Structure for representing a string.
@@ -57,8 +57,8 @@ typedef struct String {
 union Value {
   int i;
   double d;
-  struct String s;
-} Value;
+  struct String *s;
+};
 
 /**
  * @brief Structure for representing a lexical token.
@@ -144,6 +144,8 @@ struct LinkedTlist *newTlist();
  * @param token Token to add.
  * @param last Last node in the token list.
  * @return Pointer to the last node in the token list.
+ * @note This function is not expected to be used after the program starts using popToken function.
+ * @note User is expected to keep pointer to both head and tail of the list.
  */
 struct LinkedTlist *pushToken(struct Token *token, struct LinkedTlist *last);
 
@@ -151,13 +153,15 @@ struct LinkedTlist *pushToken(struct Token *token, struct LinkedTlist *last);
  * @brief Removes and returns the first token from a token list.
  * @param list Token list to remove the token from.
  * @return Pointer to the removed token.
+ * @note When program starts using this function it isnt expected to use pushToken function ever
+ * again.
  */
 struct Token *popToken(struct LinkedTlist *list);
 
 /**
  * @brief Looks ahead in the token list and returns the nth token without removing it.
  * @param list Token list to look ahead in.
- * @param n Number of tokens to look ahead.
+ * @param n Number of tokens to look ahead, head of the list is 0.
  * @return Pointer to the nth token in the list.
  */
 struct Token *lookAheadToken(struct LinkedTlist *list, int n);
