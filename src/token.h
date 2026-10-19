@@ -61,7 +61,7 @@ union Value {
  */
 typedef struct Token {
     enum TkType type;
-    int varIndex;
+    union Value *value;
 } Token;
 
 /** 
@@ -86,7 +86,7 @@ struct Token *newToken(enum TkType type);
  * @param varType Type of the variable.
  * @param value Value to set.
  */
-void setValue(struct Token *token, union Value value);
+void setValue(struct Token *token, union Value *value);
 
 /**
  * @brief Gets the type of a token.
@@ -100,7 +100,7 @@ enum TkType getTkType(struct Token *token);
  * @param token Token to get the index for.
  * @return Index of the token.
  */
-int getIndex(struct Token *token);
+union Value getValue(struct Token *token);
 
 // STRING FUNCTIONS
 

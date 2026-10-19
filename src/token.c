@@ -13,20 +13,21 @@
 struct Token *newToken(enum TkType type) {
     struct Token *token = arena_alloc(sizeof(struct Token));
     token->type = type;
-    token->varIndex = -1;
+    token->value = NULL;
     return token;
 }
 
-void setValue(struct Token *token, union Value value) {
-    // hash value and set the index
+void setValue(struct Token *token, union Value *value) {
+    token->value = arena_alloc(sizeof(union Value));
+    token->value = value;
 }
 
 enum TkType getTkType(struct Token *token) {
     return token->type;
 }
 
-int getIndex(struct Token *token) {
-    return token->varIndex;
+union Value *getValue(struct Token *token) {
+    return token->value;
 }
 
 struct String *newString(char *text, int length) {
