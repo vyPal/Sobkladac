@@ -22,17 +22,16 @@ typedef struct LinkedTlist {
   struct LinkedTlist *next;
 } LinkedTlist;
 
-struct Token *newToken(enum TkType type) {
+struct Token *newToken(enum TkType type, int line) {
   struct Token *token = arena_alloc(sizeof(struct Token));
   token->type = type;
   token->value = NULL;
-  token->line = -1;
+  token->line = line;
   return token;
 }
 
-void setValue(struct Token *token, union Value *value, int line) {
+void setValue(struct Token *token, union Value *value) {
   token->value = value;
-  token->line = line;
 }
 
 enum TkType getTkType(const struct Token *token) {
@@ -49,7 +48,7 @@ int getLine(const struct Token *token) {
 
 // STRING FUNCTIONS
 
-struct String *newString(char *text, int length) {
+struct String *newString(const char *text, size_t length) {
   struct String *string = arena_alloc(sizeof(struct String));
   string->string = text;
   string->length = length;
@@ -61,13 +60,13 @@ char *getString(const struct String *string) {
   return string->string;
 }
 
-int getStringLenght(const struct String *string) {
+size_t getStringLength(const struct String *string) {
   return string->length;
 }
 
 // LIST FUNCTIONS
 
-struct LinkedTlist *newTlist() {
+struct LinkedTlist *newTlist(void) {
   struct LinkedTlist *list = arena_alloc(sizeof(struct LinkedTlist));
   list->next = NULL;
   list->token = NULL;
@@ -108,7 +107,7 @@ struct Token *popToken(struct LinkedTlist *list) {
 }
 
 struct Token *lookAheadToken(struct LinkedTlist *list, int n) {
-  if (list == NULL || n <= 0)
+  if (list == NULL || n < 0)
     return NULL;
 
   for (int i = 0; i < n && list != NULL; i++) {

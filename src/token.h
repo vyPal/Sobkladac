@@ -15,32 +15,33 @@
  * @brief Enumeration of token types.
  */
 enum TkType {
-  Ident,     // *char
-  Number,    // int
-  Decimal,   // double
-  StringTk,  // *char
+  TK_IDENT,    // *char
+  TK_NUMBER,   // int
+  TK_DECIMAL,  // double
+  TK_STRING,   // *char
   // operators
-  Plus,      // +
-  Minus,     // -
-  Multiply,  // *
-  Divide,    // /
-  Bigger,    // >
-  Smaller,   // <
-  Equal,     // ==
-  Sequal,    // <=
-  Bequal,    // >=
-  NotEqual,  // !=
+  TK_PLUS,       // +
+  TK_MINUS,      // -
+  TK_MULTIPLY,   // *
+  TK_DIVIDE,     // /
+  TK_BIGGER,     // >
+  TK_SMALLER,    // <
+  TK_EQUAL,      // ==
+  TK_SEQUAL,     // <=
+  TK_BEQUAL,     // >=
+  TK_NOT_EQUAL,  // !=
   // others
-  Colon,      // :
-  Semicolon,  // ;
-  Comma,      // ,
-  Assign,     // =
-  Pipe,       // |
-  Lbracket,   // (
-  Rbracket,   // )
-  NewLine,    // \n
-  Indent,     // int (number of spaces)
-  AtMain      // @main
+  TK_COLON,      // :
+  TK_SEMICOLON,  // ;
+  TK_COMMA,      // ,
+  TK_ASSIGN,     // =
+  TK_PIPE,       // |
+  TK_LPAREN,     // (
+  TK_RPAREN,     // )
+  TK_NEWLINE,    // \n
+  TK_INDENT,     // int (number of spaces)
+  TK_ATMAIN,     // @main
+  TK_EOF         // end of file
 };
 
 /**
@@ -48,7 +49,7 @@ enum TkType {
  */
 typedef struct String {
   char *string;
-  int length;
+  size_t length;
 } String;
 
 /**
@@ -74,17 +75,17 @@ typedef struct LinkedTlist LinkedTlist;
 /**
  * @brief Creates a new token with the specified type.
  * @param type Type of the token to create.
+ * @param line Line number where the token was found.
  * @return Pointer to the new token.
  */
-struct Token *newToken(enum TkType type);
+struct Token *newToken(enum TkType type, int line);
 
 /**
  * @brief Sets the value of a token.
  * @param token Token to set the value for.
  * @param value Value to set.
- * @param line Number of line the token is on.
  */
-void setValue(struct Token *token, union Value *value, int line);
+void setValue(struct Token *token, union Value *value);
 
 /**
  * @brief Gets the type of a token.
@@ -115,7 +116,7 @@ int getLine(const struct Token *token);
  * @param length Length of the string.
  * @return Pointer to the new string.
  */
-struct String *newString(char *string, int length);
+struct String *newString(const char *string, size_t length);
 
 /**
  * @brief Gets the contents of a string.
@@ -129,7 +130,7 @@ char *getString(const struct String *string);
  * @param string String to get the length of.
  * @return Length of the string.
  */
-int getStringLenght(const struct String *string);
+size_t getStringLength(const struct String *string);
 
 // LINKED LIST FUNCTIONS
 
@@ -137,7 +138,7 @@ int getStringLenght(const struct String *string);
  * @brief Creates a new token list.
  * @return Pointer to the new token list.
  */
-struct LinkedTlist *newTlist();
+struct LinkedTlist *newTlist(void);
 
 /**
  * @brief Adds a token to the end of a token list.
