@@ -94,7 +94,7 @@ typedef enum {
 } Ast_expression_type;
 
 /// @brief IFJ26 expression
-typedef struct Ast_expression {
+struct Ast_expression {
   Ast_expression_type expression_type;  // determines union
   Ast_location location;
   Ast_data_type deduced_data_type;  // for semantic analysis
