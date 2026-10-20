@@ -1,3 +1,19 @@
+/**
+ * @file ast.h
+ * Project: IFJ26 compiler
+ * @brief Implementation of AST header
+ * @author David Sobek <xsobekd00>
+ *
+ * Brief explanation:
+ *  PROGRAM is split into FUNCTIONS
+ *  there is one MAIN FUNCTION
+ *  FUNCTION body can be either a VALUE or a CODE BLOCK
+ *  a VALUE can be either an EXPRESSION or a FUNCTION CALL
+ *  an EXPRESSION can be a number, string, variable or an operator
+ *  a CODE BLOCK reffers to multiple COMMANDS with the same indentation
+ *  one line of IFJ26 code contains up to one COMMAND
+ */
+
 #ifndef AST_H
 #define AST_H
 
@@ -5,6 +21,43 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+
+// TODO remove:
+typedef struct Ast_program Ast_program;
+typedef struct Ast_function Ast_function;
+typedef struct Ast_function_parameter Ast_function_parameter;
+typedef struct Ast_code_block Ast_code_block;
+typedef struct Ast_command Ast_command;
+typedef struct Ast_expression Ast_expression;
+typedef struct Ast_function_call Ast_function_call;
+typedef struct Ast_function_call_argument Ast_function_call_argument;
+typedef struct Ast_value Ast_value;
+
+/// @brief source code position
+typedef struct {
+  unsigned line;
+  unsigned column;
+} Ast_location;
+
+/// @brief function body can be a value or a code block
+typedef enum {
+  VALUE,      // one line
+  CODE_BLOCK  // multiple lines
+} Ast_function_body_type;
+
+/// @brief IFJ26 command types
+typedef enum {
+  VARIABLE_DECLARATION,
+  ASSIGNEMENT,
+  FUNCTION_CALL,
+  RETURN,
+  IF,
+  WHILE,
+  EXPRESSION
+} Ast_command_type;
+
+/// @brief IFJ26 values can be expressions or function calls
+typedef enum { EXPRESSION, FUNCTION_CALL } Ast_value_type;
 
 /// @brief IFJ26 data types
 typedef enum {
@@ -30,24 +83,6 @@ typedef enum {
   NOT_EQUAL        // !=
 } Ast_operator;
 
-/// @brief source code position
-typedef struct {
-  unsigned line;
-  unsigned column;
-} Ast_location;
-
-// TODO remove:
-typedef struct Ast_program Ast_program;
-typedef struct Ast_function Ast_function;
-typedef struct Ast_function_parameter Ast_function_parameter;
-typedef struct Ast_code_block Ast_code_block;
-typedef struct Ast_code_line Ast_code_line;
-typedef struct Ast_expression Ast_expression;
-typedef struct Ast_function_call Ast_function_call;
-typedef struct Ast_function_call_argument Ast_function_call_argument;
-typedef struct Ast_value Ast_value;
-
-/// @brief Ast_expression union type
 typedef enum {
   INT_LITERAL,
   DOUBLE_LITERAL,
@@ -102,9 +137,6 @@ struct Ast_function_call {
 };
 
 /// @brief IFJ26 values can be expressions or function calls
-typedef enum { EXPRESSION, FUNCTION_CALL } Ast_value_type;
-
-/// @brief IFJ26 values can be expressions or function calls
 struct Ast_value {
   Ast_value_type type;  // determines union
   union {
@@ -113,22 +145,11 @@ struct Ast_value {
   } data;
 };
 
-/// @brief what is on a single line of IFJ26 code
-typedef enum {
-  VARIABLE_DECLARATION,
-  ASSIGNEMENT,
-  FUNCTION_CALL,
-  RETURN,
-  IF,
-  WHILE,
-  EXPRESSION
-} Ast_code_line_type;
-
-/// @brief a single line of IFJ26 code
-struct Ast_code_line {
-  Ast_code_line_type type;  // determines union
+/// @brief one line of IFJ26 code has up to one command
+struct Ast_command {
+  Ast_command_type type;  // determines union
   Ast_location location;
-  Ast_code_line *next_line;
+  Ast_command *next_command;
 
   union {
     struct {  // VARIABLE_DECLARATION
@@ -171,8 +192,8 @@ struct Ast_code_line {
 
 /// @brief a block of code in a linked list
 struct Ast_code_block {
-  Ast_code_line *first_line;
-  Ast_code_line *last_line;
+  Ast_command *first_command;
+  Ast_command *last_command;
 };
 
 /// @brief IFJ26 function parameter
@@ -181,12 +202,6 @@ struct Ast_function_parameter {
   Ast_data_type data_type;
   Ast_function_parameter *next_parameter;
 };
-
-/// @brief function body can be a value or a code block
-typedef enum {
-  VALUE,      // one line
-  CODE_BLOCK  // multiple lines
-} Ast_function_body_type;
 
 /// @brief IFJ26 function
 struct Ast_function {
@@ -197,8 +212,7 @@ struct Ast_function {
   Ast_function_parameter *first_parameter;
   Ast_function_parameter *last_parameter;
 
-  Ast_data_type declared_return_type;
-  Ast_data_type resolved_return_type;
+  Ast_data_type declared_return_type;  // has to be declared
 
   Ast_function_body_type body_type;  // determines union
   union {
@@ -219,7 +233,7 @@ Ast_program *ast_program_new(void);
 Ast_function *ast_function_new(const char *name, Ast_location location);
 Ast_function_parameter *ast_function_parameter_new(const char *name, Ast_data_type type);
 Ast_code_block *ast_code_block_new(void);
-Ast_code_line *ast_code_line_new(Ast_code_line_type type, Ast_location location);
+Ast_command *ast_code_command_new(Ast_command_type type, Ast_location location);
 Ast_expression *ast_expression_new(Ast_expression_type type, Ast_location location);
 Ast_function_call *ast_function_call_new(const char *name, Ast_location location);
 Ast_function_call_argument *ast_function_call_argument_new(Ast_expression *expression);
@@ -228,7 +242,7 @@ Ast_value *ast_value_from_function_call(Ast_function_call *function_call);
 
 void ast_program_append_function(Ast_program *program, Ast_function *function);
 void ast_function_append_parameter(Ast_function *function, Ast_function_parameter *parameter);
-void ast_block_append_line(Ast_code_block *block, Ast_code_line *line);
+void ast_block_append_command(Ast_code_block *block, Ast_command *command);
 void ast_call_append_argument(Ast_function_call *call, Ast_function_call_argument *argument);
 
 void ast_free_program(Ast_program *program);
