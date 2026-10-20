@@ -40,12 +40,12 @@ typedef struct {
 typedef struct AstProgram AstProgram;
 typedef struct AstFunction AstFunction;
 typedef struct AstParam AstParam;
-typedef struct AstBlock AstBlock;
-typedef struct AstStmt AstStmt;
+typedef struct Ast_block Ast_block;
+typedef struct Ast_code_line Ast_code_line;
 typedef struct Ast_expression Ast_expression;
-typedef struct AstCall AstCall;
-typedef struct AstCallArg AstCallArg;
-typedef struct AstValue AstValue;
+typedef struct Ast_function_call Ast_function_call;
+typedef struct Ast_function_call_argument Ast_function_call_argument;
+typedef struct Ast_value Ast_value;
 
 /// @brief Ast_expression union type
 typedef enum {
@@ -58,8 +58,9 @@ typedef enum {
   BINARY
 } Ast_expression_type;
 
+/// @brief IFJ26 expression
 typedef struct Ast_expression {
-  Ast_expression_type expression_type;
+  Ast_expression_type expression_type;  // determines union
   Ast_location location;
   Ast_data_type deduced_data_type;  // for sematic analysis
 
@@ -72,114 +73,107 @@ typedef struct Ast_expression {
     char *variable;  // VARIABLE
 
     struct {  // UNARY
-      Ast_operator ast_operator;
+      Ast_operator operator_ast;
       Ast_expression *expression;
     } unary;
 
     struct {  // BINARY
-      Ast_operator ast_operator;
+      Ast_operator operator_ast;
       Ast_expression *left_expression;
       Ast_expression *right_expression;
     } binary;
   } data;
 } Ast_expression;
 
-/* ---------- Volání funkcí a argumenty ---------- */
-
-/* Argumenty jsou v základním IFJ26 pouze termy (literály nebo proměnné),
- * nikoli libovolné výrazy. AstExpr * se zde používá pro opětovné využití
- * reprezentace literálu/proměnné; převod z parseru musí dodržet toto pravidlo.
- */
-struct AstCallArg {
-  Ast_expression *term;
-  AstCallArg *next;
+/// @brief IFJ26 function call argument
+struct Ast_function_call_argument {
+  Ast_expression *expression;
+  Ast_function_call_argument *next_argument;
 };
 
-struct AstCall {
-  char *name; /* Název volané uživatelské či vestavěné funkce. */
-  Ast_location loc;
+/// @brief IFJ26 function call
+struct Ast_function_call {
+  char *function_name;
+  Ast_location location;
 
-  AstCallArg *arguments; /* První argument, seznam je spojový. */
-  AstCallArg *arguments_last;
+  // arguments stored as linked-list
+  Ast_function_call_argument *first_argument;
+  Ast_function_call_argument *last_argument;
 };
 
-/* Některá místa IFJ26 přijímají buď výraz, nebo volání funkce
- * (např. inicializace proměnné, pravá strana přiřazení nebo návratová
- * hodnota). Tento obal zachovává rozdíl mezi těmito dvěma případy.
- */
-typedef enum { AST_VALUE_EXPR, AST_VALUE_CALL } AstValueKind;
+/// @brief IFJ26 values can be expressions or function calls
+typedef enum { EXPRESSION, FUNCTION_CALL } Ast_value_type;
 
-struct AstValue {
-  AstValueKind kind;
+/// @brief IFJ26 values can be expressions or function calls
+struct Ast_value {
+  Ast_value_type type;  // determines union
   union {
-    Ast_expression *expr;
-    AstCall *call;
-  } as;
+    Ast_expression *expression;
+    Ast_function_call *function_call;
+  } data;
 };
 
-/* ---------- Příkazy a bloky ---------- */
-
+/// @brief what is on a single line of IFJ26 code
 typedef enum {
-  AST_STMT_VAR_DECL, /* val x = ... / var x = ... */
-  AST_STMT_ASSIGN,   /* x = ... */
-  AST_STMT_CALL,     /* samostatný příkaz volání funkce */
-  AST_STMT_RETURN,   /* return ... nebo samostatné return */
-  AST_STMT_IF,       /* if ... then ... else ... */
-  AST_STMT_WHILE,    /* while ... do ... */
-  AST_STMT_EXPR      /* samostatné vyhodnocení výrazu */
-} AstStmtKind;
+  VARIABLE_DECLARATION,
+  ASSIGNEMENT,
+  FUNCTION_CALL,
+  RETURN,
+  IF,
+  WHILE,
+  EXPRESSION
+} Ast_code_line_type;
 
-struct AstStmt {
-  AstStmtKind kind; /* Určuje platnou část union 'as'. */
-  Ast_location loc;
-  AstStmt *next; /* Další příkaz ve stejném bloku, nebo NULL. */
+struct Ast_code_line {
+  Ast_code_line_type type;  // determines union
+  Ast_location location;
+  Ast_code_line *next_line;
 
   union {
-    struct { /* AST_STMT_VAR_DECL */
-      char *name;
-      bool is_mutable;             /* false pro val, true pro var */
-      bool has_explicit_type;      /* Bylo uvedeno ': Int' apod.? */
-      Ast_data_type declared_type; /* Platí, pokud has_explicit_type */
-      Ast_data_type resolved_type; /* Typ doplněný/ověřený analýzou */
-      AstValue *initializer;       /* Inicializace je povinná. */
-    } var_decl;
+    struct {  // VARIABLE_DECLARATION
+      char *variable_name;
+      bool is_mutable;  // false == val, true == var
+      Ast_data_type declared_type;
+      Ast_data_type resolved_type;
+      Ast_value *value;
+    } variable_declaration;
 
-    struct { /* AST_STMT_ASSIGN */
-      char *target_name;
-      AstValue *value;
-    } assign;
+    struct {  // ASSIGNEMENT
+      char *variable_name;
+      Ast_value *value;
+    } assignement;
 
-    struct { /* AST_STMT_CALL */
-      AstCall *call;
-    } call_stmt;
+    struct {  // FUNCTION_CALL
+      Ast_function_call *function_call;
+    } call;
 
-    struct { /* AST_STMT_RETURN */
-      AstValue *value;
-    } return_stmt;
+    struct {  // RETURN
+      Ast_value *value;
+    } return_ast;
 
-    struct { /* AST_STMT_IF */
+    struct {  // IF
       Ast_expression *condition;
-      AstBlock *then_block;
-      AstBlock *else_block; /* V základním IFJ26 je else povinné. */
-    } if_stmt;
+      Ast_block *then_block;
+      Ast_block *else_block;
+    } if_ast;
 
-    struct { /* AST_STMT_WHILE */
+    struct {  // WHILE
       Ast_expression *condition;
-      AstBlock *body;
-    } while_stmt;
+      Ast_block *block;
+    } while_ast;
 
-    struct { /* AST_STMT_EXPR */
+    struct {  // EXPRESSION
       Ast_expression *expr;
-    } expr_stmt;
-  } as;
+    } expr_ast;
+  } data;
 };
 
 /* Blok uchovává příkazy v pořadí provádění.
  * Ukazatel na poslední příkaz umožňuje přidávat příkazy v O(1) čase.
  */
-struct AstBlock {
-  AstStmt *first;
-  AstStmt *last;
+struct Ast_block {
+  Ast_code_line *first;
+  Ast_code_line *last;
 };
 
 /* ---------- Parametry a funkce ---------- */
@@ -199,7 +193,7 @@ typedef enum {
 struct AstFunction {
   char *name;
   bool is_main; /* Funkce označená anotací @main. */
-  Ast_location loc;
+  Ast_location location;
 
   AstParam *params;
   AstParam *params_last;
@@ -208,10 +202,10 @@ struct AstFunction {
   Ast_data_type declared_return_type; /* Platí, pokud je typ explicitní. */
   Ast_data_type resolved_return_type; /* Výsledný typ po sémantické analýze. */
 
-  AstFunctionBodyKind body_kind;
+  AstFunctionBodyKind body_kind;  // determines union
   union {
-    AstValue *value; /* AST_FUNCTION_BODY_VALUE */
-    AstBlock *block; /* AST_FUNCTION_BODY_BLOCK */
+    Ast_value *value; /* AST_FUNCTION_BODY_VALUE */
+    Ast_block *block; /* AST_FUNCTION_BODY_BLOCK */
   } body;
 
   AstFunction *next;
@@ -230,20 +224,20 @@ struct AstProgram {
  */
 
 AstProgram *ast_program_new(void);
-AstFunction *ast_function_new(const char *name, Ast_location loc);
+AstFunction *ast_function_new(const char *name, Ast_location location);
 AstParam *ast_param_new(const char *name, Ast_data_type type);
-AstBlock *ast_block_new(void);
-AstStmt *ast_stmt_new(AstStmtKind kind, Ast_location loc);
-Ast_expression *ast_expr_new(Ast_expression_type kind, Ast_location loc);
-AstCall *ast_call_new(const char *name, Ast_location loc);
-AstCallArg *ast_call_arg_new(Ast_expression *term);
-AstValue *ast_value_from_expr(Ast_expression *expr);
-AstValue *ast_value_from_call(AstCall *call);
+Ast_block *ast_block_new(void);
+Ast_code_line *ast_stmt_new(Ast_code_line_type kind, Ast_location location);
+Ast_expression *ast_expr_new(Ast_expression_type kind, Ast_location location);
+Ast_function_call *ast_call_new(const char *name, Ast_location location);
+Ast_function_call_argument *ast_call_arg_new(Ast_expression *term);
+Ast_value *ast_value_from_expr(Ast_expression *expr);
+Ast_value *ast_value_from_call(Ast_function_call *call);
 
 void ast_program_append_function(AstProgram *program, AstFunction *function);
 void ast_function_append_param(AstFunction *function, AstParam *param);
-void ast_block_append_stmt(AstBlock *block, AstStmt *stmt);
-void ast_call_append_arg(AstCall *call, AstCallArg *arg);
+void ast_block_append_stmt(Ast_block *block, Ast_code_line *stmt);
+void ast_call_append_arg(Ast_function_call *call, Ast_function_call_argument *arg);
 
 /* Uvolní celý AST včetně všech jeho uzlů a vlastněných řetězců. */
 void ast_free_program(AstProgram *program);
