@@ -10,7 +10,7 @@
  *  FUNCTION body can be either a VALUE or a CODE BLOCK
  *  a VALUE can be either an EXPRESSION or a FUNCTION CALL
  *  an EXPRESSION can be a number, string, variable or an operator
- *  a CODE BLOCK reffers to multiple COMMANDS with the same indentation
+ *  a CODE BLOCK refers to multiple COMMANDS with the same indentation
  *  one line of IFJ26 code contains up to one COMMAND
  */
 
@@ -97,7 +97,7 @@ typedef enum {
 typedef struct Ast_expression {
   Ast_expression_type expression_type;  // determines union
   Ast_location location;
-  Ast_data_type deduced_data_type;  // for sematic analysis
+  Ast_data_type deduced_data_type;  // for semantic analysis
 
   union {
     int32_t int_value;    // INT_LITERAL
