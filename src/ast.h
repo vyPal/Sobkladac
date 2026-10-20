@@ -37,10 +37,10 @@ typedef struct {
 } Ast_location;
 
 // TODO remove:
-typedef struct AstProgram AstProgram;
-typedef struct AstFunction AstFunction;
-typedef struct AstParam AstParam;
-typedef struct Ast_block Ast_block;
+typedef struct Ast_program Ast_program;
+typedef struct Ast_function Ast_function;
+typedef struct Ast_function_parameter Ast_function_parameter;
+typedef struct Ast_code_block Ast_code_block;
 typedef struct Ast_code_line Ast_code_line;
 typedef struct Ast_expression Ast_expression;
 typedef struct Ast_function_call Ast_function_call;
@@ -124,6 +124,7 @@ typedef enum {
   EXPRESSION
 } Ast_code_line_type;
 
+/// @brief a single line of IFJ26 code
 struct Ast_code_line {
   Ast_code_line_type type;  // determines union
   Ast_location location;
@@ -153,99 +154,83 @@ struct Ast_code_line {
 
     struct {  // IF
       Ast_expression *condition;
-      Ast_block *then_block;
-      Ast_block *else_block;
+      Ast_code_block *then_block;
+      Ast_code_block *else_block;
     } if_ast;
 
     struct {  // WHILE
       Ast_expression *condition;
-      Ast_block *block;
+      Ast_code_block *code_block;
     } while_ast;
 
     struct {  // EXPRESSION
-      Ast_expression *expr;
-    } expr_ast;
+      Ast_expression *expression;
+    } expression_ast;
   } data;
 };
 
-/* Blok uchovává příkazy v pořadí provádění.
- * Ukazatel na poslední příkaz umožňuje přidávat příkazy v O(1) čase.
- */
-struct Ast_block {
-  Ast_code_line *first;
-  Ast_code_line *last;
+/// @brief a block of code in a linked list
+struct Ast_code_block {
+  Ast_code_line *first_line;
+  Ast_code_line *last_line;
 };
 
-/* ---------- Parametry a funkce ---------- */
-
-struct AstParam {
-  char *name;
-  Ast_data_type type; /* Parametr má v základním IFJ26 explicitní typ. */
-  bool symbol_resolved;
-  AstParam *next;
+/// @brief IFJ26 function parameter
+struct Ast_function_parameter {
+  char *parameter_name;
+  Ast_data_type data_type;
+  Ast_function_parameter *next_parameter;
 };
 
+/// @brief function body can be a value or a code block
 typedef enum {
-  AST_FUNCTION_BODY_VALUE, /* Jednořádkové tělo: výraz nebo volání. */
-  AST_FUNCTION_BODY_BLOCK  /* Víceřádkové odsazené tělo. */
-} AstFunctionBodyKind;
+  VALUE,      // one line
+  CODE_BLOCK  // multiple lines
+} Ast_function_body_type;
 
-struct AstFunction {
-  char *name;
-  bool is_main; /* Funkce označená anotací @main. */
+/// @brief IFJ26 function
+struct Ast_function {
+  char *function_name;
+  bool is_main;  // @main
   Ast_location location;
 
-  AstParam *params;
-  AstParam *params_last;
+  Ast_function_parameter *first_parameter;
+  Ast_function_parameter *last_parameter;
 
-  bool has_explicit_return_type;      /* Byl napsán ': Int', ': Unit' atd.? */
-  Ast_data_type declared_return_type; /* Platí, pokud je typ explicitní. */
-  Ast_data_type resolved_return_type; /* Výsledný typ po sémantické analýze. */
+  Ast_data_type declared_return_type;
+  Ast_data_type resolved_return_type;
 
-  AstFunctionBodyKind body_kind;  // determines union
+  Ast_function_body_type body_type;  // determines union
   union {
-    Ast_value *value; /* AST_FUNCTION_BODY_VALUE */
-    Ast_block *block; /* AST_FUNCTION_BODY_BLOCK */
+    Ast_value *value;            // VALUE
+    Ast_code_block *code_block;  // BLOCK
   } body;
 
-  AstFunction *next;
+  Ast_function *next_function;
 };
 
-/* ---------- Celý program ---------- */
-
-struct AstProgram {
-  AstFunction *functions;      /* První funkce v programu. */
-  AstFunction *functions_last; /* Poslední funkce, pro přidávání O(1). */
+/// @brief whole program
+struct Ast_program {
+  Ast_function *firsst_function;
+  Ast_function *last_function;
 };
 
-/* ---------- Základní API modulu ast.c ----------
- * Následující funkce jsou pouze deklarace. Jejich implementace patří
- * do ast.c. Pokud si tým zvolí jiné rozhraní, můžete je upravit.
- */
+Ast_program *ast_program_new(void);
+Ast_function *ast_function_new(const char *name, Ast_location location);
+Ast_function_parameter *ast_function_parameter_new(const char *name, Ast_data_type type);
+Ast_code_block *ast_code_block_new(void);
+Ast_code_line *ast_code_line_new(Ast_code_line_type type, Ast_location location);
+Ast_expression *ast_expression_new(Ast_expression_type type, Ast_location location);
+Ast_function_call *ast_function_call_new(const char *name, Ast_location location);
+Ast_function_call_argument *ast_function_call_argument_new(Ast_expression *expression);
+Ast_value *ast_value_from_expr(Ast_expression *expression);
+Ast_value *ast_value_from_function_call(Ast_function_call *function_call);
 
-AstProgram *ast_program_new(void);
-AstFunction *ast_function_new(const char *name, Ast_location location);
-AstParam *ast_param_new(const char *name, Ast_data_type type);
-Ast_block *ast_block_new(void);
-Ast_code_line *ast_stmt_new(Ast_code_line_type kind, Ast_location location);
-Ast_expression *ast_expr_new(Ast_expression_type kind, Ast_location location);
-Ast_function_call *ast_call_new(const char *name, Ast_location location);
-Ast_function_call_argument *ast_call_arg_new(Ast_expression *term);
-Ast_value *ast_value_from_expr(Ast_expression *expr);
-Ast_value *ast_value_from_call(Ast_function_call *call);
+void ast_program_append_function(Ast_program *program, Ast_function *function);
+void ast_function_append_parameter(Ast_function *function, Ast_function_parameter *parameter);
+void ast_block_append_line(Ast_code_block *block, Ast_code_line *line);
+void ast_call_append_argument(Ast_function_call *call, Ast_function_call_argument *argument);
 
-void ast_program_append_function(AstProgram *program, AstFunction *function);
-void ast_function_append_param(AstFunction *function, AstParam *param);
-void ast_block_append_stmt(Ast_block *block, Ast_code_line *stmt);
-void ast_call_append_arg(Ast_function_call *call, Ast_function_call_argument *arg);
-
-/* Uvolní celý AST včetně všech jeho uzlů a vlastněných řetězců. */
-void ast_free_program(AstProgram *program);
-
-/* Pomocné funkce pro ladění; výpis směřuje do předaného streamu,
- * při ladění překladače se typicky použije stderr, nikdy stdout.
- */
-const char *ast_type_name(Ast_data_type type);
-void ast_dump_program(const AstProgram *program, FILE *out);
+void ast_free_program(Ast_program *program);
 
 #endif  // AST_H
