@@ -48,7 +48,7 @@ typedef enum {
 /// @brief IFJ26 command types
 typedef enum {
   VARIABLE_DECLARATION,
-  ASSIGNEMENT,
+  ASSIGNMENT,
   FUNCTION_CALL,
   RETURN,
   IF,
@@ -57,7 +57,7 @@ typedef enum {
 } Ast_command_type;
 
 /// @brief IFJ26 values can be expressions or function calls
-typedef enum { EXPRESSION, FUNCTION_CALL } Ast_value_type;
+typedef enum { VALUE_EXPRESSION, VALUE_FUNCTION_CALL } Ast_value_type;
 
 /// @brief IFJ26 data types
 typedef enum {
@@ -118,7 +118,7 @@ typedef struct Ast_expression {
       Ast_expression *right_expression;
     } binary;
   } data;
-} Ast_expression;
+};
 
 /// @brief IFJ26 function call argument
 struct Ast_function_call_argument {
@@ -160,10 +160,10 @@ struct Ast_command {
       Ast_value *value;
     } variable_declaration;
 
-    struct {  // ASSIGNEMENT
+    struct {  // ASSIGNMENT
       char *variable_name;
       Ast_value *value;
-    } assignement;
+    } assignment;
 
     struct {  // FUNCTION_CALL
       Ast_function_call *function_call;
@@ -225,7 +225,7 @@ struct Ast_function {
 
 /// @brief whole program
 struct Ast_program {
-  Ast_function *firsst_function;
+  Ast_function *first_function;
   Ast_function *last_function;
 };
 
