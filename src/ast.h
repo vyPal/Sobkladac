@@ -22,7 +22,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-// TODO remove:
 typedef struct Ast_program Ast_program;
 typedef struct Ast_function Ast_function;
 typedef struct Ast_function_parameter Ast_function_parameter;
