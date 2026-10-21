@@ -23,16 +23,16 @@ typedef struct HashTable HashTable;
 HashTable *htCreate(size_t initialCapacity);
 
 /// @brief Inserts a key-value pair into the hash table.
-bool htInsert(HashTable *table, char *key, void *value);
+bool htInsert(HashTable *table, const char *key, void *value);
 
 /// @brief Checks whether a key exists in the hash table.
-bool htContains(HashTable *table, char *key);
+bool htContains(HashTable *table, const char *key);
 
 /// @brief Retrieves the value associated with a key.
-void *htGet(HashTable *table, char *key);
+void *htGet(HashTable *table, const char *key);
 
 /// @brief Removes a key-value pair from the hash table.
-bool htRemove(HashTable *table, char *key);
+bool htRemove(HashTable *table, const char *key);
 
 /// @brief Returns the number of entries in the hash table.
 size_t htSize(const HashTable *table);

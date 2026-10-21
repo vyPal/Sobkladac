@@ -88,7 +88,7 @@ static bool resizeTable(HashTable *table) {
   return true;
 }
 
-bool htInsert(HashTable *table, char *key, void *value) {
+bool htInsert(HashTable *table, const char *key, void *value) {
   size_t index;
   HTEntry *entry;
   char *keyCopy;
@@ -129,7 +129,7 @@ bool htInsert(HashTable *table, char *key, void *value) {
   return true;
 }
 
-bool htContains(HashTable *table, char *key) {
+bool htContains(HashTable *table, const char *key) {
   size_t index;
   HTEntry *entry;
 
@@ -151,7 +151,7 @@ bool htContains(HashTable *table, char *key) {
   return false;
 }
 
-void *htGet(HashTable *table, char *key) {
+void *htGet(HashTable *table, const char *key) {
   size_t index;
   HTEntry *entry;
 
@@ -173,7 +173,7 @@ void *htGet(HashTable *table, char *key) {
   return NULL;
 }
 
-bool htRemove(HashTable *table, char *key) {
+bool htRemove(HashTable *table, const char *key) {
   size_t index;
   HTEntry *entry;
   HTEntry *previous = NULL;
