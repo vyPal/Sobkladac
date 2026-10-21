@@ -1,3 +1,11 @@
+/**
+ * @file hashtable.h
+ * @brief Hash table implementation for string keys and generic values.
+ * @author David Sobek <xsobekd00>
+ *
+ * hashtable.h implementation
+ */
+
 #include "hashtable.h"
 
 #include <stdlib.h>
@@ -15,7 +23,7 @@ struct HashTable {
   size_t size;
 };
 
-// A simple string hash function (a variation of djb2)
+/// @brief A simple string hash function (a variation of djb2)
 static size_t hashString(const char *key) {
   size_t hash = 5381;
 
@@ -66,7 +74,7 @@ HashTable *htCreate(size_t initialCapacity) {
   return table;
 }
 
-// Double the bucket array size and rehash all entries
+/// @brief Double the bucket array size and rehash all entries
 static bool resizeTable(HashTable *table) {
   size_t newCapacity;
   HTEntry **newBuckets;

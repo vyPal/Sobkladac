@@ -1,3 +1,12 @@
+/**
+ * @file hashtable.h
+ * @brief Hash table implementation for string keys and generic values.
+ * @author David Sobek <xsobekd00>
+ *
+ * Provides a hash table that stores string keys and associated values using separate chaining to
+ * handle collisions. The table automatically resizes when it reaches a load factor of 75%.
+ */
+
 #ifndef HASHTABLE_H
 #define HASHTABLE_H
 
@@ -6,20 +15,32 @@
 
 typedef struct HashTable HashTable;
 
+/**
+ * @brief Creates a new hash table.
+ * @param initialCapacity Initial number of buckets. If zero, the default capacity of 256 is used.
+ * @return Pointer to the created hash table, or NULL if memory allocation fails.
+ */
 HashTable *htCreate(size_t initialCapacity);
 
+/// @brief Destroys a hash table and frees its allocated memory.
 void htDestroy(HashTable *table);
 
+/// @brief Inserts a key-value pair into the hash table.
 bool htInsert(HashTable *table, char *key, void *value);
 
+/// @brief Checks whether a key exists in the hash table.
 bool htContains(HashTable *table, char *key);
 
-void *htGet(HashTable *table, char *key);  // NULL == key not found
+/// @brief Retrieves the value associated with a key.
+void *htGet(HashTable *table, char *key);
 
+/// @brief Removes a key-value pair from the hash table.
 bool htRemove(HashTable *table, char *key);
 
+/// @brief Returns the number of entries in the hash table.
 size_t htSize(const HashTable *table);
 
+/// @brief Returns the current number of buckets in the hash table.
 size_t htCapacity(const HashTable *table);
 
 #endif  // HASHTABLE_H
