@@ -23,7 +23,7 @@ TEST_FLAGS := --report-error
 
 FORMAT_FILES := $(wildcard $(SRC_DIR)/*.c $(SRC_DIR)/*.h $(TEST_DIR)/*.c $(TEST_DIR)/*.h)
 
-.PHONY: all build dev asan test-build test test-asan check format format-check tidy cppcheck build-check clean
+.PHONY: all build dev asan test-build test test-asan check format format-check tidy cppcheck build-check clean check-all
 
 all: build
 
@@ -77,6 +77,8 @@ tidy:
 check: format-check cppcheck
 
 build-check: check dev
+
+check-all: build-check tidy asan
 
 clean:
 	rm -rf $(OBJ_DIR) $(TARGET) $(TEST_TARGET)
