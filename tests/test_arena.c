@@ -1,10 +1,10 @@
 /**
- * @file unit.c
+ * @file test_arena.c
  * Project: IFJ26 compiler
- * @brief Simple test runner
+ * @brief Arena allocator unit tests
  * @author Jakub Palacky <xpalacj00>
  *
- * Collection of basic unit tests
+ * Tests for the arena allocator in common.c
  */
 
 #include <stddef.h>
