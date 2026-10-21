@@ -5,5 +5,18 @@ Checks: >
   clang-analyzer-*,
   misc-include-cleaner,
   readability-misleading-indentation,
+  readability-identifier-naming,
   -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
-WarningsAsErrors: ""
+WarningsAsErrors: "readability-identifier-naming"
+HeaderFilterRegex: "src/.*"
+CheckOptions:
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.UnionCase: CamelCase
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.TypedefCase: CamelCase
+  readability-identifier-naming.FunctionCase: camelBack
+  readability-identifier-naming.EnumConstantCase: UPPER_CASE
+  readability-identifier-naming.MacroDefinitionCase: UPPER_CASE
+  readability-identifier-naming.VariableCase: camelBack
+  readability-identifier-naming.ParameterCase: camelBack
+  readability-identifier-naming.MemberCase: camelBack
