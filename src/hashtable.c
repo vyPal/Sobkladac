@@ -171,6 +171,28 @@ bool htInsert(HashTable *table, char *key, void *value) {
   return true;
 }
 
+bool htContains(HashTable *table, char *key) {
+  size_t index;
+  HTEntry *entry;
+
+  if (table == NULL || key == NULL) {
+    return false;
+  }
+
+  index = getIndex(key, table->capacity);
+  entry = table->buckets[index];
+
+  while (entry != NULL) {
+    if (strcmp(entry->key, key) == 0) {
+      return true;
+    }
+
+    entry = entry->next;
+  }
+
+  return false;
+}
+
 void *htGet(HashTable *table, char *key) {
   size_t index;
   HTEntry *entry;

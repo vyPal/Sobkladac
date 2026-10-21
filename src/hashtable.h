@@ -12,6 +12,8 @@ void htDestroy(HashTable *table);
 
 bool htInsert(HashTable *table, char *key, void *value);
 
+bool htContains(HashTable *table, char *key);
+
 void *htGet(HashTable *table, char *key);  // NULL == key not found
 
 bool htRemove(HashTable *table, char *key);
