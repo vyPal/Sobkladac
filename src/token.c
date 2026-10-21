@@ -25,7 +25,7 @@ typedef struct LinkedTlist {
 } LinkedTlist;
 
 struct Token *newToken(enum TkType type, int line) {
-  struct Token *token = arena_alloc(sizeof(struct Token));
+  struct Token *token = arenaAlloc(sizeof(struct Token));
   token->type = type;
   token->value = NULL;
   token->line = line;
@@ -51,7 +51,7 @@ int getLine(const struct Token *token) {
 // STRING FUNCTIONS
 
 struct String *newString(char *text, size_t length) {
-  struct String *string = arena_alloc(sizeof(struct String));
+  struct String *string = arenaAlloc(sizeof(struct String));
   string->string = text;
   string->length = length;
 
@@ -69,7 +69,7 @@ size_t getStringLength(const struct String *string) {
 // LIST FUNCTIONS
 
 struct LinkedTlist *newTlist(void) {
-  struct LinkedTlist *list = arena_alloc(sizeof(struct LinkedTlist));
+  struct LinkedTlist *list = arenaAlloc(sizeof(struct LinkedTlist));
   list->next = NULL;
   list->token = NULL;
   return list;

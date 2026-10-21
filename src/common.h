@@ -58,7 +58,7 @@ void die(int code, int line, const char *fmt, ...)
  * @note Allocated memory is uninitialized
  * @note Allocated memory is 16-byte aligned and is guaranteed to live until cleanup or reallocation
  */
-void *arena_alloc(size_t n);
+void *arenaAlloc(size_t n);
 
 /**
  * @brief Allocates n bytes of zeroed memory in the arena allocator
@@ -68,7 +68,7 @@ void *arena_alloc(size_t n);
  * @note If you plan to reallocate later, keep current size saved somewhere
  * @note Allocated memory is 16-byte aligned and is guaranteed to live until cleanup or reallocation
  */
-void *arena_zalloc(size_t n);
+void *arenaZalloc(size_t n);
 
 /**
  * @brief Reallocates pointer from `o` bytes to `n` bytes of memory
@@ -81,7 +81,7 @@ void *arena_zalloc(size_t n);
  * @note Keeps `min(o,n)` bytes, old pointer shouldn't be used afterwards
  * @warning Passing an inaccurate value of `o` may result in undefined behavior
  */
-void *arena_realloc(void *p, size_t o, size_t n);
+void *arenaRealloc(void *p, size_t o, size_t n);
 
 /**
  * @brief Duplicates a string using the arena allocator for allocating a destination address
@@ -93,13 +93,13 @@ void *arena_realloc(void *p, size_t o, size_t n);
  * @note Function doesn't stop on an embedded NUL, the caller must ensure `s` has at least `n`
  * readable bytes
  */
-char *arena_strndup(const char *s, size_t n);
+char *arenaStrndup(const char *s, size_t n);
 
 /**
  * @brief Frees all memory held by arena allocator
  * @warning Calling this function makes all previously allocated pointers invalid
  * @note It is recommended to use the `die()` function instead if exiting with non-zero code
  */
-void arena_cleanup(void);
+void arenaCleanup(void);
 
 #endif  // !COMMON_H
