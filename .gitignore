@@ -1,6 +1,5 @@
 /obj/
 /ifj26
-/test_ifj26
 *.o
 *.d
 /compile_commands.json
