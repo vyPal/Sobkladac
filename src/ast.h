@@ -211,7 +211,8 @@ struct Ast_function {
   Ast_function_parameter *first_parameter;
   Ast_function_parameter *last_parameter;
 
-  Ast_data_type declared_return_type;  // has to be declared
+  Ast_data_type declared_return_type;
+  Ast_data_type resolved_return_type;
 
   Ast_function_body_type body_type;  // determines union
   union {
