@@ -17,7 +17,7 @@ struct HashTable {
 };
 
 // A simple string hash function (a variation of djb2)
-static size_t hash_string(char *key) {
+static size_t hashString(char *key) {
   size_t hash = 5381;
 
   while (*key != '\0') {
@@ -28,11 +28,11 @@ static size_t hash_string(char *key) {
   return hash;
 }
 
-static size_t get_index(char *key, size_t capacity) {
-  return hash_string(key) % capacity;
+static size_t getIndex(char *key, size_t capacity) {
+  return hashString(key) % capacity;
 }
 
-static char *copy_string(const char *text) {
+static char *copyString(const char *text) {
   size_t length = strlen(text) + 1;
   char *copy = malloc(length);
 
@@ -43,11 +43,11 @@ static char *copy_string(const char *text) {
   return copy;
 }
 
-HashTable *ht_create(size_t initial_capacity) {
+HashTable *htCreate(size_t initialCapacity) {
   HashTable *table;
 
-  if (initial_capacity == 0) {
-    initial_capacity = 4;
+  if (initialCapacity == 0) {
+    initialCapacity = 4;
   }
 
   table = malloc(sizeof(HashTable));
@@ -55,28 +55,28 @@ HashTable *ht_create(size_t initial_capacity) {
     return NULL;
   }
 
-  table->buckets = calloc(initial_capacity, sizeof(HTEntry *));
+  table->buckets = calloc(initialCapacity, sizeof(HTEntry *));
   if (table->buckets == NULL) {
     free(table);
     return NULL;
   }
 
-  table->capacity = initial_capacity;
+  table->capacity = initialCapacity;
   table->size = 0;
 
   return table;
 }
 
 // Double the bucket array size and rehash all entries
-static bool resize_table(HashTable *table) {
-  size_t new_capacity;
-  HTEntry **new_buckets;
+static bool resizeTable(HashTable *table) {
+  size_t newCapacity;
+  HTEntry **newBuckets;
   size_t i;
 
-  new_capacity = table->capacity * 2;
+  newCapacity = table->capacity * 2;
 
-  new_buckets = calloc(new_capacity, sizeof(HTEntry *));
-  if (new_buckets == NULL) {
+  newBuckets = calloc(newCapacity, sizeof(HTEntry *));
+  if (newBuckets == NULL) {
     return false;
   }
 
@@ -85,22 +85,22 @@ static bool resize_table(HashTable *table) {
 
     while (entry != NULL) {
       HTEntry *next = entry->next;
-      size_t index = get_index(entry->key, new_capacity);
+      size_t index = getIndex(entry->key, newCapacity);
 
-      entry->next = new_buckets[index];
-      new_buckets[index] = entry;
+      entry->next = newBuckets[index];
+      newBuckets[index] = entry;
       entry = next;
     }
   }
 
   free(table->buckets);
-  table->buckets = new_buckets;
-  table->capacity = new_capacity;
+  table->buckets = newBuckets;
+  table->capacity = newCapacity;
 
   return true;
 }
 
-void ht_destroy(HashTable *table) {
+void htDestroy(HashTable *table) {
   size_t i;
 
   if (table == NULL) {
@@ -122,16 +122,16 @@ void ht_destroy(HashTable *table) {
   free(table);
 }
 
-bool ht_insert(HashTable *table, char *key, int value) {
+bool htInsert(HashTable *table, char *key, int value) {
   size_t index;
   HTEntry *entry;
-  char *key_copy;
+  char *keyCopy;
 
   if (table == NULL || key == NULL) {
     return false;
   }
 
-  index = get_index(key, table->capacity);
+  index = getIndex(key, table->capacity);
   entry = table->buckets[index];
 
   // Update the value if the key is already in the table
@@ -146,24 +146,24 @@ bool ht_insert(HashTable *table, char *key, int value) {
 
   // Resize when the table is 75% full
   if (table->size >= table->capacity * 3 / 4) {
-    if (!resize_table(table)) {
+    if (!resizeTable(table)) {
       return false;
     }
   }
 
-  key_copy = copy_string(key);
-  if (key_copy == NULL) {
+  keyCopy = copyString(key);
+  if (keyCopy == NULL) {
     return false;
   }
 
   entry = malloc(sizeof(HTEntry));
   if (entry == NULL) {
-    free(key_copy);
+    free(keyCopy);
     return false;
   }
 
-  index = get_index(key, table->capacity);
-  entry->key = key_copy;
+  index = getIndex(key, table->capacity);
+  entry->key = keyCopy;
   entry->value = value;
   entry->next = table->buckets[index];
   table->buckets[index] = entry;
@@ -172,7 +172,7 @@ bool ht_insert(HashTable *table, char *key, int value) {
   return true;
 }
 
-int ht_get(HashTable *table, char *key) {
+int htGet(HashTable *table, char *key) {
   size_t index;
   HTEntry *entry;
 
@@ -180,7 +180,7 @@ int ht_get(HashTable *table, char *key) {
     return -1;
   }
 
-  index = get_index(key, table->capacity);
+  index = getIndex(key, table->capacity);
   entry = table->buckets[index];
 
   while (entry != NULL) {
@@ -193,7 +193,7 @@ int ht_get(HashTable *table, char *key) {
   return -1;
 }
 
-bool ht_remove(HashTable *table, char *key) {
+bool htRemove(HashTable *table, char *key) {
   size_t index;
   HTEntry *entry;
   HTEntry *previous = NULL;
@@ -202,7 +202,7 @@ bool ht_remove(HashTable *table, char *key) {
     return false;
   }
 
-  index = get_index(key, table->capacity);
+  index = getIndex(key, table->capacity);
   entry = table->buckets[index];
 
   while (entry != NULL) {
@@ -226,7 +226,7 @@ bool ht_remove(HashTable *table, char *key) {
   return false;
 }
 
-size_t ht_size(const HashTable *table) {
+size_t htSize(const HashTable *table) {
   if (table == NULL) {
     return 0;
   }
@@ -234,7 +234,7 @@ size_t ht_size(const HashTable *table) {
   return table->size;
 }
 
-size_t ht_capacity(const HashTable *table) {
+size_t htCapacity(const HashTable *table) {
   if (table == NULL) {
     return 0;
   }

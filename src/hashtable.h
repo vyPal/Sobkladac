@@ -6,18 +6,18 @@
 
 typedef struct HashTable HashTable;
 
-HashTable *ht_create(size_t initial_capacity);
+HashTable *htCreate(size_t initialCapacity);
 
-void ht_destroy(HashTable *table);
+void htDestroy(HashTable *table);
 
-bool ht_insert(HashTable *table, char *key, int value);
+bool htInsert(HashTable *table, char *key, int value);
 
-int ht_get(HashTable *table, char *key);  // -1 == key not found
+int htGet(HashTable *table, char *key);  // -1 == key not found
 
-bool ht_remove(HashTable *table, char *key);
+bool htRemove(HashTable *table, char *key);
 
-size_t ht_size(const HashTable *table);
+size_t htSize(const HashTable *table);
 
-size_t ht_capacity(const HashTable *table);
+size_t htCapacity(const HashTable *table);
 
 #endif  // HASHTABLE_H
