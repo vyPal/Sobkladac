@@ -131,7 +131,7 @@ bool htInsert(HashTable *table, const char *key, void *value) {
 
 bool htContains(HashTable *table, const char *key) {
   size_t index;
-  HTEntry *entry;
+  const HTEntry *entry;
 
   if (table == NULL || key == NULL) {
     return false;
