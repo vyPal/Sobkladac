@@ -16,7 +16,7 @@ struct HashTable {
 };
 
 // A simple string hash function (a variation of djb2)
-static size_t hashString(char *key) {
+static size_t hashString(const char *key) {
   size_t hash = 5381;
 
   while (*key != '\0') {
@@ -27,7 +27,7 @@ static size_t hashString(char *key) {
   return hash;
 }
 
-static size_t getIndex(char *key, size_t capacity) {
+static size_t getIndex(const char *key, size_t capacity) {
   return hashString(key) % capacity;
 }
 
