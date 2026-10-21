@@ -46,7 +46,7 @@ HashTable *htCreate(size_t initialCapacity) {
   HashTable *table;
 
   if (initialCapacity == 0) {
-    initialCapacity = 4;
+    initialCapacity = 256;  // default capacity
   }
 
   table = malloc(sizeof(HashTable));
