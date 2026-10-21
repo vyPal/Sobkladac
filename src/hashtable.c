@@ -145,9 +145,7 @@ bool htInsert(HashTable *table, char *key, void *value) {
 
   // Resize when the table is 75% full
   if (table->size >= table->capacity * 3 / 4) {
-    if (!resizeTable(table)) {
-      return false;
-    }
+    resizeTable(table);
   }
 
   keyCopy = copyString(key);
