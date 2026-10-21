@@ -1,12 +1,11 @@
 #include "hashtable.h"
 
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 typedef struct HTEntry {
   char *key;
-  int value;
+  void *value;
   struct HTEntry *next;
 } HTEntry;
 
@@ -122,7 +121,7 @@ void htDestroy(HashTable *table) {
   free(table);
 }
 
-bool htInsert(HashTable *table, char *key, int value) {
+bool htInsert(HashTable *table, char *key, void *value) {
   size_t index;
   HTEntry *entry;
   char *keyCopy;
@@ -172,12 +171,12 @@ bool htInsert(HashTable *table, char *key, int value) {
   return true;
 }
 
-int htGet(HashTable *table, char *key) {
+void *htGet(HashTable *table, char *key) {
   size_t index;
   HTEntry *entry;
 
   if (table == NULL || key == NULL) {
-    return -1;
+    return NULL;
   }
 
   index = getIndex(key, table->capacity);
@@ -187,10 +186,11 @@ int htGet(HashTable *table, char *key) {
     if (strcmp(entry->key, key) == 0) {
       return entry->value;
     }
+
     entry = entry->next;
   }
 
-  return -1;
+  return NULL;
 }
 
 bool htRemove(HashTable *table, char *key) {

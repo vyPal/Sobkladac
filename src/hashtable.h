@@ -10,9 +10,9 @@ HashTable *htCreate(size_t initialCapacity);
 
 void htDestroy(HashTable *table);
 
-bool htInsert(HashTable *table, char *key, int value);
+bool htInsert(HashTable *table, char *key, void *value);
 
-int htGet(HashTable *table, char *key);  // -1 == key not found
+void *htGet(HashTable *table, char *key);  // NULL == key not found
 
 bool htRemove(HashTable *table, char *key);
 
