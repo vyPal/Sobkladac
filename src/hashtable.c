@@ -1,15 +1,16 @@
 /**
- * @file hashtable.h
+ * @file hashtable.c
  * @brief Hash table implementation for string keys and generic values.
  * @author David Sobek <xsobekd00>
  *
- * hashtable.h implementation
+ * Hash table implementation using the arena allocator.
  */
 
 #include "hashtable.h"
 
-#include <stdlib.h>
 #include <string.h>
+
+#include "common.h"
 
 typedef struct HTEntry {
   char *key;
@@ -40,14 +41,7 @@ static size_t getIndex(const char *key, size_t capacity) {
 }
 
 static char *copyString(const char *text) {
-  size_t length = strlen(text) + 1;
-  char *copy = malloc(length);
-
-  if (copy != NULL) {
-    strcpy(copy, text);
-  }
-
-  return copy;
+  return arenaStrndup(text, strlen(text));
 }
 
 HashTable *htCreate(size_t initialCapacity) {
@@ -57,17 +51,9 @@ HashTable *htCreate(size_t initialCapacity) {
     initialCapacity = 256;  // default capacity
   }
 
-  table = malloc(sizeof(HashTable));
-  if (table == NULL) {
-    return NULL;
-  }
+  table = arenaAlloc(sizeof(HashTable));
 
-  table->buckets = calloc(initialCapacity, sizeof(HTEntry *));
-  if (table->buckets == NULL) {
-    free(table);
-    return NULL;
-  }
-
+  table->buckets = arenaZalloc(initialCapacity * sizeof(HTEntry *));
   table->capacity = initialCapacity;
   table->size = 0;
 
@@ -81,11 +67,7 @@ static bool resizeTable(HashTable *table) {
   size_t i;
 
   newCapacity = table->capacity * 2;
-
-  newBuckets = calloc(newCapacity, sizeof(HTEntry *));
-  if (newBuckets == NULL) {
-    return false;
-  }
+  newBuckets = arenaZalloc(newCapacity * sizeof(HTEntry *));
 
   for (i = 0; i < table->capacity; i++) {
     HTEntry *entry = table->buckets[i];
@@ -100,33 +82,10 @@ static bool resizeTable(HashTable *table) {
     }
   }
 
-  free(table->buckets);
   table->buckets = newBuckets;
   table->capacity = newCapacity;
 
   return true;
-}
-
-void htDestroy(HashTable *table) {
-  size_t i;
-
-  if (table == NULL) {
-    return;
-  }
-
-  for (i = 0; i < table->capacity; i++) {
-    HTEntry *entry = table->buckets[i];
-
-    while (entry != NULL) {
-      HTEntry *next = entry->next;
-      free(entry->key);
-      free(entry);
-      entry = next;
-    }
-  }
-
-  free(table->buckets);
-  free(table);
 }
 
 bool htInsert(HashTable *table, char *key, void *value) {
@@ -141,7 +100,7 @@ bool htInsert(HashTable *table, char *key, void *value) {
   index = getIndex(key, table->capacity);
   entry = table->buckets[index];
 
-  // Update the value if the key is already in the table
+  // Update the value if the key is already in the table.
   while (entry != NULL) {
     if (strcmp(entry->key, key) == 0) {
       entry->value = value;
@@ -151,21 +110,14 @@ bool htInsert(HashTable *table, char *key, void *value) {
     entry = entry->next;
   }
 
-  // Resize when the table is 75% full
+  // Resize when the table is 75% full.
   if (table->size >= table->capacity * 3 / 4) {
     resizeTable(table);
   }
 
   keyCopy = copyString(key);
-  if (keyCopy == NULL) {
-    return false;
-  }
 
-  entry = malloc(sizeof(HTEntry));
-  if (entry == NULL) {
-    free(keyCopy);
-    return false;
-  }
+  entry = arenaAlloc(sizeof(HTEntry));
 
   index = getIndex(key, table->capacity);
   entry->key = keyCopy;
@@ -241,8 +193,6 @@ bool htRemove(HashTable *table, char *key) {
         previous->next = entry->next;
       }
 
-      free(entry->key);
-      free(entry);
       table->size--;
       return true;
     }

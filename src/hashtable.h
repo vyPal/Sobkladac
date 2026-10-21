@@ -5,6 +5,7 @@
  *
  * Provides a hash table that stores string keys and associated values using separate chaining to
  * handle collisions. The table automatically resizes when it reaches a load factor of 75%.
+ * Memory is managed by arena allocator.
  */
 
 #ifndef HASHTABLE_H
@@ -17,13 +18,9 @@ typedef struct HashTable HashTable;
 
 /**
  * @brief Creates a new hash table.
- * @param initialCapacity Initial number of buckets. If zero, the default capacity of 256 is used.
- * @return Pointer to the created hash table, or NULL if memory allocation fails.
+ * @param initialCapacity If zero, the default capacity of 256 is used.
  */
 HashTable *htCreate(size_t initialCapacity);
-
-/// @brief Destroys a hash table and frees its allocated memory.
-void htDestroy(HashTable *table);
 
 /// @brief Inserts a key-value pair into the hash table.
 bool htInsert(HashTable *table, char *key, void *value);
