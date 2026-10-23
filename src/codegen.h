@@ -14,6 +14,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "ast.h"
 #include "strbuf.h"
 
 typedef enum {
@@ -180,5 +181,7 @@ void emitInstr(StringBuilder *out, Opcode op, const Operand *args, size_t argc);
 
 char *newLabel(const char *func, const char *desc);
 char *newVar(const char *name);
+
+char *generateCode(AstProgram program);
 
 #endif  // !CODEGEN_H
