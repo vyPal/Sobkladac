@@ -33,6 +33,93 @@ LinkedTlist *lexerMain() {
     }
 
     switch (nextChar) {
+      case '\n':
+        listLastToken = pushToken(newToken(TK_NEWLINE, line), listLastToken);
+        int indentCount = 0;
+        while (preloadedChar == false) {
+          nextCharInt = fgetc(stdin);
+          nextChar = (char)nextCharInt;
+          position++;
+
+          if (nextChar == ' ') {
+            indentCount++;
+          } else {
+            preloadedChar = true;
+            Token *tk = newToken(TK_INDENT, line);
+            setValue(tk, indentCount);
+            listLastToken = pushToken(tk, listLastToken);
+          }
+        }
+        break;
+      case '@':
+        nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar != 'm')
+          // error
+          nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar != 'a')
+          // error
+          nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar != 'i')
+          // error
+          nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar != 'n')
+          // error
+          break;
+
+        // signs
+      case '>':
+        nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar == '=') {
+          listLastToken = pushToken(newToken(TK_BEQUAL, line), listLastToken);
+        } else {
+          listLastToken = pushToken(newToken(TK_BIGGER, line), listLastToken);
+          preloadedChar = true;
+        }
+        break;
+      case '<':
+        nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar == '=') {
+          listLastToken = pushToken(newToken(TK_SMALLER, line), listLastToken);
+        } else {
+          listLastToken = pushToken(newToken(TK_SEQUAL, line), listLastToken);
+          preloadedChar = true;
+        }
+        break;
+      case '=':
+        nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar == '=') {
+          listLastToken = pushToken(newToken(TK_EQUAL, line), listLastToken);
+        } else {
+          listLastToken = pushToken(newToken(TK_ASSIGN, line), listLastToken);
+          preloadedChar = true;
+        }
+        break;
+      case '!':
+        nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar != '=') {
+          // error
+        } else {
+          listLastToken = pushToken(newToken(TK_NOT_EQUAL, line), listLastToken);
+        }
+        break;
+
+        // one line tokens
       case '+':
         listLastToken = pushToken(newToken(TK_PLUS, line), listLastToken);
         break;
@@ -61,10 +148,11 @@ LinkedTlist *lexerMain() {
         listLastToken = pushToken(newToken(TK_COMMA, line), listLastToken);
         break;
       default:
+        // error
         break;
     }
   }
   listLastToken = pushToken(newToken(TK_EOF, line), listLastToken);
 
-  return NULL;
+  return tokenList;
 }
