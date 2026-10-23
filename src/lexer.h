@@ -14,3 +14,5 @@
 #define LEXER_H
 
 #endif  // LEXER_H
+
+LinkedTlist *lexerMain();
