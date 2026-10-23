@@ -4,7 +4,7 @@
  * @author David Sobek <xsobekd00>
  *
  * Provides a hash table that stores string keys and associated values using separate chaining to
- * handle collisions. The table automatically resizes when it reaches a load factor of 75%.
+ * handle collisions. The table automatically doubles its size when it reaches a load factor of 75%.
  * Memory is managed by arena allocator.
  */
 
