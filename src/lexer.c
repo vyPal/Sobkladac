@@ -12,6 +12,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "common.h"
+
 LinkedTlist *lexerMain() {
   int line = 1;
   int position = 0;
@@ -56,23 +58,27 @@ LinkedTlist *lexerMain() {
         nextChar = (char)nextCharInt;
         position++;
         if (nextChar != 'm')
-          // error
-          nextCharInt = fgetc(stdin);
+          die(1, line, "Unexpected character at line %d colum %d, expected \"@main\"", line,
+              position);
+        nextCharInt = fgetc(stdin);
         nextChar = (char)nextCharInt;
         position++;
         if (nextChar != 'a')
-          // error
-          nextCharInt = fgetc(stdin);
+          die(1, line, "Unexpected character at line %d colum %d, expected \"@main\"", line,
+              position);
+        nextCharInt = fgetc(stdin);
         nextChar = (char)nextCharInt;
         position++;
         if (nextChar != 'i')
-          // error
-          nextCharInt = fgetc(stdin);
+          die(1, line, "Unexpected character at line %d colum %d, expected \"@main\"", line,
+              position);
+        nextCharInt = fgetc(stdin);
         nextChar = (char)nextCharInt;
         position++;
         if (nextChar != 'n')
-          // error
-          break;
+          die(1, line, "Unexpected character at line %d colum %d, expected \"@main\"", line,
+              position);
+        break;
 
         // signs
       case '>':
@@ -113,7 +119,7 @@ LinkedTlist *lexerMain() {
         nextChar = (char)nextCharInt;
         position++;
         if (nextChar != '=') {
-          // error
+          die(1, line, "Unexpected character at line %d colum %d, expected \"!=\"", line, position);
         } else {
           listLastToken = pushToken(newToken(TK_NOT_EQUAL, line), listLastToken);
         }
@@ -130,7 +136,34 @@ LinkedTlist *lexerMain() {
         listLastToken = pushToken(newToken(TK_MULTIPLY, line), listLastToken);
         break;
       case '/':
-        listLastToken = pushToken(newToken(TK_DIVIDE, line), listLastToken);
+        nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar == '/') {
+          while (nextChar != '\n') {
+            nextCharInt = fgetc(stdin);
+            nextChar = (char)nextCharInt;
+            position++;
+          }
+          preloadedChar = true;
+        } else if (nextChar == '*') {
+          bool endComment = false;
+          while (!endComment) {
+            nextCharInt = fgetc(stdin);
+            nextChar = (char)nextCharInt;
+            position++;
+            if (nextChar == '*') {
+              nextCharInt = fgetc(stdin);
+              nextChar = (char)nextCharInt;
+              position++;
+              if (nextChar == '/')
+                endComment = true;
+            }
+          }
+        } else {
+          listLastToken = pushToken(newToken(TK_DIVIDE, line), listLastToken);
+          preloadedChar = true;
+        }
         break;
       case '(':
         listLastToken = pushToken(newToken(TK_LPAREN, line), listLastToken);
@@ -147,8 +180,10 @@ LinkedTlist *lexerMain() {
       case ',':
         listLastToken = pushToken(newToken(TK_COMMA, line), listLastToken);
         break;
+      case ' ':
+        break;
       default:
-        // error
+        die(1, line, "Unexpected character at line %d colum %d", line, position);
         break;
     }
   }
