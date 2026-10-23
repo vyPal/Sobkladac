@@ -12,13 +12,12 @@
 #include <string.h>
 
 #include "common.h"
-#include "hashtable.c"
+#include "hashtable.h"
 #include "tst.h"
 
 tstsuite("HashTable", ) {
   tstcase("htCreate", ) {
-    HashTable *ht = arenaZalloc(sizeof(HashTable));
-    ht = htCreate(0);
+    HashTable *ht = htCreate(0);
     tstcheck(ht != NULL, "hashtable should be created");
   }
   /*
