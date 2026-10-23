@@ -64,6 +64,7 @@ typedef enum {
   INT,     // 32bit signed integer
   DOUBLE,  // 64bit float IEEE 754
   STRING,  // unmodifiable character list
+  BOOL,    // true/false
   UNIT     // nothing
 } AstDataType;
 
@@ -102,6 +103,8 @@ struct AstExpression {
     int32_t intValue;    // INT_LITERAL
     double doubleValue;  // DOUBLE_LITERAL
     char *stringValue;   // STRING_LITERAL
+    bool boolValue;      // BOOL
+
     // UNIT_LITERAL (no data)
 
     char *variable;  // VARIABLE
