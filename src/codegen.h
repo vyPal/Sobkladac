@@ -170,6 +170,15 @@ extern const InstrInfo instrInfo[OP_COUNT];
 
 bool instrValidate(Opcode op, const Operand *args, size_t argc);
 
+void emitOperand(StringBuilder *out, Operand op);
 void emitInstr(StringBuilder *out, Opcode op, const Operand *args, size_t argc);
+
+#define EMIT(out, op, ...)                                  \
+  emitInstr((out), OP_##op, (const Operand[]){__VA_ARGS__}, \
+            sizeof((const Operand[]){__VA_ARGS__}) / sizeof(Operand))
+#define EMIT0(out, op) emitInstr((out), OP_##op, NULL, 0)
+
+char *newLabel(const char *func, const char *desc);
+char *newVar(const char *name);
 
 #endif  // !CODEGEN_H
