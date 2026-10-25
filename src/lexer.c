@@ -58,6 +58,7 @@ LinkedTlist *lexerMain() {
             position++;
 
             char *str = arena_alloc(sizeof(char));
+            str[0] = '\0';
             int startLine = line;
             while (nextChar != '"') {
               if (nextCharInt == EOF)
@@ -66,11 +67,11 @@ LinkedTlist *lexerMain() {
               else if (nextChar == '\n') {
                 line++;
                 position = 0;
-                addChar(str, nextChar);
+                addChar(&str, nextChar);
               } else if (nextChar == '\\') {
                 strEscape(str, &position, &line);
               } else
-                addChar(str, nextChar);
+                addChar(&str, nextChar);
 
               nextCharInt = fgetc(stdin);
               nextChar = (char)nextCharInt;
@@ -106,6 +107,7 @@ LinkedTlist *lexerMain() {
           position++;
 
           char *str = arena_alloc(sizeof(char));
+          str[0] = '\0';
           while (nextChar != '"') {
             if (nextCharInt == EOF)
               die(1, line, "Unexpected end of file while parsing string at line %d colum %d", line,
@@ -116,7 +118,7 @@ LinkedTlist *lexerMain() {
             } else if (nextChar == '\\') {
               strEscape(str, &position, &line);
             } else
-              addChar(str, nextChar);
+              addChar(&str, nextChar);
 
             nextCharInt = fgetc(stdin);
             nextChar = (char)nextCharInt;
@@ -128,6 +130,7 @@ LinkedTlist *lexerMain() {
           setValue(tk, string);
           lastToken = pushToken(tk, lastToken);
         }
+        break;
       // number
       case '0':
         while (nextChar == '0' || nextChar == '_') {
@@ -135,12 +138,22 @@ LinkedTlist *lexerMain() {
           nextChar = (char)nextCharInt;
           position++;
           if (nextChar == '_')
-            // function
-            break;
+            numUnderscore(&nextChar, &position, &line, true);
+          break;
         }
-        Token *tk = newToken(TK_NUMBER, line);
-        setValue(tk, 0);
-        lastToken = pushToken(tk, lastToken);
+        if (nextChar == '.' || nextChar == 'e' || nextChar == 'E') {
+          numDecimal(lastToken, &nextChar, 0, &line, &position, &preloadedChar);
+        } else {
+          preloadedChar = true;
+          Token *tk = newToken(TK_NUMBER, line);
+          int zero = 0;
+          setValue(tk, &zero);
+          lastToken = pushToken(tk, lastToken);
+        }
+        break;
+      // decimal
+      case '.':
+        numDecimal(lastToken, &nextChar, 0, &line, &position, &preloadedChar);
         break;
       // other
       case '\n':
@@ -158,7 +171,8 @@ LinkedTlist *lexerMain() {
           } else {
             preloadedChar = true;
             Token *tk = newToken(TK_INDENT, line);
-            setValue(tk, indentCount);
+            int indent = indentCount;
+            setValue(tk, &indent);
             lastToken = pushToken(tk, lastToken);
           }
         }
@@ -301,7 +315,47 @@ LinkedTlist *lexerMain() {
       case ' ':
         break;
       default:
-        die(1, line, "Unexpected character at line %d colum %d", line, position);
+        // identifier
+        if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z')) {
+          char *str = arena_alloc(sizeof(char));
+          str[0] = nextChar;
+          str[1] = '\0';
+          while (true) {
+            nextCharInt = fgetc(stdin);
+            nextChar = (char)nextCharInt;
+            position++;
+            if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z') ||
+                (nextChar >= '0' && nextChar <= '9') || nextChar == '_') {
+              addChar(&str, nextChar);
+            } else {
+              preloadedChar = true;
+              break;
+            }
+          }
+          Token *tk = newToken(TK_IDENT, line);
+          String *string = newString(str, strlen(str));
+          setValue(tk, string);
+          lastToken = pushToken(tk, lastToken);
+        }
+        // number
+        else if (nextChar >= '1' && nextChar <= '9') {
+          int integer = nextChar - '0';
+          while ((nextChar >= '0' && nextChar <= '9') || nextChar == '_') {
+            if (nextChar == '_') {
+              numUnderscore(&nextChar, &position, &line, false);
+            } else
+              integer = integer * 10 + (nextChar - '0');
+          }
+          if (nextChar == '.' || nextChar == 'e' || nextChar == 'E') {
+            numDecimal(lastToken, &nextChar, integer, &line, &position, &preloadedChar);
+          } else {
+            preloadedChar = true;
+            Token *tk = newToken(TK_NUMBER, line);
+            setValue(tk, &integer);
+            lastToken = pushToken(tk, lastToken);
+          }
+        } else
+          die(1, line, "Unexpected character at line %d colum %d", line, position);
         break;
     }
   }
@@ -310,11 +364,11 @@ LinkedTlist *lexerMain() {
   return tokenList;
 }
 
-void addChar(char *str, char c) {
-  str = arena_realloc(str, strlen(str) + 1, strlen(str) + 2);
-  size_t len = strlen(str);
-  str[len] = c;
-  str[len + 1] = '\0';
+void addChar(char **str, char c) {
+  size_t len = strlen(*str);
+  *str = arena_realloc(*str, len + 1, len + 2);
+  (*str)[len] = c;
+  (*str)[len + 1] = '\0';
 }
 
 void strEscape(char *str, int *position, int *line) {
@@ -331,22 +385,103 @@ void strEscape(char *str, int *position, int *line) {
 
   switch (nextChar) {
     case '\\':
-      addChar(str, '\\');
+      addChar(&str, '\\');
       break;
     case '"':
-      addChar(str, '"');
+      addChar(&str, '"');
       break;
     case 'n':
-      addChar(str, '\n');
+      addChar(&str, '\n');
       break;
     case 't':
-      addChar(str, '\t');
+      addChar(&str, '\t');
       break;
     case 'r':
-      addChar(str, '\r');
+      addChar(&str, '\r');
       break;
     default:
       die(1, *line, "Unexpected character after \"\\\" at line %d colum %d", *line, *position);
       break;
+  }
+}
+
+void numUnderscore(char *nextChar, int *position, int *line, bool isZero) {
+  int nextCharInt;
+
+  nextCharInt = fgetc(stdin);
+  *nextChar = (char)nextCharInt;
+  (*position)++;
+
+  while (*nextChar == '_') {
+    nextCharInt = fgetc(stdin);
+    *nextChar = (char)nextCharInt;
+    (*position)++;
+  }
+
+  if ((*nextChar < '0' || *nextChar > '9') && !isZero) {
+    die(1, *line, "Unexpected character after \"_\" at line %d colum %d, expected digit", *line,
+        *position);
+  } else if (*nextChar != '0' && isZero) {
+    die(1, *line, "Unexpected character after \"_\" at line %d colum %d, expected \"0\"", *line,
+        *position);
+  }
+}
+
+void numDecimal(LinkedTlist *lastToken, char *nextChar, int integer, int *line, int *position,
+                bool *preloadedChar) {
+  int nextCharInt;
+  double decimal = (double)integer;
+  int decExp = -1;
+
+  if (*nextChar == '.') {
+    nextCharInt = fgetc(stdin);
+    *nextChar = (char)nextCharInt;
+    (*position)++;
+    while ((*nextChar >= '0' && *nextChar <= '9') || *nextChar == '_') {
+      if (*nextChar == '_') {
+        numUnderscore(nextChar, position, line, false);
+      }
+      decimal = decimal + ((*nextChar - '0') * pow(10, decExp));
+
+      nextCharInt = fgetc(stdin);
+      *nextChar = (char)nextCharInt;
+      (*position)++;
+      decExp--;
+    }
+  }
+  if (*nextChar == 'e' || *nextChar == 'E') {
+    nextCharInt = fgetc(stdin);
+    *nextChar = (char)nextCharInt;
+    (*position)++;
+    int expSign = 1;
+    if (*nextChar == '+' || *nextChar == '-') {
+      if (*nextChar == '-')
+        expSign = -1;
+
+      nextCharInt = fgetc(stdin);
+      *nextChar = (char)nextCharInt;
+      (*position)++;
+    }
+
+    int exponent = 0;
+    while ((*nextChar >= '0' && *nextChar <= '9') || *nextChar == '_') {
+      if (*nextChar == '_') {
+        numUnderscore(nextChar, position, line, false);
+      }
+      exponent = exponent * 10 + (*nextChar - '0');
+
+      nextCharInt = fgetc(stdin);
+      *nextChar = (char)nextCharInt;
+      (*position)++;
+    }
+    if (*nextChar != 'd' && *nextChar != 'D') {
+      *preloadedChar = true;
+    }
+
+    decimal *= pow(10, expSign * exponent);
+
+    Token *tk = newToken(TK_DECIMAL, *line);
+    setValue(tk, &decimal);
+    lastToken = pushToken(tk, lastToken);
   }
 }
