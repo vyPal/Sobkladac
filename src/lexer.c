@@ -23,7 +23,7 @@ LinkedTlist *lexerMain() {
   int nextCharInt;
 
   LinkedTlist *tokenList = newTlist();
-  LinkedTlist *listLastToken = tokenList;
+  LinkedTlist *lastToken = tokenList;
 
   while (nextCharInt != EOF) {
     if (preloadedChar) {
@@ -35,8 +35,118 @@ LinkedTlist *lexerMain() {
     }
 
     switch (nextChar) {
+      // string
+      case '"':
+        nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        // multi line string
+        if (nextChar == '"') {
+          nextCharInt = fgetc(stdin);
+          nextChar = (char)nextCharInt;
+          position++;
+          // empty string
+          if (nextChar != '"') {
+            preloadedChar = true;
+            Token *tk = newToken(TK_STRING, line);
+            String *string = newString("", 0);
+            setValue(tk, string);
+            lastToken = pushToken(tk, lastToken);
+          } else {
+            nextCharInt = fgetc(stdin);
+            nextChar = (char)nextCharInt;
+            position++;
+
+            char *str = arena_alloc(sizeof(char));
+            int startLine = line;
+            while (nextChar != '"') {
+              if (nextCharInt == EOF)
+                die(1, line, "Unexpected end of file while parsing string at line %d colum %d",
+                    line, position);
+              else if (nextChar == '\n') {
+                line++;
+                position = 0;
+                addChar(str, nextChar);
+              } else if (nextChar == '\\') {
+                strEscape(str, &position, &line);
+              } else
+                addChar(str, nextChar);
+
+              nextCharInt = fgetc(stdin);
+              nextChar = (char)nextCharInt;
+              position++;
+            }
+            // check for closing quotes
+            nextCharInt = fgetc(stdin);
+            nextChar = (char)nextCharInt;
+            position++;
+            if (nextChar != '"') {
+              die(1, line, "Unexpected character at line %d colum %d, expected \"\"\"", line,
+                  position);
+            }
+            nextCharInt = fgetc(stdin);
+            nextChar = (char)nextCharInt;
+            position++;
+            if (nextChar != '"') {
+              die(1, line, "Unexpected character at line %d colum %d, expected \"\"\"", line,
+                  position);
+            }
+
+            // write token
+            Token *tk = newToken(TK_STRING, startLine);
+            String *string = newString(str, strlen(str));
+            setValue(tk, string);
+            lastToken = pushToken(tk, lastToken);
+          }
+        }
+        // single line string
+        else {
+          nextCharInt = fgetc(stdin);
+          nextChar = (char)nextCharInt;
+          position++;
+
+          char *str = arena_alloc(sizeof(char));
+          while (nextChar != '"') {
+            if (nextCharInt == EOF)
+              die(1, line, "Unexpected end of file while parsing string at line %d colum %d", line,
+                  position);
+            else if (nextChar == '\n') {
+              die(1, line, "Unexpected newline while parsing string at line %d colum %d", line,
+                  position);
+            } else if (nextChar == '\\') {
+              strEscape(str, &position, &line);
+            } else
+              addChar(str, nextChar);
+
+            nextCharInt = fgetc(stdin);
+            nextChar = (char)nextCharInt;
+            position++;
+          }
+          // write token
+          Token *tk = newToken(TK_STRING, line);
+          String *string = newString(str, strlen(str));
+          setValue(tk, string);
+          lastToken = pushToken(tk, lastToken);
+        }
+      // number
+      case '0':
+        while (nextChar == '0' || nextChar == '_') {
+          nextCharInt = fgetc(stdin);
+          nextChar = (char)nextCharInt;
+          position++;
+          if (nextChar == '_')
+            // function
+            break;
+        }
+        Token *tk = newToken(TK_NUMBER, line);
+        setValue(tk, 0);
+        lastToken = pushToken(tk, lastToken);
+        break;
+      // other
       case '\n':
-        listLastToken = pushToken(newToken(TK_NEWLINE, line), listLastToken);
+        lastToken = pushToken(newToken(TK_NEWLINE, line), lastToken);
+        line++;
+        position = 0;
         int indentCount = 0;
         while (preloadedChar == false) {
           nextCharInt = fgetc(stdin);
@@ -49,7 +159,7 @@ LinkedTlist *lexerMain() {
             preloadedChar = true;
             Token *tk = newToken(TK_INDENT, line);
             setValue(tk, indentCount);
-            listLastToken = pushToken(tk, listLastToken);
+            lastToken = pushToken(tk, lastToken);
           }
         }
         break;
@@ -86,9 +196,9 @@ LinkedTlist *lexerMain() {
         nextChar = (char)nextCharInt;
         position++;
         if (nextChar == '=') {
-          listLastToken = pushToken(newToken(TK_BEQUAL, line), listLastToken);
+          lastToken = pushToken(newToken(TK_BEQUAL, line), lastToken);
         } else {
-          listLastToken = pushToken(newToken(TK_BIGGER, line), listLastToken);
+          lastToken = pushToken(newToken(TK_BIGGER, line), lastToken);
           preloadedChar = true;
         }
         break;
@@ -97,9 +207,9 @@ LinkedTlist *lexerMain() {
         nextChar = (char)nextCharInt;
         position++;
         if (nextChar == '=') {
-          listLastToken = pushToken(newToken(TK_SMALLER, line), listLastToken);
+          lastToken = pushToken(newToken(TK_SMALLER, line), lastToken);
         } else {
-          listLastToken = pushToken(newToken(TK_SEQUAL, line), listLastToken);
+          lastToken = pushToken(newToken(TK_SEQUAL, line), lastToken);
           preloadedChar = true;
         }
         break;
@@ -108,9 +218,9 @@ LinkedTlist *lexerMain() {
         nextChar = (char)nextCharInt;
         position++;
         if (nextChar == '=') {
-          listLastToken = pushToken(newToken(TK_EQUAL, line), listLastToken);
+          lastToken = pushToken(newToken(TK_EQUAL, line), lastToken);
         } else {
-          listLastToken = pushToken(newToken(TK_ASSIGN, line), listLastToken);
+          lastToken = pushToken(newToken(TK_ASSIGN, line), lastToken);
           preloadedChar = true;
         }
         break;
@@ -121,26 +231,26 @@ LinkedTlist *lexerMain() {
         if (nextChar != '=') {
           die(1, line, "Unexpected character at line %d colum %d, expected \"!=\"", line, position);
         } else {
-          listLastToken = pushToken(newToken(TK_NOT_EQUAL, line), listLastToken);
+          lastToken = pushToken(newToken(TK_NOT_EQUAL, line), lastToken);
         }
         break;
 
         // one line tokens
       case '+':
-        listLastToken = pushToken(newToken(TK_PLUS, line), listLastToken);
+        lastToken = pushToken(newToken(TK_PLUS, line), lastToken);
         break;
       case '-':
-        listLastToken = pushToken(newToken(TK_MINUS, line), listLastToken);
+        lastToken = pushToken(newToken(TK_MINUS, line), lastToken);
         break;
       case '*':
-        listLastToken = pushToken(newToken(TK_MULTIPLY, line), listLastToken);
+        lastToken = pushToken(newToken(TK_MULTIPLY, line), lastToken);
         break;
       case '/':
         nextCharInt = fgetc(stdin);
         nextChar = (char)nextCharInt;
         position++;
         if (nextChar == '/') {
-          while (nextChar != '\n') {
+          while (nextChar != '\n' && nextCharInt != EOF) {
             nextCharInt = fgetc(stdin);
             nextChar = (char)nextCharInt;
             position++;
@@ -158,27 +268,35 @@ LinkedTlist *lexerMain() {
               position++;
               if (nextChar == '/')
                 endComment = true;
-            }
+            } else if (nextChar == '\n') {
+              position = 0;
+              line++;
+            } else if (nextCharInt == EOF)
+              die(1, line, "Unexpected end of file while parsing comment at line %d colum %d", line,
+                  position);
           }
         } else {
-          listLastToken = pushToken(newToken(TK_DIVIDE, line), listLastToken);
+          lastToken = pushToken(newToken(TK_DIVIDE, line), lastToken);
           preloadedChar = true;
         }
         break;
       case '(':
-        listLastToken = pushToken(newToken(TK_LPAREN, line), listLastToken);
+        lastToken = pushToken(newToken(TK_LPAREN, line), lastToken);
         break;
       case ')':
-        listLastToken = pushToken(newToken(TK_RPAREN, line), listLastToken);
+        lastToken = pushToken(newToken(TK_RPAREN, line), lastToken);
         break;
       case ':':
-        listLastToken = pushToken(newToken(TK_COLON, line), listLastToken);
+        lastToken = pushToken(newToken(TK_COLON, line), lastToken);
         break;
       case ';':
-        listLastToken = pushToken(newToken(TK_SEMICOLON, line), listLastToken);
+        lastToken = pushToken(newToken(TK_SEMICOLON, line), lastToken);
         break;
       case ',':
-        listLastToken = pushToken(newToken(TK_COMMA, line), listLastToken);
+        lastToken = pushToken(newToken(TK_COMMA, line), lastToken);
+        break;
+      case '|':
+        lastToken = pushToken(newToken(TK_PIPE, line), lastToken);
         break;
       case ' ':
         break;
@@ -187,7 +305,48 @@ LinkedTlist *lexerMain() {
         break;
     }
   }
-  listLastToken = pushToken(newToken(TK_EOF, line), listLastToken);
+  lastToken = pushToken(newToken(TK_EOF, line), lastToken);
 
   return tokenList;
+}
+
+void addChar(char *str, char c) {
+  str = arena_realloc(str, strlen(str) + 1, strlen(str) + 2);
+  size_t len = strlen(str);
+  str[len] = c;
+  str[len + 1] = '\0';
+}
+
+void strEscape(char *str, int *position, int *line) {
+  char nextChar;
+  int nextCharInt;
+
+  nextCharInt = fgetc(stdin);
+  nextChar = (char)nextCharInt;
+  (*position)++;
+
+  if (nextCharInt == EOF)
+    die(1, *line, "Unexpected end of file while parsing string at line %d colum %d", *line,
+        *position);
+
+  switch (nextChar) {
+    case '\\':
+      addChar(str, '\\');
+      break;
+    case '"':
+      addChar(str, '"');
+      break;
+    case 'n':
+      addChar(str, '\n');
+      break;
+    case 't':
+      addChar(str, '\t');
+      break;
+    case 'r':
+      addChar(str, '\r');
+      break;
+    default:
+      die(1, *line, "Unexpected character after \"\\\" at line %d colum %d", *line, *position);
+      break;
+  }
 }
