@@ -13,6 +13,6 @@
 #ifndef LEXER_H
 #define LEXER_H
 
-#endif  // LEXER_H
+LinkedTlist *lexerMain(void);
 
-LinkedTlist *lexerMain();
+#endif  // LEXER_H
