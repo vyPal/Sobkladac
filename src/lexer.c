@@ -9,18 +9,144 @@
 
 #include "lexer.h"
 
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "common.h"
+
+void addChar(char **str, char c) {
+  size_t len = strlen(*str);
+  *str = arenaRealloc(*str, len + 1, len + 2);
+  (*str)[len] = c;
+  (*str)[len + 1] = '\0';
+}
+
+void strEscape(char *str, int *position, int *line) {
+  char nextChar;
+  int nextCharInt;
+
+  nextCharInt = fgetc(stdin);
+  nextChar = (char)nextCharInt;
+  (*position)++;
+
+  if (nextCharInt == EOF)
+    die(1, *line, "Unexpected end of file while parsing string at line %d colum %d", *line,
+        *position);
+
+  switch (nextChar) {
+    case '\\':
+      addChar(&str, '\\');
+      break;
+    case '"':
+      addChar(&str, '"');
+      break;
+    case 'n':
+      addChar(&str, '\n');
+      break;
+    case 't':
+      addChar(&str, '\t');
+      break;
+    case 'r':
+      addChar(&str, '\r');
+      break;
+    default:
+      die(1, *line, "Unexpected character after \"\\\" at line %d colum %d", *line, *position);
+      break;
+  }
+}
+
+void numUnderscore(char *nextChar, int *position, int *line, bool isZero) {
+  int nextCharInt;
+
+  nextCharInt = fgetc(stdin);
+  *nextChar = (char)nextCharInt;
+  (*position)++;
+
+  while (*nextChar == '_') {
+    nextCharInt = fgetc(stdin);
+    *nextChar = (char)nextCharInt;
+    (*position)++;
+  }
+
+  if ((*nextChar < '0' || *nextChar > '9') && !isZero) {
+    die(1, *line, "Unexpected character after \"_\" at line %d colum %d, expected digit", *line,
+        *position);
+  } else if (*nextChar != '0' && isZero) {
+    die(1, *line, "Unexpected character after \"_\" at line %d colum %d, expected \"0\"", *line,
+        *position);
+  }
+}
+
+void numDecimal(LinkedTlist **lastToken, char *nextChar, int integer, int *line, int *position,
+                bool *preloadedChar) {
+  int nextCharInt;
+  double decimal = (double)integer;
+
+  if (*nextChar == '.') {
+    nextCharInt = fgetc(stdin);
+    *nextChar = (char)nextCharInt;
+    (*position)++;
+    int decExp = -1;
+    while ((*nextChar >= '0' && *nextChar <= '9') || *nextChar == '_') {
+      if (*nextChar == '_') {
+        numUnderscore(nextChar, position, line, false);
+      }
+      decimal = decimal + ((*nextChar - '0') * pow(10, decExp));
+
+      nextCharInt = fgetc(stdin);
+      *nextChar = (char)nextCharInt;
+      (*position)++;
+      decExp--;
+    }
+  }
+  if (*nextChar == 'e' || *nextChar == 'E') {
+    nextCharInt = fgetc(stdin);
+    *nextChar = (char)nextCharInt;
+    (*position)++;
+    int expSign = 1;
+    if (*nextChar == '+' || *nextChar == '-') {
+      if (*nextChar == '-')
+        expSign = -1;
+
+      nextCharInt = fgetc(stdin);
+      *nextChar = (char)nextCharInt;
+      (*position)++;
+    }
+
+    int exponent = 0;
+    while ((*nextChar >= '0' && *nextChar <= '9') || *nextChar == '_') {
+      if (*nextChar == '_') {
+        numUnderscore(nextChar, position, line, false);
+      }
+      exponent = exponent * 10 + (*nextChar - '0');
+
+      nextCharInt = fgetc(stdin);
+      *nextChar = (char)nextCharInt;
+      (*position)++;
+    }
+    if (*nextChar != 'd' && *nextChar != 'D') {
+      *preloadedChar = true;
+    }
+
+    decimal *= pow(10, expSign * exponent);
+
+    Token *tk = newToken(TK_DECIMAL, *line);
+    union Value *value = arenaAlloc(sizeof(union Value));
+    value->d = decimal;
+    setValue(tk, value);
+    *lastToken = pushToken(tk, *lastToken);
+  }
+}
 
 LinkedTlist *lexerMain() {
   int line = 1;
   int position = 0;
 
-  bool preloadedChar;
+  bool preloadedChar = false;
   char nextChar;
-  int nextCharInt;
+  int nextCharInt = 0;
 
   LinkedTlist *tokenList = newTlist();
   LinkedTlist *lastToken = tokenList;
@@ -148,7 +274,7 @@ LinkedTlist *lexerMain() {
           break;
         }
         if (nextChar == '.' || nextChar == 'e' || nextChar == 'E') {
-          numDecimal(lastToken, &nextChar, 0, &line, &position, &preloadedChar);
+          numDecimal(&lastToken, &nextChar, 0, &line, &position, &preloadedChar);
         } else {
           preloadedChar = true;
           Token *tk = newToken(TK_NUMBER, line);
@@ -161,7 +287,7 @@ LinkedTlist *lexerMain() {
         break;
       // decimal
       case '.':
-        numDecimal(lastToken, &nextChar, 0, &line, &position, &preloadedChar);
+        numDecimal(&lastToken, &nextChar, 0, &line, &position, &preloadedChar);
         break;
       // other
       case '\n':
@@ -359,7 +485,7 @@ LinkedTlist *lexerMain() {
               integer = integer * 10 + (nextChar - '0');
           }
           if (nextChar == '.' || nextChar == 'e' || nextChar == 'E') {
-            numDecimal(lastToken, &nextChar, integer, &line, &position, &preloadedChar);
+            numDecimal(&lastToken, &nextChar, integer, &line, &position, &preloadedChar);
           } else {
             preloadedChar = true;
             Token *tk = newToken(TK_NUMBER, line);
@@ -373,131 +499,7 @@ LinkedTlist *lexerMain() {
         break;
     }
   }
-  lastToken = pushToken(newToken(TK_EOF, line), lastToken);
+  pushToken(newToken(TK_EOF, line), lastToken);
 
   return tokenList;
-}
-
-void addChar(char **str, char c) {
-  size_t len = strlen(*str);
-  *str = arenaRealloc(*str, len + 1, len + 2);
-  (*str)[len] = c;
-  (*str)[len + 1] = '\0';
-}
-
-void strEscape(char *str, int *position, int *line) {
-  char nextChar;
-  int nextCharInt;
-
-  nextCharInt = fgetc(stdin);
-  nextChar = (char)nextCharInt;
-  (*position)++;
-
-  if (nextCharInt == EOF)
-    die(1, *line, "Unexpected end of file while parsing string at line %d colum %d", *line,
-        *position);
-
-  switch (nextChar) {
-    case '\\':
-      addChar(&str, '\\');
-      break;
-    case '"':
-      addChar(&str, '"');
-      break;
-    case 'n':
-      addChar(&str, '\n');
-      break;
-    case 't':
-      addChar(&str, '\t');
-      break;
-    case 'r':
-      addChar(&str, '\r');
-      break;
-    default:
-      die(1, *line, "Unexpected character after \"\\\" at line %d colum %d", *line, *position);
-      break;
-  }
-}
-
-void numUnderscore(char *nextChar, int *position, int *line, bool isZero) {
-  int nextCharInt;
-
-  nextCharInt = fgetc(stdin);
-  *nextChar = (char)nextCharInt;
-  (*position)++;
-
-  while (*nextChar == '_') {
-    nextCharInt = fgetc(stdin);
-    *nextChar = (char)nextCharInt;
-    (*position)++;
-  }
-
-  if ((*nextChar < '0' || *nextChar > '9') && !isZero) {
-    die(1, *line, "Unexpected character after \"_\" at line %d colum %d, expected digit", *line,
-        *position);
-  } else if (*nextChar != '0' && isZero) {
-    die(1, *line, "Unexpected character after \"_\" at line %d colum %d, expected \"0\"", *line,
-        *position);
-  }
-}
-
-void numDecimal(LinkedTlist *lastToken, char *nextChar, int integer, int *line, int *position,
-                bool *preloadedChar) {
-  int nextCharInt;
-  double decimal = (double)integer;
-  int decExp = -1;
-
-  if (*nextChar == '.') {
-    nextCharInt = fgetc(stdin);
-    *nextChar = (char)nextCharInt;
-    (*position)++;
-    while ((*nextChar >= '0' && *nextChar <= '9') || *nextChar == '_') {
-      if (*nextChar == '_') {
-        numUnderscore(nextChar, position, line, false);
-      }
-      decimal = decimal + ((*nextChar - '0') * pow(10, decExp));
-
-      nextCharInt = fgetc(stdin);
-      *nextChar = (char)nextCharInt;
-      (*position)++;
-      decExp--;
-    }
-  }
-  if (*nextChar == 'e' || *nextChar == 'E') {
-    nextCharInt = fgetc(stdin);
-    *nextChar = (char)nextCharInt;
-    (*position)++;
-    int expSign = 1;
-    if (*nextChar == '+' || *nextChar == '-') {
-      if (*nextChar == '-')
-        expSign = -1;
-
-      nextCharInt = fgetc(stdin);
-      *nextChar = (char)nextCharInt;
-      (*position)++;
-    }
-
-    int exponent = 0;
-    while ((*nextChar >= '0' && *nextChar <= '9') || *nextChar == '_') {
-      if (*nextChar == '_') {
-        numUnderscore(nextChar, position, line, false);
-      }
-      exponent = exponent * 10 + (*nextChar - '0');
-
-      nextCharInt = fgetc(stdin);
-      *nextChar = (char)nextCharInt;
-      (*position)++;
-    }
-    if (*nextChar != 'd' && *nextChar != 'D') {
-      *preloadedChar = true;
-    }
-
-    decimal *= pow(10, expSign * exponent);
-
-    Token *tk = newToken(TK_DECIMAL, *line);
-    union Value *value = arenaAlloc(sizeof(union Value));
-    value->d = decimal;
-    setValue(tk, value);
-    lastToken = pushToken(tk, lastToken);
-  }
 }
