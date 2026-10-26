@@ -45,26 +45,26 @@ typedef struct {
 } StSymbol;
 
 /// @brief Symbol-table.
-typedef struct StSymTable {
+typedef struct SymTable {
   HashTable *symbols;
-  struct StSymTable *parent;
-} StSymTable;
+  struct SymTable *parent;
+} SymTable;
 
 /// @brief Create Symbol table. parent = NULL => global scope
-StSymTable *symtableCreate(StSymTable *parent);
+SymTable *symtableCreate(SymTable *parent);
 
 /// @brief Look up a symbol in the current scope and its parent scopes.
-StSymbol *symtableLookup(StSymTable *table, const char *name);
+StSymbol *symtableLookup(SymTable *table, const char *symbolName);
 
 /// @brief Look up a symbol in the current scope.
-StSymbol *symtableLookupLocal(StSymTable *table, const char *name);
+StSymbol *symtableLookupLocal(SymTable *table, const char *symbolName);
 
 /// @brief Insert a new symbol inside a Symbol table.
-bool symtableInsertSymbol(StSymTable *table, const char *name, StSymbol *symbol);
+bool symtableInsertSymbol(SymTable *table, const char *symbolName, StSymbol *symbol);
 
 #endif  // SYMTABLE_H
 
-/* TIPS FOR SEMATIC ANALYSIS
+/* TIPS FOR SEMANTIC ANALYSIS
 Create the global scope and register built-in functions.
 Register all user-defined function names and their declared signatures.
 Analyze function bodies, resolving parameter and local-variable names.
