@@ -434,6 +434,7 @@ LinkedTlist *lexerMain(void) {
           preloadedChar = true;
         } else if (nextChar == '*') {
           bool endComment = false;
+          bool newLine = false;
           char prevChar = 0;
           while (!endComment) {
             nextCharInt = fgetc(stdin);
@@ -444,11 +445,27 @@ LinkedTlist *lexerMain(void) {
             } else if (nextChar == '\n') {
               position = 0;
               line++;
+              newLine = true;
             } else if (nextCharInt == EOF)
               die(1, line, "Unexpected end of file while parsing comment at line %d colum %d", line,
                   position);
             prevChar = nextChar;
           }
+          nextCharInt = fgetc(stdin);
+          nextChar = (char)nextCharInt;
+          position++;
+
+          while (nextChar == ' ' && newLine) {
+            nextCharInt = fgetc(stdin);
+            nextChar = (char)nextCharInt;
+            position++;
+          }
+          if (nextChar != '\n' && newLine)
+            die(1, line,
+                "Unexpected character at line %d colum %d, no token is allowed after multiline "
+                "comment",
+                line, position);
+          preloadedChar = true;
         } else {
           lastToken = pushToken(newToken(TK_DIVIDE, line), lastToken);
           preloadedChar = true;
