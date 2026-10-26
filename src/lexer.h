@@ -16,5 +16,3 @@
 #endif  // LEXER_H
 
 LinkedTlist *lexerMain();
-
-double tkDecimal(LinkedTlist *lastToken, char nextChar, int integer, int *line, int *pos);
