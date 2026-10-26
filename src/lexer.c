@@ -497,6 +497,97 @@ LinkedTlist *lexerMain(void) {
           char *str = arenaAlloc(2 * sizeof(char));
           str[0] = nextChar;
           str[1] = '\0';
+          // ifj26.*
+          if (nextChar == 'i') {
+            nextCharInt = fgetc(stdin);
+            nextChar = (char)nextCharInt;
+            position++;
+            if (nextChar == 'f') {
+              nextCharInt = fgetc(stdin);
+              nextChar = (char)nextCharInt;
+              position++;
+              if (nextChar == 'j') {
+                nextCharInt = fgetc(stdin);
+                nextChar = (char)nextCharInt;
+                position++;
+                if (nextChar == '2') {
+                  nextCharInt = fgetc(stdin);
+                  nextChar = (char)nextCharInt;
+                  position++;
+                  if (nextChar == '6') {
+                    nextCharInt = fgetc(stdin);
+                    nextChar = (char)nextCharInt;
+                    position++;
+                    if (nextChar == '.') {
+                      nextCharInt = fgetc(stdin);
+                      nextChar = (char)nextCharInt;
+                      position++;
+                      if (nextChar == '*') {
+                        nextCharInt = fgetc(stdin);
+                        nextChar = (char)nextCharInt;
+                        position++;
+                        if (nextChar != ' ' && nextChar != '\n') {
+                          lastToken = pushToken(newToken(TK_IFJ, line), lastToken);
+                        }
+                      } else
+                        die(1, line, "Unexpected character at line %d colum %d", line, position);
+                    } else if ((nextChar >= 'a' && nextChar <= 'z') ||
+                               (nextChar >= 'A' && nextChar <= 'Z') ||
+                               (nextChar >= '0' && nextChar <= '9') || nextChar == '_') {
+                      addChar(&str, 'i');
+                      addChar(&str, 'f');
+                      addChar(&str, 'j');
+                      addChar(&str, '2');
+                      addChar(&str, '6');
+                      addChar(&str, nextChar);
+                    } else if (nextChar == ' ' || nextChar == '\n') {
+                      preloadedChar = true;
+                    } else
+                      die(1, line, "Unexpected character at line %d colum %d", line, position);
+                  } else if ((nextChar >= 'a' && nextChar <= 'z') ||
+                             (nextChar >= 'A' && nextChar <= 'Z') ||
+                             (nextChar >= '0' && nextChar <= '9') || nextChar == '_') {
+                    addChar(&str, 'i');
+                    addChar(&str, 'f');
+                    addChar(&str, 'j');
+                    addChar(&str, '2');
+                    addChar(&str, nextChar);
+                  } else if (nextChar == ' ' || nextChar == '\n') {
+                    preloadedChar = true;
+                  } else
+                    die(1, line, "Unexpected character at line %d colum %d", line, position);
+                } else if ((nextChar >= 'a' && nextChar <= 'z') ||
+                           (nextChar >= 'A' && nextChar <= 'Z') ||
+                           (nextChar >= '0' && nextChar <= '9') || nextChar == '_') {
+                  addChar(&str, 'i');
+                  addChar(&str, 'f');
+                  addChar(&str, 'j');
+                  addChar(&str, nextChar);
+                } else if (nextChar == ' ' || nextChar == '\n') {
+                  preloadedChar = true;
+                } else
+                  die(1, line, "Unexpected character at line %d colum %d", line, position);
+              } else if ((nextChar >= 'a' && nextChar <= 'z') ||
+                         (nextChar >= 'A' && nextChar <= 'Z') ||
+                         (nextChar >= '0' && nextChar <= '9') || nextChar == '_') {
+                addChar(&str, 'i');
+                addChar(&str, 'f');
+                addChar(&str, nextChar);
+              } else if (nextChar == ' ' || nextChar == '\n') {
+                preloadedChar = true;
+              } else
+                die(1, line, "Unexpected character at line %d colum %d", line, position);
+            } else if ((nextChar >= 'a' && nextChar <= 'z') ||
+                       (nextChar >= 'A' && nextChar <= 'Z') ||
+                       (nextChar >= '0' && nextChar <= '9') || nextChar == '_') {
+              addChar(&str, 'i');
+              addChar(&str, nextChar);
+            } else if (nextChar == ' ' || nextChar == '\n') {
+              preloadedChar = true;
+            } else
+              die(1, line, "Unexpected character at line %d colum %d", line, position);
+          }
+          // ident
           while (true) {
             nextCharInt = fgetc(stdin);
             nextChar = (char)nextCharInt;
