@@ -89,6 +89,8 @@ void numDecimal(LinkedTlist **lastToken, char *nextChar, int integer, int *line,
     *nextChar = (char)nextCharInt;
     (*position)++;
     int decExp = -1;
+    if (*nextChar < '0' && *nextChar > '9')
+      die(1, line, "Unexpected character at line %d colum %d, expected digit", *line, *position);
     while ((*nextChar >= '0' && *nextChar <= '9') || *nextChar == '_') {
       if (*nextChar == '_') {
         numUnderscore(nextChar, position, line, false);
@@ -130,6 +132,8 @@ void numDecimal(LinkedTlist **lastToken, char *nextChar, int integer, int *line,
   if (*nextChar != 'd' && *nextChar != 'D') {
     *preloadedChar = true;
   }
+  if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z'))
+    die(1, line, "Unexpected character at line %d colum %d", *line, *position);
 
   decimal *= pow(10, expSign * exponent);
 
@@ -227,6 +231,9 @@ LinkedTlist *lexerMain(void) {
               nextChar = (char)nextCharInt;
               position++;
             }
+            if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z') ||
+                (nextChar >= '0' && nextChar <= '9'))
+              die(1, line, "Unexpected character at line %d colum %d", line, position);
             preloadedChar = true;
 
             // write token
@@ -258,6 +265,15 @@ LinkedTlist *lexerMain(void) {
             nextChar = (char)nextCharInt;
             position++;
           }
+
+          nextCharInt = fgetc(stdin);
+          nextChar = (char)nextCharInt;
+          position++;
+          if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z') ||
+              (nextChar >= '0' && nextChar <= '9'))
+            die(1, line, "Unexpected character at line %d colum %d", line, position);
+          preloadedChar = true;
+
           // write token
           Token *tk = newToken(TK_STRING, line);
           String *string = newString(str, strlen(str));
@@ -282,6 +298,8 @@ LinkedTlist *lexerMain(void) {
         } else if (nextChar >= '0' && nextChar <= '9') {
           die(1, line, "Unexpected character at line %d colum %d, number cant start with 0", line,
               position);
+        } else if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z')) {
+          die(1, line, "Unexpected character at line %d colum %d", line, position);
         } else {
           preloadedChar = true;
           Token *tk = newToken(TK_NUMBER, line);
@@ -498,6 +516,8 @@ LinkedTlist *lexerMain(void) {
           }
           if (nextChar == '.' || nextChar == 'e' || nextChar == 'E') {
             numDecimal(&lastToken, &nextChar, integer, &line, &position, &preloadedChar);
+          } else if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z')) {
+            die(1, line, "Unexpected character at line %d colum %d", line, position);
           } else {
             preloadedChar = true;
             Token *tk = newToken(TK_NUMBER, line);
