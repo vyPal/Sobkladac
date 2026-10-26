@@ -50,7 +50,9 @@ LinkedTlist *lexerMain() {
             preloadedChar = true;
             Token *tk = newToken(TK_STRING, line);
             String *string = newString("", 0);
-            setValue(tk, string);
+            union Value *value = arenaAlloc(sizeof(union Value));
+            value->s = string;
+            setValue(tk, value);
             lastToken = pushToken(tk, lastToken);
           } else {
             nextCharInt = fgetc(stdin);
@@ -96,7 +98,9 @@ LinkedTlist *lexerMain() {
             // write token
             Token *tk = newToken(TK_STRING, startLine);
             String *string = newString(str, strlen(str));
-            setValue(tk, string);
+            union Value *value = arenaAlloc(sizeof(union Value));
+            value->s = string;
+            setValue(tk, value);
             lastToken = pushToken(tk, lastToken);
           }
         }
@@ -127,7 +131,9 @@ LinkedTlist *lexerMain() {
           // write token
           Token *tk = newToken(TK_STRING, line);
           String *string = newString(str, strlen(str));
-          setValue(tk, string);
+          union Value *value = arenaAlloc(sizeof(union Value));
+          value->s = string;
+          setValue(tk, value);
           lastToken = pushToken(tk, lastToken);
         }
         break;
@@ -147,7 +153,9 @@ LinkedTlist *lexerMain() {
           preloadedChar = true;
           Token *tk = newToken(TK_NUMBER, line);
           int zero = 0;
-          setValue(tk, &zero);
+          union Value *value = arenaAlloc(sizeof(union Value));
+          value->i = zero;
+          setValue(tk, value);
           lastToken = pushToken(tk, lastToken);
         }
         break;
@@ -172,7 +180,9 @@ LinkedTlist *lexerMain() {
             preloadedChar = true;
             Token *tk = newToken(TK_INDENT, line);
             int indent = indentCount;
-            setValue(tk, &indent);
+            union Value *value = arenaAlloc(sizeof(union Value));
+            value->i = indent;
+            setValue(tk, value);
             lastToken = pushToken(tk, lastToken);
           }
         }
@@ -334,7 +344,9 @@ LinkedTlist *lexerMain() {
           }
           Token *tk = newToken(TK_IDENT, line);
           String *string = newString(str, strlen(str));
-          setValue(tk, string);
+          union Value *value = arenaAlloc(sizeof(union Value));
+          value->s = string;
+          setValue(tk, value);
           lastToken = pushToken(tk, lastToken);
         }
         // number
@@ -351,7 +363,9 @@ LinkedTlist *lexerMain() {
           } else {
             preloadedChar = true;
             Token *tk = newToken(TK_NUMBER, line);
-            setValue(tk, &integer);
+            union Value *value = arenaAlloc(sizeof(union Value));
+            value->i = integer;
+            setValue(tk, value);
             lastToken = pushToken(tk, lastToken);
           }
         } else
@@ -481,7 +495,9 @@ void numDecimal(LinkedTlist *lastToken, char *nextChar, int integer, int *line, 
     decimal *= pow(10, expSign * exponent);
 
     Token *tk = newToken(TK_DECIMAL, *line);
-    setValue(tk, &decimal);
+    union Value *value = arenaAlloc(sizeof(union Value));
+    value->d = decimal;
+    setValue(tk, value);
     lastToken = pushToken(tk, lastToken);
   }
 }
