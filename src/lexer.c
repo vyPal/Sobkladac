@@ -188,7 +188,8 @@ LinkedTlist *lexerMain() {
             char *str = arenaAlloc(sizeof(char));
             str[0] = '\0';
             int startLine = line;
-            while (nextChar != '"') {
+            bool endString = false;
+            while (!endString) {
               if (nextCharInt == EOF)
                 die(1, line, "Unexpected end of file while parsing string at line %d colum %d",
                     line, position);
@@ -196,8 +197,23 @@ LinkedTlist *lexerMain() {
                 line++;
                 position = 0;
                 addChar(&str, nextChar);
-              } else if (nextChar == '\\') {
-                strEscape(str, &position, &line);
+              } else if (nextChar == '"') {
+                nextCharInt = fgetc(stdin);
+                nextChar = (char)nextCharInt;
+                position++;
+                if (nextChar == '"') {
+                  nextCharInt = fgetc(stdin);
+                  nextChar = (char)nextCharInt;
+                  position++;
+                  if (nextChar == '"') {
+                    endString = true;
+                  } else
+                    addChar(&str, '"');
+                  addChar(&str, '"');
+                  addChar(&str, nextChar);
+                } else
+                  addChar(&str, '"');
+                addChar(&str, nextChar);
               } else
                 addChar(&str, nextChar);
 
@@ -205,21 +221,7 @@ LinkedTlist *lexerMain() {
               nextChar = (char)nextCharInt;
               position++;
             }
-            // check for closing quotes
-            nextCharInt = fgetc(stdin);
-            nextChar = (char)nextCharInt;
-            position++;
-            if (nextChar != '"') {
-              die(1, line, "Unexpected character at line %d colum %d, expected \"\"\"", line,
-                  position);
-            }
-            nextCharInt = fgetc(stdin);
-            nextChar = (char)nextCharInt;
-            position++;
-            if (nextChar != '"') {
-              die(1, line, "Unexpected character at line %d colum %d, expected \"\"\"", line,
-                  position);
-            }
+            preloadedChar = true;
 
             // write token
             Token *tk = newToken(TK_STRING, startLine);
