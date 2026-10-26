@@ -7,6 +7,7 @@
 
 #include "ast.h"
 #include "common.h"
+#include "ir.h"
 #include "strbuf.h"
 
 static unsigned nameCounter;
@@ -98,7 +99,7 @@ void emitOperand(StringBuilder *out, Operand op) {
             if (ch > 32 && ch != 35 && ch != 92)
               sbAppendChar(out, ch);
             else
-              sbAppendf(out, "%3d", (int)ch);
+              sbAppendf(out, "\\%3d", (int)ch);
           }
           break;
         case CT_NIL:
@@ -151,30 +152,30 @@ static inline Operand labelOp(char *l) {
 /// Lower expression into IFJcode26
 /// @note Expects all used variables to be present in LF
 /// @note Result is left on top of stack
-void lowerExpression(StringBuilder *code, AstExpression *expr) {
+void lowerExpression(InstrList *code, AstExpression *expr) {
   switch (expr->expressionType) {
     case INT_LITERAL:
-      EMIT(code, PUSHS, intOp(expr->data.intValue));
+      IR_EMIT(code, PUSHS, intOp(expr->data.intValue));
       break;
     case DOUBLE_LITERAL:
-      EMIT(code, PUSHS, floatOp(expr->data.doubleValue));
+      IR_EMIT(code, PUSHS, floatOp(expr->data.doubleValue));
       break;
     case STRING_LITERAL:
-      EMIT(code, PUSHS, stringOp(expr->data.stringValue));
+      IR_EMIT(code, PUSHS, stringOp(expr->data.stringValue));
       break;
     case UNIT_LITERAL:
-      EMIT(code, PUSHS, nilOp());
+      IR_EMIT(code, PUSHS, nilOp());
       break;
     case VARIABLE:
-      EMIT(code, PUSHS, varOp(FT_LF, expr->data.variable));
+      IR_EMIT(code, PUSHS, varOp(FT_LF, expr->data.variable));
       break;
     case UNARY:
-      EMIT(code, PUSHS, intOp(0));
+      IR_EMIT(code, PUSHS, intOp(0));
       lowerExpression(code, expr->data.unary.expression);
       if (expr->data.unary.operatorAst != NEGATION)
         die(ERR_INTERNAL, (int)expr->location.line,
             "Binary operation cannot be performed on single operand");
-      EMIT0(code, SUBS);
+      IR_EMIT0(code, SUBS);
       break;
     case BINARY:
       lowerExpression(code, expr->data.binary.leftExpression);
@@ -184,112 +185,112 @@ void lowerExpression(StringBuilder *code, AstExpression *expr) {
           die(ERR_INTERNAL, (int)expr->location.line,
               "Unary operation cannot be performed on two operands");
         case MULTIPLICATION:
-          EMIT0(code, MULS);
+          IR_EMIT0(code, MULS);
           break;
         case DIVISION:
-          EMIT0(code, IDIVS);
+          IR_EMIT0(code, IDIVS);
           break;
         case ADDITION:
-          EMIT0(code, ADDS);
+          IR_EMIT0(code, ADDS);
           break;
         case SUBTRACTION:
-          EMIT0(code, SUBS);
+          IR_EMIT0(code, SUBS);
           break;
         case LESSER:
-          EMIT0(code, LTS);
+          IR_EMIT0(code, LTS);
           break;
         case LESSER_EQUAL:;
-          EMIT0(code, GTS);
-          EMIT0(code, NOTS);
+          IR_EMIT0(code, GTS);
+          IR_EMIT0(code, NOTS);
           break;
         case GREATER:
-          EMIT0(code, GTS);
+          IR_EMIT0(code, GTS);
           break;
         case GREATER_EQUAL:;
-          EMIT0(code, LTS);
-          EMIT0(code, NOTS);
+          IR_EMIT0(code, LTS);
+          IR_EMIT0(code, NOTS);
           break;
         case EQUAL:
-          EMIT0(code, EQS);
+          IR_EMIT0(code, EQS);
           break;
         case NOT_EQUAL:
-          EMIT0(code, EQS);
-          EMIT0(code, NOTS);
+          IR_EMIT0(code, EQS);
+          IR_EMIT0(code, NOTS);
           break;
       }
   }
 }
 
-void lowerFunctionCall(StringBuilder *code, AstFunctionCall *call) {
-  EMIT0(code, CREATEFRAME);
+void lowerFunctionCall(InstrList *code, AstFunctionCall *call) {
+  IR_EMIT0(code, CREATEFRAME);
   AstFunctionCallArgument *arg = call->firstArgument;
   unsigned argc = 0;
   while (arg != NULL) {
     lowerExpression(code, arg->expression);
     Operand op = varOp(FT_TF, funcParam(argc++));
-    EMIT(code, DEFVAR, op);
-    EMIT(code, POPS, op);
+    IR_EMIT(code, DEFVAR, op);
+    IR_EMIT(code, POPS, op);
     arg = arg->nextArgument;
   }
-  EMIT0(code, PUSHFRAME);
-  EMIT(code, CALL, labelOp(call->functionName));
-  EMIT0(code, POPFRAME);
-  EMIT(code, PUSHS, varOp(FT_TF, "$ret"));
+  IR_EMIT0(code, PUSHFRAME);
+  IR_EMIT(code, CALL, labelOp(call->functionName));
+  IR_EMIT0(code, POPFRAME);
+  IR_EMIT(code, PUSHS, varOp(FT_TF, "$ret"));
 }
 
-void lowerValue(StringBuilder *code, AstValue *val) {
+void lowerValue(InstrList *code, AstValue *val) {
   if (val->type == VALUE_EXPRESSION)
     lowerExpression(code, val->data.expression);
   else
     lowerFunctionCall(code, val->data.functionCall);
 }
 
-void lowerCodeBlock(StringBuilder *code, AstCodeBlock *block);
+void lowerCodeBlock(InstrList *code, AstCodeBlock *block);
 
-void lowerCommand(StringBuilder *code, AstCommand *cmd) {
+void lowerCommand(InstrList *code, AstCommand *cmd) {
   switch (cmd->type) {
     case VARIABLE_DECLARATION:;
       Operand var = varOp(FT_LF, cmd->data.variableDeclaration.variableName);
-      EMIT(code, DEFVAR, var);
+      IR_EMIT(code, DEFVAR, var);
       lowerValue(code, cmd->data.variableDeclaration.value);
-      EMIT(code, POPS, var);
+      IR_EMIT(code, POPS, var);
       break;
     case ASSIGNMENT:;
       Operand dst = varOp(FT_LF, cmd->data.assignment.variableName);
-      EMIT(code, DEFVAR, dst);
+      IR_EMIT(code, DEFVAR, dst);
       lowerValue(code, cmd->data.assignment.value);
-      EMIT(code, POPS, dst);
+      IR_EMIT(code, POPS, dst);
       break;
     case FUNCTION_CALL:
       lowerFunctionCall(code, cmd->data.call.functionCall);
       break;
     case RETURN:
       lowerValue(code, cmd->data.returnAst.value);
-      EMIT(code, POPS, varOp(FT_LF, "$ret"));
-      EMIT0(code, RETURN);
+      IR_EMIT(code, POPS, varOp(FT_LF, "$ret"));
+      IR_EMIT0(code, RETURN);
       break;
     case IF:;
       Operand t = labelOp(newLabel("everything_is_one_function", "if_true"));
       Operand f = labelOp(newLabel("everything_is_one_function", "if_false"));
       lowerExpression(code, cmd->data.ifAst.condition);
-      EMIT(code, PUSHS, intOp(0));
-      EMIT(code, JUMPIFEQS, f);
-      EMIT(code, JUMP, t);
-      EMIT(code, LABEL, t);
+      IR_EMIT(code, PUSHS, intOp(0));
+      IR_EMIT(code, JUMPIFEQS, f);
+      IR_EMIT(code, JUMP, t);
+      IR_EMIT(code, LABEL, t);
       lowerCodeBlock(code, cmd->data.ifAst.thenBlock);
-      EMIT(code, LABEL, f);
+      IR_EMIT(code, LABEL, f);
       lowerCodeBlock(code, cmd->data.ifAst.elseBlock);
       break;
     case WHILE:;
       Operand loop = labelOp(newLabel("everything_is_one_function", "when"));
       Operand loopEnd = labelOp(newLabel("everything_is_one_function", "when_end"));
-      EMIT(code, LABEL, loop);
+      IR_EMIT(code, LABEL, loop);
       lowerExpression(code, cmd->data.whileAst.condition);
-      EMIT(code, PUSHS, intOp(0));
-      EMIT(code, JUMPIFEQS, loopEnd);
-      EMIT(code, JUMP, loop);
+      IR_EMIT(code, PUSHS, intOp(0));
+      IR_EMIT(code, JUMPIFEQS, loopEnd);
+      IR_EMIT(code, JUMP, loop);
       lowerCodeBlock(code, cmd->data.whileAst.codeBlock);
-      EMIT(code, LABEL, loopEnd);
+      IR_EMIT(code, LABEL, loopEnd);
       break;
     case EXPRESSION:
       lowerExpression(code, cmd->data.expressionAst.expression);
@@ -297,7 +298,7 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd) {
   }
 }
 
-void lowerCodeBlock(StringBuilder *code, AstCodeBlock *block) {
+void lowerCodeBlock(InstrList *code, AstCodeBlock *block) {
   AstCommand *cmd = block->firstCommand;
   while (cmd != NULL) {
     lowerCommand(code, cmd);
@@ -305,40 +306,42 @@ void lowerCodeBlock(StringBuilder *code, AstCodeBlock *block) {
   }
 }
 
-void lowerFunction(StringBuilder *code, AstFunction *func) {
-  EMIT(code, LABEL, labelOp(func->functionName));
+void lowerFunction(InstrList *code, AstFunction *func) {
+  IR_EMIT(code, LABEL, labelOp(func->functionName));
   if (func->isMain)
-    EMIT(code, LABEL, labelOp("$main"));
+    IR_EMIT(code, LABEL, labelOp("$main"));
 
   AstFunctionParameter *param = func->firstParameter;
   unsigned argc = 0;
   while (param != NULL) {
     Operand np = varOp(FT_LF, param->parameterName);
     Operand arg = varOp(FT_LF, funcParam(argc++));
-    EMIT(code, MOVE, np, arg);
+    IR_EMIT(code, MOVE, np, arg);
     param = param->nextParameter;
   }
 
   if (func->bodyType == VALUE) {
     lowerValue(code, func->body.value);
-    EMIT(code, POPS, varOp(FT_LF, "$ret"));
+    IR_EMIT(code, POPS, varOp(FT_LF, "$ret"));
   } else {
     lowerCodeBlock(code, func->body.codeBlock);
   }
 }
 
 char *generateCode(AstProgram program) {
-  StringBuilder code = sbNew(0);
-  sbAppend(&code, ".IFJcode26\n");
-  EMIT0(&code, CREATEFRAME);
-  EMIT0(&code, PUSHFRAME);
-  EMIT(&code, CALL, labelOp("$main"));
-  EMIT0(&code, POPFRAME);
-  EMIT(&code, EXIT, varOp(FT_TF, "$ret"));
-  AstFunction *func = program.firstFunction;
-  while (func != NULL) {
-    lowerFunction(&code, func);
-    func = func->nextFunction;
+  InstrList code = {0};
+  IR_EMIT0(&code, CREATEFRAME);
+  IR_EMIT0(&code, PUSHFRAME);
+  IR_EMIT(&code, CALL, labelOp("$main"));
+  IR_EMIT(&code, EXIT, intOp(0));
+  for (AstFunction *func = program.firstFunction; func != NULL; func = func->nextFunction) {
+    InstrList body = {0};
+    lowerFunction(&body, func);
+    irSplice(&code, &body);
   }
-  return sbBuild(&code);
+  irOptimize(&code);
+  StringBuilder out = sbNew(0);
+  sbAppend(&out, ".IFJcode26\n");
+  irEmit(&out, &code);
+  return sbBuild(&out);
 }
