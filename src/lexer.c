@@ -57,7 +57,7 @@ LinkedTlist *lexerMain() {
             nextChar = (char)nextCharInt;
             position++;
 
-            char *str = arena_alloc(sizeof(char));
+            char *str = arenaAlloc(sizeof(char));
             str[0] = '\0';
             int startLine = line;
             while (nextChar != '"') {
@@ -106,7 +106,7 @@ LinkedTlist *lexerMain() {
           nextChar = (char)nextCharInt;
           position++;
 
-          char *str = arena_alloc(sizeof(char));
+          char *str = arenaAlloc(sizeof(char));
           str[0] = '\0';
           while (nextChar != '"') {
             if (nextCharInt == EOF)
@@ -317,7 +317,7 @@ LinkedTlist *lexerMain() {
       default:
         // identifier
         if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z')) {
-          char *str = arena_alloc(sizeof(char));
+          char *str = arenaAlloc(sizeof(char));
           str[0] = nextChar;
           str[1] = '\0';
           while (true) {
@@ -366,7 +366,7 @@ LinkedTlist *lexerMain() {
 
 void addChar(char **str, char c) {
   size_t len = strlen(*str);
-  *str = arena_realloc(*str, len + 1, len + 2);
+  *str = arenaRealloc(*str, len + 1, len + 2);
   (*str)[len] = c;
   (*str)[len + 1] = '\0';
 }
