@@ -279,6 +279,9 @@ LinkedTlist *lexerMain(void) {
         }
         if (nextChar == '.' || nextChar == 'e' || nextChar == 'E') {
           numDecimal(&lastToken, &nextChar, 0, &line, &position, &preloadedChar);
+        } else if (nextChar >= '0' && nextChar <= '9') {
+          die(1, line, "Unexpected character at line %d colum %d, number cant start with 0", line,
+              position);
         } else {
           preloadedChar = true;
           Token *tk = newToken(TK_NUMBER, line);
