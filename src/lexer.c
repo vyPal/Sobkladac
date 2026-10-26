@@ -89,8 +89,8 @@ void numDecimal(LinkedTlist **lastToken, char *nextChar, int integer, int *line,
     *nextChar = (char)nextCharInt;
     (*position)++;
     int decExp = -1;
-    if (*nextChar < '0' && *nextChar > '9')
-      die(1, line, "Unexpected character at line %d colum %d, expected digit", *line, *position);
+    if (*nextChar < '0' || *nextChar > '9')
+      die(1, *line, "Unexpected character at line %d colum %d, expected digit", *line, *position);
     while ((*nextChar >= '0' && *nextChar <= '9') || *nextChar == '_') {
       if (*nextChar == '_') {
         numUnderscore(nextChar, position, line, false);
@@ -132,8 +132,8 @@ void numDecimal(LinkedTlist **lastToken, char *nextChar, int integer, int *line,
   if (*nextChar != 'd' && *nextChar != 'D') {
     *preloadedChar = true;
   }
-  if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z'))
-    die(1, line, "Unexpected character at line %d colum %d", *line, *position);
+  if ((*nextChar >= 'a' && *nextChar <= 'z') || (*nextChar >= 'A' && *nextChar <= 'Z'))
+    die(1, *line, "Unexpected character at line %d colum %d", *line, *position);
 
   decimal *= pow(10, expSign * exponent);
 
