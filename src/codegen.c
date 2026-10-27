@@ -151,33 +151,33 @@ static inline Operand labelOp(char *l) {
 /// Lower expression into IFJcode26
 /// @note Expects all used variables to be present in LF
 /// @note Result is left on top of stack
-void lowerExpression(StringBuilder *code, AstExpression *expr) {
+AstDataType lowerExpression(StringBuilder *code, AstExpression *expr) {
   switch (expr->expressionType) {
     case INT_LITERAL:
       EMIT(code, PUSHS, intOp(expr->data.intValue));
-      break;
+      return INT;
     case DOUBLE_LITERAL:
       EMIT(code, PUSHS, floatOp(expr->data.doubleValue));
-      break;
+      return DOUBLE;
     case STRING_LITERAL:
       EMIT(code, PUSHS, stringOp(expr->data.stringValue));
-      break;
+      return STRING;
     case UNIT_LITERAL:
       EMIT(code, PUSHS, nilOp());
-      break;
+      return UNIT;
     case VARIABLE:
       EMIT(code, PUSHS, varOp(FT_LF, expr->data.variable));
-      break;
+      return UNIT;  // BUG: Needs symbol table to resolve data type
     case UNARY:
       EMIT(code, PUSHS, intOp(0));
-      lowerExpression(code, expr->data.unary.expression);
+      AstDataType ty = lowerExpression(code, expr->data.unary.expression);
       if (expr->data.unary.operatorAst != NEGATION)
         die(ERR_INTERNAL, (int)expr->location.line,
             "Binary operation cannot be performed on single operand");
       EMIT0(code, SUBS);
-      break;
+      return ty;
     case BINARY:
-      lowerExpression(code, expr->data.binary.leftExpression);
+      AstDataType tyb = lowerExpression(code, expr->data.binary.leftExpression);
       lowerExpression(code, expr->data.binary.rightExpression);
       switch (expr->data.binary.operatorAst) {
         case NEGATION:
@@ -217,10 +217,62 @@ void lowerExpression(StringBuilder *code, AstExpression *expr) {
           EMIT0(code, NOTS);
           break;
       }
+      return tyb;
   }
 }
 
 void lowerFunctionCall(StringBuilder *code, AstFunctionCall *call) {
+  if (strcmp(call->functionName, "print") == 0) {
+    Operand temp = varOp(FT_LF, newTempVar());
+    EMIT(code, POPS, temp);
+    switch (lowerExpression(code, call->firstArgument->expression)) {
+      case INT:
+      case DOUBLE:
+      case STRING:
+      case BOOL:;
+        EMIT(code, WRITE, temp);
+        break;
+      case UNIT:
+        EMIT(code, WRITE, stringOp("()"));
+        break;
+      case UNKNOWN:
+        die(ERR_INTERNAL, 0, "Unable to print unknown value");
+    }
+    return;
+  } else if (strcmp(call->functionName, "toStr") == 0) {
+    char *tempVar = newTempVar();
+    Operand temp = varOp(FT_LF, tempVar);
+    Operand ret = varOp(FT_LF, "$ret");
+    EMIT(code, POPS, temp);
+    switch (lowerExpression(code, call->firstArgument->expression)) {
+      case INT:
+        EMIT(code, INT2STR, ret, temp);
+        break;
+      case DOUBLE:
+        EMIT(code, FLOAT2STR, ret, temp);
+        break;
+      case STRING:
+        EMIT(code, MOVE, ret, temp);
+        break;
+      case BOOL:;
+        Operand trueLabel = labelOp(newLabel("everything_is_one_function", tempVar));
+        Operand endLabel = labelOp(newLabel("everything_is_one_function", tempVar));
+        EMIT(code, JUMPIFEQ, trueLabel, temp, boolOp(true));
+        EMIT(code, MOVE, ret, stringOp("false"));
+        EMIT(code, JUMP, endLabel);
+        EMIT(code, LABEL, trueLabel);
+        EMIT(code, MOVE, ret, stringOp("true"));
+        EMIT(code, LABEL, endLabel);
+        break;
+      case UNIT:
+        EMIT(code, MOVE, ret, stringOp("()"));
+        break;
+      case UNKNOWN:
+        die(ERR_INTERNAL, 0, "Unable to print unknown value");
+    }
+    return;
+  }
+
   EMIT0(code, CREATEFRAME);
   AstFunctionCallArgument *arg = call->firstArgument;
   unsigned argc = 0;
