@@ -104,7 +104,7 @@ void numDecimal(LinkedTlist **lastToken, char prevChar, char *nextChar, int inte
       (*position)++;
       decExp--;
     }
-    prevChar = nextChar;
+    prevChar = *nextChar;
   }
   int expSign = 1;
   int exponent = 0;
@@ -322,12 +322,12 @@ LinkedTlist *lexerMain(void) {
       // decimal
       case '.':
         nextCharInt = fgetc(stdin);
-        char prevChar = nextChar;
+        char prev = nextChar;
         nextChar = (char)nextCharInt;
         position++;
         preloadedChar = true;
         if (nextChar >= '0' && nextChar <= '9')
-          numDecimal(&lastToken, prevChar, &nextChar, 0, &line, &position, &preloadedChar);
+          numDecimal(&lastToken, prev, &nextChar, 0, &line, &position, &preloadedChar);
         else
           lastToken = pushToken(newToken(TK_DOT, line), lastToken);
         break;
