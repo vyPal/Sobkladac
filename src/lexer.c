@@ -123,6 +123,10 @@ void numDecimal(LinkedTlist **lastToken, char prevChar, char *nextChar, int inte
       (*position)++;
     }
 
+    if (*nextChar < '0' || *nextChar > '9')
+      die(1, *line, "Unexpected character at line %d colum %d, after E/e there must be a digit",
+          *line, *position);
+
     while ((*nextChar >= '0' && *nextChar <= '9') || *nextChar == '_') {
       if (*nextChar == '_') {
         numUnderscore(nextChar, position, line, false);
