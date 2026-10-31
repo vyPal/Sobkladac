@@ -153,11 +153,36 @@ static inline Operand typeOp(ConstType t) {
 }
 
 typedef struct {
+  char **names;
+  size_t count;
+  size_t capacity;
+} VariableRegistry;
+
+static VariableRegistry registry = {0};
+
+static void registerVariable(Operand op) {
+  if (op.type != OK_VAR)
+    return;
+  if (registry.names == NULL) {
+    registry.names = (char **)arenaAlloc(sizeof(char *) * 64);
+    registry.capacity = 64;
+    registry.count = 0;
+  }
+  if (registry.count + 1 > registry.capacity) {
+    registry.names =
+        (char **)arenaRealloc((void *)registry.names, sizeof(char *) * registry.capacity,
+                              sizeof(char *) * registry.capacity * 2);
+    registry.capacity *= 2;
+  }
+  registry.names[registry.count++] = op.value.var.name;
+}
+
+typedef struct {
   AstDataType ty;
   Operand val;
 } ValueInfo;
 
-static Operand getResultOperand(StringBuilder *code, const Operand *preferred) {
+static Operand getResultOperand(const Operand *preferred) {
   if (preferred != NULL) {
     if (preferred->type != OK_VAR)
       die(ERR_INTERNAL, 0, "Result destination must be a variable");
@@ -166,7 +191,7 @@ static Operand getResultOperand(StringBuilder *code, const Operand *preferred) {
   }
 
   Operand tmp = varOp(FT_LF, newTempVar());
-  EMIT(code, DEFVAR, tmp);
+  registerVariable(tmp);
   return tmp;
 }
 
@@ -183,6 +208,42 @@ static void storeValue(StringBuilder *code, Operand dst, ValueInfo value) {
     return;
 
   EMIT(code, MOVE, dst, value.val);
+}
+
+#define INT_WRAP_LABEL "$wrap32"
+#define INT_WRAP_VALUE "$wrap$value"
+#define INT_WRAP_TEMP "$wrap$temp"
+
+static void emitIntWrap(StringBuilder *code, Operand dst) {
+  EMIT(code, MOVE, varOp(FT_GF, INT_WRAP_VALUE), dst);
+  EMIT(code, CALL, labelOp(INT_WRAP_LABEL));
+  EMIT(code, MOVE, dst, varOp(FT_GF, INT_WRAP_VALUE));
+}
+
+static void emitIntWrapRoutine(StringBuilder *code) {
+  Operand value = varOp(FT_GF, INT_WRAP_VALUE);
+  Operand temp = varOp(FT_GF, INT_WRAP_TEMP);
+  Operand wrap = labelOp("$wrap32$wrap");
+  Operand positive = labelOp("$wrap32$positive");
+
+  EMIT(code, LABEL, labelOp(INT_WRAP_LABEL));
+  EMIT(code, LT, temp, value, intOp(INT32_MIN));
+  EMIT(code, JUMPIFEQ, wrap, temp, boolOp(true));
+  EMIT(code, GT, temp, value, intOp(INT32_MAX));
+  EMIT(code, JUMPIFEQ, wrap, temp, boolOp(true));
+  EMIT0(code, RETURN);
+
+  EMIT(code, LABEL, wrap);
+  EMIT(code, ADD, value, value, intOp(INT64_C(1) << 31));
+  EMIT(code, IDIV, temp, value, intOp(INT64_C(1) << 32));
+  EMIT(code, MUL, temp, temp, intOp(INT64_C(1) << 32));
+  EMIT(code, SUB, value, value, temp);
+  EMIT(code, LT, temp, value, intOp(0));
+  EMIT(code, JUMPIFEQ, positive, temp, boolOp(false));
+  EMIT(code, ADD, value, value, intOp(INT64_C(1) << 32));
+  EMIT(code, LABEL, positive);
+  EMIT(code, SUB, value, value, intOp(INT64_C(1) << 31));
+  EMIT0(code, RETURN);
 }
 
 /// Lower expression into IFJcode26
@@ -203,10 +264,10 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
     case UNIT_LITERAL:
       return (ValueInfo){.ty = UNIT, .val = nilOp()};
     case VARIABLE:
-      return (ValueInfo){
-          .ty = UNKNOWN,
-          .val =
-              varOp(FT_LF, expr->data.variable)};  // BUG: Needs symbol table to resolve data type
+      if (expr->deducedDataType == UNKNOWN) {
+        die(ERR_INTERNAL, (int)expr->location.line, "Variable expression has no resolved type");
+      }
+      return (ValueInfo){.ty = expr->deducedDataType, .val = varOp(FT_LF, expr->data.variable)};
     case UNARY:
       if (expr->data.unary.operatorAst != NEGATION)
         die(ERR_INTERNAL, (int)expr->location.line,
@@ -214,25 +275,34 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
 
       ValueInfo operand = lowerExpression(code, expr->data.unary.expression, NULL);
 
-      dst = getResultOperand(code, preferredDst);
+      dst = getResultOperand(preferredDst);
 
-      EMIT(code, SUB, dst, intOp(0), operand.val);
+      if (operand.ty == INT) {
+        EMIT(code, SUB, dst, intOp(0), operand.val);
+        emitIntWrap(code, dst);
+      } else
+        EMIT(code, SUB, dst, floatOp(0.0), operand.val);
 
       return (ValueInfo){.ty = operand.ty, .val = dst};
     case BINARY:;
       ValueInfo left = lowerExpression(code, expr->data.binary.leftExpression, NULL);
       ValueInfo right = lowerExpression(code, expr->data.binary.rightExpression, NULL);
-      dst = getResultOperand(code, preferredDst);
+      dst = getResultOperand(preferredDst);
+      bool isIntOperation = left.ty == INT && right.ty == INT;
 
       switch (expr->data.binary.operatorAst) {
         case MULTIPLICATION:
           EMIT(code, MUL, dst, left.val, right.val);
+          if (isIntOperation)
+            emitIntWrap(code, dst);
           return (ValueInfo){.ty = left.ty, .val = dst};
 
         case DIVISION:
-          if (left.ty == INT)
+          if (left.ty == INT) {
             EMIT(code, IDIV, dst, left.val, right.val);
-          else
+            if (isIntOperation)
+              emitIntWrap(code, dst);
+          } else
             EMIT(code, DIV, dst, left.val, right.val);
 
           return (ValueInfo){.ty = left.ty, .val = dst};
@@ -240,12 +310,17 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
         case ADDITION:
           if (left.ty == STRING)
             EMIT(code, CONCAT, dst, left.val, right.val);
-          else
+          else {
             EMIT(code, ADD, dst, left.val, right.val);
+            if (isIntOperation)
+              emitIntWrap(code, dst);
+          }
           return (ValueInfo){.ty = left.ty, .val = dst};
 
         case SUBTRACTION:
           EMIT(code, SUB, dst, left.val, right.val);
+          if (isIntOperation)
+            emitIntWrap(code, dst);
           return (ValueInfo){.ty = left.ty, .val = dst};
 
         case LESSER:
@@ -312,7 +387,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
         return (ValueInfo){.ty = STRING, .val = stringOp("()")};
       case INT:
       case DOUBLE: {
-        Operand dst = getResultOperand(code, preferredDst);
+        Operand dst = getResultOperand(preferredDst);
         if (arg.ty == INT)
           EMIT(code, INT2STR, dst, arg.val);
         else
@@ -320,7 +395,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
         return (ValueInfo){.ty = STRING, .val = dst};
       }
       case BOOL: {
-        Operand dst = getResultOperand(code, preferredDst);
+        Operand dst = getResultOperand(preferredDst);
         Operand trueLabel = labelOp(newLabel("everything_is_one_function", "bool_to_str"));
         Operand endLabel = labelOp(newLabel("everything_is_one_function", "bool_to_str"));
 
@@ -338,25 +413,40 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
     }
     die(ERR_INTERNAL, 0, "Unreachable");
   } else if (strcmp(call->functionName, "readLine") == 0) {
-    Operand dst = getResultOperand(code, preferredDst);
+    Operand dst = getResultOperand(preferredDst);
     EMIT(code, READ, dst, typeOp(CT_STRING));
     return (ValueInfo){.ty = STRING, .val = dst};
   } else if (strcmp(call->functionName, "readInt") == 0) {
-    Operand dst = getResultOperand(code, preferredDst);
+    Operand dst = getResultOperand(preferredDst);
+    Operand temp = varOp(FT_GF, INT_WRAP_TEMP);
+    Operand invalid = labelOp(newLabel("everything_is_one_function", "readInt_invalid"));
+    Operand ok = labelOp(newLabel("everything_is_one_function", "readInt"));
     EMIT(code, READ, dst, typeOp(CT_INT));
+    EMIT(code, JUMPIFEQ, invalid, dst, nilOp());
+    EMIT(code, LT, temp, dst, intOp(INT32_MIN));
+    EMIT(code, JUMPIFEQ, invalid, temp, boolOp(true));
+    EMIT(code, GT, temp, dst, intOp(INT32_MAX));
+    EMIT(code, JUMPIFEQ, ok, temp, boolOp(false));
+    EMIT(code, LABEL, invalid);
+    EMIT(code, MOVE, dst, intOp(0));
+    EMIT(code, LABEL, ok);
     return (ValueInfo){.ty = STRING, .val = dst};
   } else if (strcmp(call->functionName, "readDouble") == 0) {
-    Operand dst = getResultOperand(code, preferredDst);
+    Operand dst = getResultOperand(preferredDst);
+    Operand ok = labelOp(newLabel("everything_is_one_function", "readFloat"));
     EMIT(code, READ, dst, typeOp(CT_FLOAT));
+    EMIT(code, JUMPIFNEQ, ok, dst, nilOp());
+    EMIT(code, MOVE, dst, floatOp(0.0));
+    EMIT(code, LABEL, ok);
     return (ValueInfo){.ty = STRING, .val = dst};
   } else if (strcmp(call->functionName, "toInt") == 0) {
     ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
-    Operand dst = getResultOperand(code, preferredDst);
+    Operand dst = getResultOperand(preferredDst);
     EMIT(code, FLOAT2INT, dst, arg.val);
     return (ValueInfo){.ty = INT, .val = dst};
   } else if (strcmp(call->functionName, "strLength") == 0) {
     ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
-    Operand dst = getResultOperand(code, preferredDst);
+    Operand dst = getResultOperand(preferredDst);
     EMIT(code, STRLEN, dst, arg.val);
     return (ValueInfo){.ty = INT, .val = dst};
   } else if (strcmp(call->functionName, "subStr") == 0) {
@@ -367,12 +457,12 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
     Operand exit40 = labelOp(newLabel("everything_is_one_function", "sub_str"));
     Operand loop = labelOp(newLabel("everything_is_one_function", "sub_str_loop"));
     Operand ok = labelOp(newLabel("everything_is_one_function", "sub_str_ok"));
-    Operand dst = getResultOperand(code, preferredDst);
+    Operand dst = getResultOperand(preferredDst);
 
-    EMIT(code, DEFVAR, strlen);
-    EMIT(code, DEFVAR, tempOp);
-    EMIT(code, DEFVAR, index);
-    EMIT(code, DEFVAR, result);
+    registerVariable(strlen);
+    registerVariable(tempOp);
+    registerVariable(index);
+    registerVariable(result);
 
     AstFunctionCallArgument *arg = call->firstArgument;
     ValueInfo str = lowerExpression(code, arg->expression, NULL);
@@ -386,8 +476,8 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
     EMIT(code, JUMPIFEQ, exit40, tempOp, boolOp(true));
     EMIT(code, GT, tempOp, start.val, end.val);
     EMIT(code, JUMPIFEQ, exit40, tempOp, boolOp(true));
-    EMIT(code, GT, tempOp, start.val, strlen);
-    EMIT(code, JUMPIFEQ, exit40, tempOp, boolOp(true));
+    EMIT(code, LT, tempOp, start.val, strlen);
+    EMIT(code, JUMPIFEQ, exit40, tempOp, boolOp(false));
     EMIT(code, GT, tempOp, end.val, strlen);
     EMIT(code, JUMPIFEQ, exit40, tempOp, boolOp(true));
 
@@ -396,7 +486,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
     EMIT(code, JUMPIFEQ, ok, tempOp, intOp(0));
     EMIT(code, MOVE, index, start.val);  // start doesn't have to be a variable
     EMIT(code, JUMPIFNEQ, loop, tempOp, strlen);
-    storeValue(code, dst, str);
+    storeValue(code, result, str);
     EMIT(code, JUMP, ok);
 
     EMIT(code, LABEL, loop);
@@ -404,16 +494,48 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
     EMIT(code, CONCAT, result, result, tempOp);
     EMIT(code, ADD, index, index, intOp(1));
     EMIT(code, JUMPIFNEQ, loop, index, end.val);
-    EMIT(code, MOVE, dst, result);
     EMIT(code, JUMP, ok);
 
     EMIT(code, LABEL, exit40);
     EMIT(code, EXIT, intOp(40));
     EMIT(code, LABEL, ok);
+    EMIT(code, MOVE, dst, result);
 
     return (ValueInfo){.ty = STRING, .val = dst};
+  } else if (strcmp(call->functionName, "ord") == 0) {
+    Operand tmp = varOp(FT_LF, newTempVar());
+    Operand err = labelOp(newLabel("everything_is_one_function", "ord_err"));
+    Operand ok = labelOp(newLabel("everything_is_one_function", "ord_ok"));
+    Operand dst = getResultOperand(preferredDst);
+
+    registerVariable(tmp);
+
+    AstFunctionCallArgument *arg = call->firstArgument;
+    ValueInfo str = lowerExpression(code, arg->expression, NULL);
+    arg = arg->nextArgument;
+    ValueInfo index = lowerExpression(code, arg->expression, NULL);
+
+    EMIT(code, LT, tmp, index.val, intOp(0));
+    EMIT(code, JUMPIFEQ, err, tmp, boolOp(true));
+    EMIT(code, STRLEN, tmp, str.val);
+    EMIT(code, JUMPIFEQ, err, tmp, intOp(0));
+    EMIT(code, LT, tmp, index.val, tmp);
+    EMIT(code, JUMPIFEQ, err, tmp, boolOp(false));
+
+    EMIT(code, STRI2INT, dst, str.val, index.val);
+    EMIT(code, JUMP, ok);
+
+    EMIT(code, LABEL, err);
+    EMIT(code, MOVE, dst, intOp(-1));
+    EMIT(code, LABEL, ok);
+    return (ValueInfo){.ty = INT, .val = dst};
+  } else if (strcmp(call->functionName, "chr") == 0) {
+    Operand dst = getResultOperand(preferredDst);
+    ValueInfo ch = lowerExpression(code, call->firstArgument->expression, NULL);
+    EMIT(code, INT2CHAR, dst, ch.val);
+    return (ValueInfo){.ty = STRING, .val = dst};
   } else {
-    Operand dst = getResultOperand(code, preferredDst);
+    Operand dst = getResultOperand(preferredDst);
     EMIT0(code, CREATEFRAME);
     AstFunctionCallArgument *arg = call->firstArgument;
     unsigned argc = 0;
@@ -446,7 +568,7 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd) {
   switch (cmd->type) {
     case VARIABLE_DECLARATION: {
       Operand var = varOp(FT_LF, cmd->data.variableDeclaration.variableName);
-      EMIT(code, DEFVAR, var);
+      registerVariable(var);
       ValueInfo value = lowerValue(code, cmd->data.variableDeclaration.value, &var);
       storeValue(code, var, value);
       break;
@@ -515,28 +637,43 @@ void lowerFunction(StringBuilder *code, AstFunction *func) {
     param = param->nextParameter;
   }
 
+  StringBuilder internal = sbNew(0);
+  registry.count = 0;
   if (func->bodyType == VALUE) {
     Operand ret = varOp(FT_LF, "$ret");
-    ValueInfo value = lowerValue(code, func->body.value, &ret);
-    storeValue(code, ret, value);
-    EMIT0(code, RETURN);
+    ValueInfo value = lowerValue(&internal, func->body.value, &ret);
+    storeValue(&internal, ret, value);
+    EMIT0(&internal, RETURN);
+    for (size_t i = 0; i < registry.count; i++) {
+      EMIT(code, DEFVAR, varOp(FT_LF, registry.names[i]));
+    }
+    sbAppend(code, sbBuild(&internal));
   } else {
-    lowerCodeBlock(code, func->body.codeBlock);
+    lowerCodeBlock(&internal, func->body.codeBlock);
+    for (size_t i = 0; i < registry.count; i++) {
+      EMIT(code, DEFVAR, varOp(FT_LF, registry.names[i]));
+    }
+    sbAppend(code, sbBuild(&internal));
   }
 }
 
 char *generateCode(AstProgram program) {
+  // Allocate the registry before the string builder so that the string builder can grow
+  registerVariable(nilOp());
   StringBuilder code = sbNew(0);
   sbAppend(&code, ".IFJcode26\n");
   EMIT0(&code, CREATEFRAME);
   EMIT0(&code, PUSHFRAME);
   EMIT(&code, DEFVAR, varOp(FT_LF, "$ret"));
+  EMIT(&code, DEFVAR, varOp(FT_GF, INT_WRAP_VALUE));
+  EMIT(&code, DEFVAR, varOp(FT_GF, INT_WRAP_TEMP));
   for (AstFunction *func = program.firstFunction; func != NULL; func = func->nextFunction)
     if (func->isMain) {
       EMIT(&code, CALL, labelOp(func->functionName));
       break;
     }
   EMIT(&code, EXIT, intOp(0));
+  emitIntWrapRoutine(&code);
   AstFunction *func = program.firstFunction;
   while (func != NULL) {
     lowerFunction(&code, func);
