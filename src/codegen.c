@@ -504,8 +504,6 @@ void lowerCodeBlock(StringBuilder *code, AstCodeBlock *block) {
 
 void lowerFunction(StringBuilder *code, AstFunction *func) {
   EMIT(code, LABEL, labelOp(func->functionName));
-  if (func->isMain)
-    EMIT(code, LABEL, labelOp("$main"));
 
   AstFunctionParameter *param = func->firstParameter;
   unsigned argc = 0;
@@ -533,9 +531,12 @@ char *generateCode(AstProgram program) {
   EMIT0(&code, CREATEFRAME);
   EMIT0(&code, PUSHFRAME);
   EMIT(&code, DEFVAR, varOp(FT_LF, "$ret"));
-  EMIT(&code, CALL, labelOp("$main"));
-  EMIT0(&code, POPFRAME);
-  EMIT(&code, EXIT, varOp(FT_TF, "$ret"));
+  for (AstFunction *func = program.firstFunction; func != NULL; func = func->nextFunction)
+    if (func->isMain) {
+      EMIT(&code, CALL, labelOp(func->functionName));
+      break;
+    }
+  EMIT(&code, EXIT, intOp(0));
   AstFunction *func = program.firstFunction;
   while (func != NULL) {
     lowerFunction(&code, func);
