@@ -157,168 +157,208 @@ typedef struct {
   Operand val;
 } ValueInfo;
 
+static Operand getResultOperand(StringBuilder *code, const Operand *preferred) {
+  if (preferred != NULL) {
+    if (preferred->type != OK_VAR)
+      die(ERR_INTERNAL, 0, "Result destination must be a variable");
+
+    return *preferred;
+  }
+
+  Operand tmp = varOp(FT_LF, newTempVar());
+  EMIT(code, DEFVAR, tmp);
+  return tmp;
+}
+
+static bool sameVariable(Operand a, Operand b) {
+  return a.type == OK_VAR && b.type == OK_VAR && a.value.var.ft == b.value.var.ft &&
+         strcmp(a.value.var.name, b.value.var.name) == 0;
+}
+
+static void storeValue(StringBuilder *code, Operand dst, ValueInfo value) {
+  if (dst.type != OK_VAR)
+    die(ERR_INTERNAL, 0, "Destination must be a variable");
+
+  if (sameVariable(dst, value.val))
+    return;
+
+  EMIT(code, MOVE, dst, value.val);
+}
+
 /// Lower expression into IFJcode26
 /// @param code Reference to string builder
 /// @param expr Pointer to expression to lower
 /// @param val Optional desired operand to store in (uses temporary if NULL)
 /// @note Expects all used variables to be present in LF
 /// @note Resulting value info contains destination of value
-ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operand *val) {
+ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operand *preferredDst) {
   Operand dst;
-  if (val != NULL)
-    dst = *val;
-  else if (expr->expressionType == VARIABLE) {
-    return (ValueInfo){
-        .ty = UNIT,
-        .val = varOp(FT_LF, expr->data.variable)};  // BUG: Needs symbol table to resolve data type
-  } else {
-    dst = varOp(FT_LF, newTempVar());
-    EMIT(code, DEFVAR, dst);
-  }
-
-  ValueInfo inf;
   switch (expr->expressionType) {
     case INT_LITERAL:
-      EMIT(code, MOVE, dst, intOp(expr->data.intValue));
-      return (ValueInfo){.ty = INT, .val = dst};
+      return (ValueInfo){.ty = INT, .val = intOp(expr->data.intValue)};
     case DOUBLE_LITERAL:
-      EMIT(code, MOVE, dst, floatOp(expr->data.doubleValue));
-      return (ValueInfo){.ty = DOUBLE, .val = dst};
+      return (ValueInfo){.ty = DOUBLE, .val = floatOp(expr->data.doubleValue)};
     case STRING_LITERAL:
-      EMIT(code, MOVE, dst, stringOp(expr->data.stringValue));
-      return (ValueInfo){.ty = STRING, .val = dst};
+      return (ValueInfo){.ty = STRING, .val = stringOp(expr->data.stringValue)};
     case UNIT_LITERAL:
-      EMIT(code, MOVE, dst, nilOp());
-      return (ValueInfo){.ty = UNIT, .val = dst};
+      return (ValueInfo){.ty = UNIT, .val = nilOp()};
     case VARIABLE:
-      EMIT(code, MOVE, dst, varOp(FT_LF, expr->data.variable));
-      return (ValueInfo){.ty = UNIT, .val = dst};  // BUG: Needs symbol table to resolve data type
+      return (ValueInfo){
+          .ty = UNKNOWN,
+          .val =
+              varOp(FT_LF, expr->data.variable)};  // BUG: Needs symbol table to resolve data type
     case UNARY:
       if (expr->data.unary.operatorAst != NEGATION)
         die(ERR_INTERNAL, (int)expr->location.line,
             "Binary operation cannot be performed on single operand");
-      inf = lowerExpression(code, expr->data.unary.expression, &dst);
-      EMIT(code, SUB, dst, intOp(0), dst);
-      return (ValueInfo){.ty = inf.ty, .val = dst};
+
+      ValueInfo operand = lowerExpression(code, expr->data.unary.expression, NULL);
+
+      dst = getResultOperand(code, preferredDst);
+
+      EMIT(code, SUB, dst, intOp(0), operand.val);
+
+      return (ValueInfo){.ty = operand.ty, .val = dst};
     case BINARY:;
-      inf = lowerExpression(code, expr->data.binary.leftExpression, val);
-      ValueInfo inf2 = lowerExpression(code, expr->data.binary.rightExpression, NULL);
+      ValueInfo left = lowerExpression(code, expr->data.binary.leftExpression, NULL);
+      ValueInfo right = lowerExpression(code, expr->data.binary.rightExpression, NULL);
+      dst = getResultOperand(code, preferredDst);
+
       switch (expr->data.binary.operatorAst) {
-        case NEGATION:
-          die(ERR_INTERNAL, (int)expr->location.line,
-              "Unary operation cannot be performed on two operands");
         case MULTIPLICATION:
-          EMIT(code, MUL, dst, inf.val, inf2.val);
-          return (ValueInfo){.ty = inf.ty, .val = dst};
+          EMIT(code, MUL, dst, left.val, right.val);
+          return (ValueInfo){.ty = left.ty, .val = dst};
+
         case DIVISION:
-          if (inf.ty == INT)
-            EMIT(code, IDIV, dst, inf.val, inf2.val);
+          if (left.ty == INT)
+            EMIT(code, IDIV, dst, left.val, right.val);
           else
-            EMIT(code, DIV, dst, inf.val, inf2.val);
-          return (ValueInfo){.ty = inf.ty, .val = dst};
+            EMIT(code, DIV, dst, left.val, right.val);
+
+          return (ValueInfo){.ty = left.ty, .val = dst};
+
         case ADDITION:
-          if (inf.ty == STRING)
-            EMIT(code, CONCAT, dst, inf.val, inf2.val);
+          if (left.ty == STRING)
+            EMIT(code, CONCAT, dst, left.val, right.val);
           else
-            EMIT(code, ADD, dst, inf.val, inf2.val);
-          return (ValueInfo){.ty = inf.ty, .val = dst};
+            EMIT(code, ADD, dst, left.val, right.val);
+          return (ValueInfo){.ty = left.ty, .val = dst};
+
         case SUBTRACTION:
-          EMIT(code, SUB, dst, inf.val, inf2.val);
-          return (ValueInfo){.ty = inf.ty, .val = dst};
+          EMIT(code, SUB, dst, left.val, right.val);
+          return (ValueInfo){.ty = left.ty, .val = dst};
+
         case LESSER:
-          EMIT(code, LT, dst, inf.val, inf2.val);
+          EMIT(code, LT, dst, left.val, right.val);
           return (ValueInfo){.ty = BOOL, .val = dst};
-        case LESSER_EQUAL:;
-          EMIT(code, GT, dst, inf.val, inf2.val);
+
+        case LESSER_EQUAL:
+          EMIT(code, GT, dst, left.val, right.val);
           EMIT(code, NOT, dst, dst);
           return (ValueInfo){.ty = BOOL, .val = dst};
+
         case GREATER:
-          EMIT(code, GT, dst, inf.val, inf2.val);
+          EMIT(code, GT, dst, left.val, right.val);
           return (ValueInfo){.ty = BOOL, .val = dst};
-        case GREATER_EQUAL:;
-          EMIT(code, LT, dst, inf.val, inf2.val);
+
+        case GREATER_EQUAL:
+          EMIT(code, LT, dst, left.val, right.val);
           EMIT(code, NOT, dst, dst);
           return (ValueInfo){.ty = BOOL, .val = dst};
+
         case EQUAL:
-          EMIT(code, EQ, dst, inf.val, inf2.val);
+          EMIT(code, EQ, dst, left.val, right.val);
           return (ValueInfo){.ty = BOOL, .val = dst};
+
         case NOT_EQUAL:
-          EMIT(code, EQ, dst, inf.val, inf2.val);
+          EMIT(code, EQ, dst, left.val, right.val);
           EMIT(code, NOT, dst, dst);
           return (ValueInfo){.ty = BOOL, .val = dst};
+
         default:
-          die(ERR_INTERNAL, 0, "Unknown expression type");
+          die(ERR_INTERNAL, (int)expr->location.line, "Unknown binary operator");
       }
     default:
       die(ERR_INTERNAL, 0, "Unknown expression type");
   }
 }
 
-void lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Operand *dst) {
-  Operand ret;
-  if (dst != NULL)
-    ret = *dst;
-  else
-    ret = varOp(FT_LF, "$ret");
-
-  ValueInfo exprRet;
+ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
+                            const Operand *preferredDst) {
   if (strcmp(call->functionName, "print") == 0) {
-    exprRet = lowerExpression(code, call->firstArgument->expression, NULL);
-    switch (exprRet.ty) {
+    ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
+    switch (arg.ty) {
       case INT:
       case DOUBLE:
       case STRING:
-      case BOOL:;
-        EMIT(code, WRITE, exprRet.val);
+      case BOOL:
+        EMIT(code, WRITE, arg.val);
         break;
+
       case UNIT:
         EMIT(code, WRITE, stringOp("()"));
         break;
+
       case UNKNOWN:
         die(ERR_INTERNAL, 0, "Unable to print unknown value");
     }
-    return;
+    return (ValueInfo){.ty = UNIT, .val = nilOp()};
   } else if (strcmp(call->functionName, "toStr") == 0) {
-    exprRet = lowerExpression(code, call->firstArgument->expression, &ret);
-    switch (exprRet.ty) {
-      case INT:
-        EMIT(code, INT2STR, ret, exprRet.val);
-        break;
-      case DOUBLE:
-        EMIT(code, FLOAT2STR, ret, exprRet.val);
-        break;
+    ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
+    switch (arg.ty) {
       case STRING:
-        // WARN: Could need move if lowerExpression ever doesn't use val even if supplied
-        break;
-      case BOOL:;
+        return arg;
+      case UNIT:
+        return (ValueInfo){.ty = STRING, .val = stringOp("()")};
+      case INT:
+      case DOUBLE: {
+        Operand dst = getResultOperand(code, preferredDst);
+        if (arg.ty == INT)
+          EMIT(code, INT2STR, dst, arg.val);
+        else
+          EMIT(code, FLOAT2STR, dst, arg.val);
+        return (ValueInfo){.ty = STRING, .val = dst};
+      }
+      case BOOL: {
+        Operand dst = getResultOperand(code, preferredDst);
         Operand trueLabel = labelOp(newLabel("everything_is_one_function", "bool_to_str"));
         Operand endLabel = labelOp(newLabel("everything_is_one_function", "bool_to_str"));
-        EMIT(code, JUMPIFEQ, trueLabel, exprRet.val, boolOp(true));
-        EMIT(code, MOVE, ret, stringOp("false"));
+
+        EMIT(code, JUMPIFEQ, trueLabel, arg.val, boolOp(true));
+        EMIT(code, MOVE, dst, stringOp("false"));
         EMIT(code, JUMP, endLabel);
         EMIT(code, LABEL, trueLabel);
-        EMIT(code, MOVE, ret, stringOp("true"));
+        EMIT(code, MOVE, dst, stringOp("true"));
         EMIT(code, LABEL, endLabel);
-        break;
-      case UNIT:
-        EMIT(code, MOVE, ret, stringOp("()"));
-        break;
+
+        return (ValueInfo){.ty = STRING, .val = dst};
+      }
       case UNKNOWN:
-        die(ERR_INTERNAL, 0, "Unable to print unknown value");
+        die(ERR_INTERNAL, 0, "Unable to convert unknown value");
     }
-    return;
+    die(ERR_INTERNAL, 0, "Unreachable");
   } else if (strcmp(call->functionName, "readLine") == 0) {
-    EMIT(code, READ, ret, typeOp(CT_STRING));
+    Operand dst = getResultOperand(code, preferredDst);
+    EMIT(code, READ, dst, typeOp(CT_STRING));
+    return (ValueInfo){.ty = STRING, .val = dst};
   } else if (strcmp(call->functionName, "readInt") == 0) {
-    EMIT(code, READ, ret, typeOp(CT_INT));
+    Operand dst = getResultOperand(code, preferredDst);
+    EMIT(code, READ, dst, typeOp(CT_INT));
+    return (ValueInfo){.ty = STRING, .val = dst};
   } else if (strcmp(call->functionName, "readDouble") == 0) {
-    EMIT(code, READ, ret, typeOp(CT_FLOAT));
+    Operand dst = getResultOperand(code, preferredDst);
+    EMIT(code, READ, dst, typeOp(CT_FLOAT));
+    return (ValueInfo){.ty = STRING, .val = dst};
   } else if (strcmp(call->functionName, "toInt") == 0) {
-    exprRet = lowerExpression(code, call->firstArgument->expression, &ret);
-    EMIT(code, FLOAT2INT, ret, exprRet.val);
+    ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
+    Operand dst = getResultOperand(code, preferredDst);
+    EMIT(code, FLOAT2INT, dst, arg.val);
+    return (ValueInfo){.ty = INT, .val = dst};
   } else if (strcmp(call->functionName, "strLength") == 0) {
-    exprRet = lowerExpression(code, call->firstArgument->expression, &ret);
-    EMIT(code, STRLEN, ret, exprRet.val);
+    ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
+    Operand dst = getResultOperand(code, preferredDst);
+    EMIT(code, STRLEN, dst, arg.val);
+    return (ValueInfo){.ty = INT, .val = dst};
   } else if (strcmp(call->functionName, "subStr") == 0) {
     Operand strlen = varOp(FT_LF, newTempVar());
     Operand tempOp = varOp(FT_LF, newTempVar());
@@ -327,6 +367,7 @@ void lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Operand
     Operand exit40 = labelOp(newLabel("everything_is_one_function", "sub_str"));
     Operand loop = labelOp(newLabel("everything_is_one_function", "sub_str_loop"));
     Operand ok = labelOp(newLabel("everything_is_one_function", "sub_str_ok"));
+    Operand dst = getResultOperand(code, preferredDst);
 
     EMIT(code, DEFVAR, strlen);
     EMIT(code, DEFVAR, tempOp);
@@ -355,72 +396,77 @@ void lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Operand
     EMIT(code, JUMPIFEQ, ok, tempOp, intOp(0));
     EMIT(code, MOVE, index, start.val);  // start doesn't have to be a variable
     EMIT(code, JUMPIFNEQ, loop, tempOp, strlen);
-    if (strcmp(ret.value.var.name, str.val.value.var.name) != 0)
-      EMIT(code, MOVE, ret, str.val);
+    storeValue(code, dst, str);
     EMIT(code, JUMP, ok);
 
     EMIT(code, LABEL, loop);
     EMIT(code, GETCHAR, tempOp, str.val, index);
-    EMIT(code, CONCAT, result, ret, tempOp);
+    EMIT(code, CONCAT, result, result, tempOp);
     EMIT(code, ADD, index, index, intOp(1));
     EMIT(code, JUMPIFNEQ, loop, index, end.val);
-    EMIT(code, MOVE, ret, result);
+    EMIT(code, MOVE, dst, result);
     EMIT(code, JUMP, ok);
 
     EMIT(code, LABEL, exit40);
     EMIT(code, EXIT, intOp(40));
     EMIT(code, LABEL, ok);
+
+    return (ValueInfo){.ty = STRING, .val = dst};
   } else {
+    Operand dst = getResultOperand(code, preferredDst);
     EMIT0(code, CREATEFRAME);
     AstFunctionCallArgument *arg = call->firstArgument;
     unsigned argc = 0;
     while (arg != NULL) {
       Operand op = varOp(FT_TF, funcParam(argc++));
       EMIT(code, DEFVAR, op);
-      lowerExpression(code, arg->expression, &op);
+      ValueInfo argValue = lowerExpression(code, arg->expression, &op);
+      storeValue(code, op, argValue);
       arg = arg->nextArgument;
     }
     EMIT0(code, PUSHFRAME);
     EMIT(code, DEFVAR, varOp(FT_LF, "$ret"));
     EMIT(code, CALL, labelOp(call->functionName));
     EMIT0(code, POPFRAME);
-    EMIT(code, MOVE, ret, varOp(FT_TF, "$ret"));
+    EMIT(code, MOVE, dst, varOp(FT_TF, "$ret"));
+    return (ValueInfo){.ty = UNKNOWN, .val = dst};  // BUG: Needs symbol table to resolve data type
   }
 }
 
-void lowerValue(StringBuilder *code, AstValue *val, const Operand *dst) {
-  Operand ret;
-  if (dst != NULL)
-    ret = *dst;
-  else
-    ret = varOp(FT_LF, newTempVar());
-  if (val->type == VALUE_EXPRESSION)
-    lowerExpression(code, val->data.expression, &ret);
-  else
-    lowerFunctionCall(code, val->data.functionCall, &ret);
+ValueInfo lowerValue(StringBuilder *code, AstValue *val, const Operand *preferredDst) {
+  if (val->type == VALUE_EXPRESSION) {
+    return lowerExpression(code, val->data.expression, preferredDst);
+  }
+  return lowerFunctionCall(code, val->data.functionCall, preferredDst);
 }
 
 void lowerCodeBlock(StringBuilder *code, AstCodeBlock *block);
 
 void lowerCommand(StringBuilder *code, AstCommand *cmd) {
   switch (cmd->type) {
-    case VARIABLE_DECLARATION:;
+    case VARIABLE_DECLARATION: {
       Operand var = varOp(FT_LF, cmd->data.variableDeclaration.variableName);
       EMIT(code, DEFVAR, var);
-      lowerValue(code, cmd->data.variableDeclaration.value, &var);
+      ValueInfo value = lowerValue(code, cmd->data.variableDeclaration.value, &var);
+      storeValue(code, var, value);
       break;
-    case ASSIGNMENT:;
+    }
+    case ASSIGNMENT: {
       Operand dst = varOp(FT_LF, cmd->data.assignment.variableName);
-      lowerValue(code, cmd->data.assignment.value, &dst);
+      ValueInfo value = lowerValue(code, cmd->data.assignment.value, &dst);
+      storeValue(code, dst, value);
       break;
+    }
     case FUNCTION_CALL:
       lowerFunctionCall(code, cmd->data.call.functionCall, NULL);
       break;
-    case RETURN:;
+    case RETURN: {
       Operand ret = varOp(FT_LF, "$ret");
-      lowerValue(code, cmd->data.returnAst.value, &ret);
+      ValueInfo value = lowerValue(code, cmd->data.returnAst.value, &ret);
+      storeValue(code, ret, value);
       EMIT0(code, RETURN);
       break;
+    }
     case IF:;
       Operand f = labelOp(newLabel("everything_is_one_function", "if_false"));
       Operand end = labelOp(newLabel("everything_is_one_function", "if_end"));
@@ -473,7 +519,8 @@ void lowerFunction(StringBuilder *code, AstFunction *func) {
 
   if (func->bodyType == VALUE) {
     Operand ret = varOp(FT_LF, "$ret");
-    lowerValue(code, func->body.value, &ret);
+    ValueInfo value = lowerValue(code, func->body.value, &ret);
+    storeValue(code, ret, value);
     EMIT0(code, RETURN);
   } else {
     lowerCodeBlock(code, func->body.codeBlock);
