@@ -111,6 +111,8 @@ union Value *getValue(const struct Token *token);
  */
 int getLine(const struct Token *token);
 
+void printToken(const struct Token *token);
+
 // STRING FUNCTIONS
 
 /**

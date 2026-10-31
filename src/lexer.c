@@ -140,9 +140,9 @@ void numDecimal(LinkedTlist **lastToken, char prevChar, char *nextChar, int inte
   }
   if (*nextChar != 'd' && *nextChar != 'D') {
     *preloadedChar = true;
+    if ((*nextChar >= 'a' && *nextChar <= 'z') || (*nextChar >= 'A' && *nextChar <= 'Z'))
+      die(1, *line, "Unexpected character at line %d colum %d", *line, *position);
   }
-  if ((*nextChar >= 'a' && *nextChar <= 'z') || (*nextChar >= 'A' && *nextChar <= 'Z'))
-    die(1, *line, "Unexpected character at line %d colum %d", *line, *position);
 
   decimal *= pow(10, expSign * exponent);
 
@@ -300,7 +300,6 @@ LinkedTlist *lexerMain(void) {
           position++;
           if (nextChar == '_')
             numUnderscore(&nextChar, &position, &line, true);
-          break;
         }
         if (nextChar == '.' || nextChar == 'e' || nextChar == 'E') {
           numDecimal(&lastToken, nextChar, &nextChar, 0, &line, &position, &preloadedChar);

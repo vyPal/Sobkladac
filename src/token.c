@@ -10,6 +10,8 @@
 #include "token.h"
 
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "common.h"
 
@@ -46,6 +48,37 @@ union Value *getValue(const struct Token *token) {
 
 int getLine(const struct Token *token) {
   return token->line;
+}
+
+void printToken(const struct Token *token) {
+  if (token == NULL)
+    return;
+
+  printf("Token type: %d, line: %d , ", token->type, token->line);
+  if (token->value != NULL) {
+    switch (token->type) {
+      case TK_STRING:
+        printf("value: %s\n", token->value->s->string);
+        break;
+      case TK_IDENT:
+        printf("value: %s\n", token->value->s->string);
+        break;
+      case TK_NUMBER:
+        printf("value: %d\n", token->value->i);
+        break;
+      case TK_INDENT:
+        printf("value: %d\n", token->value->i);
+        break;
+      case TK_DECIMAL:
+        printf("value: %f\n", token->value->d);
+        break;
+      default:
+        printf("value: (not applicable)\n");
+        break;
+    }
+  } else {
+    printf("value: (null)\n");
+  }
 }
 
 // STRING FUNCTIONS
