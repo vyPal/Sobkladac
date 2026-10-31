@@ -148,7 +148,7 @@ void numDecimal(LinkedTlist **lastToken, char prevChar, char *nextChar, int inte
 
   Token *tk = newToken(TK_DECIMAL, *line);
   union Value *value = arenaAlloc(sizeof(union Value));
-  value->d = decimal;
+  (*value).d = decimal;
   setValue(tk, value);
   *lastToken = pushToken(tk, *lastToken);
 }
@@ -314,7 +314,7 @@ LinkedTlist *lexerMain(void) {
           Token *tk = newToken(TK_NUMBER, line);
           int zero = 0;
           union Value *value = arenaAlloc(sizeof(union Value));
-          value->i = zero;
+          (*value).i = zero;
           setValue(tk, value);
           lastToken = pushToken(tk, lastToken);
         }
@@ -349,7 +349,7 @@ LinkedTlist *lexerMain(void) {
             Token *tk = newToken(TK_INDENT, line);
             int indent = indentCount;
             union Value *value = arenaAlloc(sizeof(union Value));
-            value->i = indent;
+            (*value).i = indent;
             setValue(tk, value);
             lastToken = pushToken(tk, lastToken);
           }
@@ -557,7 +557,7 @@ LinkedTlist *lexerMain(void) {
             preloadedChar = true;
             Token *tk = newToken(TK_NUMBER, line);
             union Value *value = arenaAlloc(sizeof(union Value));
-            value->i = integer;
+            (*value).i = integer;
             setValue(tk, value);
             lastToken = pushToken(tk, lastToken);
           }
