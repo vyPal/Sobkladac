@@ -22,15 +22,22 @@ int main(void) {
                      .data.variableDeclaration = {.variableName = "b", .value = &val2}};
   cmd1.nextCommand = &cmd2;
 
-  AstExpression lexp3 = {.expressionType = VARIABLE, .data.variable = "a"};
-  AstExpression rexp3 = {.expressionType = VARIABLE, .data.variable = "b"};
+  AstExpression lexp3 = {.expressionType = VARIABLE, .data.variable = "a", .deducedDataType = INT};
+  AstExpression rexp3 = {.expressionType = VARIABLE, .data.variable = "b", .deducedDataType = INT};
   AstExpression exp3 = {
       .expressionType = BINARY,
       .data.binary = {
           .leftExpression = &lexp3, .rightExpression = &rexp3, .operatorAst = ADDITION}};
-  AstValue val3 = {.type = VALUE_EXPRESSION, .data.expression = &exp3};
-  AstCommand cmd3 = {.type = RETURN, .data.returnAst.value = &val3, .nextCommand = NULL};
+
+  AstFunctionCallArgument arg3 = {.expression = &exp3};
+  AstFunctionCall call3 = {.functionName = "print", .firstArgument = &arg3};
+  AstCommand cmd3 = {.type = FUNCTION_CALL, .data.call.functionCall = &call3};
   cmd2.nextCommand = &cmd3;
+
+  AstExpression exp4 = {.expressionType = UNIT_LITERAL};
+  AstValue val4 = {.type = VALUE_EXPRESSION, .data.expression = &exp4};
+  AstCommand cmd4 = {.type = RETURN, .data.returnAst.value = &val4, .nextCommand = NULL};
+  cmd3.nextCommand = &cmd4;
 
   AstCodeBlock block1 = {.firstCommand = &cmd1};
   AstFunction func1 = {.functionName = "main",
