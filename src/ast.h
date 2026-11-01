@@ -65,7 +65,8 @@ typedef enum {
   DOUBLE,  // 64bit float IEEE 754
   STRING,  // unmodifiable character list
   BOOL,    // true/false
-  UNIT     // nothing
+  UNIT,    // nothing
+  ANY      // for built in functions only
 } AstDataType;
 
 /// @brief IFJ26 operators
