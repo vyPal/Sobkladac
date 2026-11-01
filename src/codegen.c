@@ -417,6 +417,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
         break;
 
       case UNKNOWN:
+      case ANY:
         die(ERR_INTERNAL, 0, "Unable to print unknown value");
     }
     return (ValueInfo){.ty = UNIT, .val = nilOp()};
@@ -452,6 +453,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
         return (ValueInfo){.ty = STRING, .val = dst};
       }
       case UNKNOWN:
+      case ANY:
         die(ERR_INTERNAL, 0, "Unable to convert unknown value");
     }
     die(ERR_INTERNAL, 0, "Unreachable");
