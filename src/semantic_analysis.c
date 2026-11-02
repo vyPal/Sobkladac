@@ -43,6 +43,46 @@ Semantic analysis checklist:
 #include "common.h"
 #include "symtable.h"
 
-bool semanticAnalysis(AstProgram *ast) {
+typedef struct {
+  SymTable *globalTable;
+} SemanticContext;
+
+bool initializeSymtable(AstProgram *ast) {
   return false;
+}
+
+bool checkDeclarations(AstProgram *ast) {
+  return false;
+}
+
+bool checkTypes(AstProgram *ast) {
+  return false;
+}
+
+bool checkReturns(AstProgram *ast) {
+  return false;
+}
+
+bool uniqueNameResolution(AstProgram *ast) {
+  return false;
+}
+
+bool semanticAnalysis(AstProgram *ast) {
+  if (!initializeSymtable(ast)) {
+    return false;
+  }
+  if (!checkDeclarations(ast)) {
+    return false;
+  }
+  if (!checkTypes(ast)) {
+    return false;
+  }
+  if (!checkReturns(ast)) {
+    return false;
+  }
+  if (!uniqueNameResolution(ast)) {
+    return false;
+  }
+
+  return true;
 }

@@ -22,6 +22,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+typedef struct SymTable SymTable;
+
 typedef struct AstProgram AstProgram;
 typedef struct AstFunction AstFunction;
 typedef struct AstFunctionParameter AstFunctionParameter;
@@ -197,6 +199,7 @@ struct AstCommand {
 struct AstCodeBlock {
   AstCommand *firstCommand;
   AstCommand *lastCommand;
+  SymTable *scope;
 };
 
 /// @brief IFJ26 function parameter
@@ -211,6 +214,7 @@ struct AstFunction {
   char *functionName;
   bool isMain;  // @main
   AstLocation location;
+  SymTable *scope;
 
   AstFunctionParameter *firstParameter;
   AstFunctionParameter *lastParameter;
