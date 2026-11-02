@@ -37,12 +37,36 @@ Semantic analysis checklist:
 - Ensure the code generator can distinguish variables with identical names in different scopes.
 */
 
+/*
+Error codes:
+1 chyba v programu v rámci lexikální analýzy (chybná struktura aktuálního lexému, komen-
+táře nebo odsazení).
+2 chyba v programu v rámci syntaktické analýzy (chybná syntaxe, chybějící prolog, nepo-
+volená konstrukce nebo porušení struktury odsazených bloků).
+3 sémantická chyba – použití nedefinované funkce, proměnné nebo typu; chybějící funkce
+s anotací @main.
+4 sémantická chyba – nepovolená redefinice funkce, proměnné, typu.
+5 sémantická chyba – nesprávný počet nebo typ argumentů při volání funkce, nepovolené
+parametry funkce s anotací @main.
+6 sémantická chyba typové kompatibility nebo odvození typu ve výrazu, přiřazení, iniciali-
+zaci, návratové hodnotě či řídicí konstrukci.
+7 sémantická chyba – pokus o zápis do nemodifikovatelné proměnné nebo formálního pa-
+rametru funkce.
+10 ostatní sémantické chyby (např. nepovolený return, nevyčerpávající match nebo nulový
+krok rozsahu).
+*/
+
 #include <stdbool.h>
 
 #include "ast.h"
 #include "codegen.h"
 #include "common.h"
 #include "symtable.h"
+
+typedef struct {
+  SymTable *globalSymTable;
+  int errorCode;
+} SemanticContext;
 
 bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsigned column,
                             AstDataType returnType, AstDataType *paramTypes, size_t paramCount,
@@ -65,12 +89,19 @@ bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsig
   return true;
 }
 
-typedef struct {
-  SymTable *globalSymTable;
-} SemanticContext;
+unsigned getParamCount(AstFunction *func) {
+  unsigned i = 0;
+  AstFunctionParameter *param = func->firstParameter;
+  while (param != NULL) {
+    i++;
+    param = param->nextParameter;
+  }
+  return i;
+}
 
 bool initializeSymtable(AstProgram *ast, SemanticContext *context) {
   context->globalSymTable = symtableCreate(NULL);
+  context->errorCode = 0;
 
   // built-in functions
   AstDataType *printParams = arenaAlloc(sizeof(AstDataType));
@@ -113,7 +144,54 @@ bool initializeSymtable(AstProgram *ast, SemanticContext *context) {
   chrParams[0] = INT;
   insertFunctionSymTable(context->globalSymTable, "chr", 0, 0, STRING, chrParams, 1, true, false);
 
-  return false;
+  // add user functions
+  AstFunction *func = ast->firstFunction;
+  bool foundMain = false;
+  while (func != NULL) {
+    // check correct main function declaration
+    if (func->isMain) {
+      if (foundMain == true) {
+        context->errorCode = 4;
+        return false;
+      }
+      if (func->firstParameter != NULL) {
+        context->errorCode = 5;
+        return false;
+      }
+      if (func->declaredReturnType != UNIT) {
+        context->errorCode = 6;
+        return false;
+      }
+      foundMain = true;
+    }
+
+    // add function to SymTable
+    unsigned paramCount = getParamCount(func);
+    AstDataType *paramTypes = NULL;
+    if (paramCount > 0) {
+      paramTypes = arenaAlloc(paramCount * sizeof(AstDataType));
+      AstFunctionParameter *param = func->firstParameter;
+      unsigned i = 0;
+      while (param != NULL) {
+        paramTypes[i] = param->dataType;
+        i++;
+        param = param->nextParameter;
+      }
+    }
+    if (!insertFunctionSymTable(context->globalSymTable, func->functionName, func->location.line,
+                                func->location.column, func->declaredReturnType, paramTypes,
+                                paramCount, false, func->isMain)) {
+      context->errorCode = 4;
+      return false;
+    }
+    func = func->nextFunction;
+  }
+  // check if main function was found
+  if (foundMain == false) {
+    context->errorCode = 3;
+    return false;
+  }
+  return true;
 }
 
 bool checkDeclarations(AstProgram *ast, SemanticContext *context) {
