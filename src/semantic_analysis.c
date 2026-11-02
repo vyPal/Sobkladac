@@ -71,7 +71,47 @@ typedef struct {
 
 bool initializeSymtable(AstProgram *ast, SemanticContext *context) {
   context->globalSymTable = symtableCreate(NULL);
+
   // built-in functions
+  AstDataType *printParams = arenaAlloc(sizeof(AstDataType));
+  printParams[0] = ANY;
+  insertFunctionSymTable(context->globalSymTable, "print", 0, 0, UNIT, printParams, 1, true, false);
+
+  insertFunctionSymTable(context->globalSymTable, "readLine", 0, 0, STRING, NULL, 0, true, false);
+
+  insertFunctionSymTable(context->globalSymTable, "readInt", 0, 0, INT, NULL, 0, true, false);
+
+  insertFunctionSymTable(context->globalSymTable, "readDouble", 0, 0, DOUBLE, NULL, 0, true, false);
+
+  AstDataType *toStrParams = arenaAlloc(sizeof(AstDataType));
+  toStrParams[0] = ANY;
+  insertFunctionSymTable(context->globalSymTable, "toStr", 0, 0, STRING, toStrParams, 1, true,
+                         false);
+
+  AstDataType *toIntParams = arenaAlloc(sizeof(AstDataType));
+  toIntParams[0] = DOUBLE;
+  insertFunctionSymTable(context->globalSymTable, "toInt", 0, 0, INT, toIntParams, 1, true, false);
+
+  AstDataType *strLengthParams = arenaAlloc(sizeof(AstDataType));
+  strLengthParams[0] = STRING;
+  insertFunctionSymTable(context->globalSymTable, "strLength", 0, 0, INT, strLengthParams, 1, true,
+                         false);
+
+  AstDataType *subStrParams = arenaAlloc(3 * sizeof(AstDataType));
+  subStrParams[0] = STRING;
+  subStrParams[1] = INT;
+  subStrParams[2] = INT;
+  insertFunctionSymTable(context->globalSymTable, "subStr", 0, 0, STRING, subStrParams, 3, true,
+                         false);
+
+  AstDataType *ordParams = arenaAlloc(2 * sizeof(AstDataType));
+  ordParams[0] = STRING;
+  ordParams[1] = INT;
+  insertFunctionSymTable(context->globalSymTable, "ord", 0, 0, INT, ordParams, 2, true, false);
+
+  AstDataType *chrParams = arenaAlloc(sizeof(AstDataType));
+  chrParams[0] = INT;
+  insertFunctionSymTable(context->globalSymTable, "chr", 0, 0, STRING, chrParams, 1, true, false);
 
   return false;
 }
