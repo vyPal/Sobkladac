@@ -40,47 +40,74 @@ Semantic analysis checklist:
 #include <stdbool.h>
 
 #include "ast.h"
+#include "codegen.h"
 #include "common.h"
 #include "symtable.h"
 
+bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsigned column,
+                            AstDataType returnType, AstDataType *paramTypes, size_t paramCount,
+                            bool isBuiltin, bool isMain) {
+  if (symtableLookupLocal(symTable, name)) {
+    return false;
+  }
+  StSymbol *symbol = arenaAlloc(sizeof(StSymbol));
+  symbol->type = ST_FUNCTION;
+  symbol->declarationLocation.line = line;
+  symbol->declarationLocation.column = column;
+  symbol->uniqueID = newVar(
+      name);  // Calling this method multiple times with the same input provides different outputs
+  symbol->data.function.returnType = returnType;
+  symbol->data.function.parameterTypes = paramTypes;
+  symbol->data.function.parameterCount = paramCount;
+  symbol->data.function.isBuiltin = isBuiltin;
+  symbol->data.function.isMain = isMain;
+  symtableInsertSymbol(symTable, name, symbol);
+  return true;
+}
+
 typedef struct {
-  SymTable *globalTable;
+  SymTable *globalSymTable;
 } SemanticContext;
 
-bool initializeSymtable(AstProgram *ast) {
+bool initializeSymtable(AstProgram *ast, SemanticContext *context) {
+  context->globalSymTable = symtableCreate(NULL);
+  // built-in functions
+
   return false;
 }
 
-bool checkDeclarations(AstProgram *ast) {
+bool checkDeclarations(AstProgram *ast, SemanticContext *context) {
   return false;
 }
 
-bool checkTypes(AstProgram *ast) {
+bool checkTypes(AstProgram *ast, SemanticContext *context) {
   return false;
 }
 
-bool checkReturns(AstProgram *ast) {
+bool checkReturns(AstProgram *ast, SemanticContext *context) {
   return false;
 }
 
-bool uniqueNameResolution(AstProgram *ast) {
+bool uniqueNameResolution(AstProgram *ast, SemanticContext *context) {
   return false;
 }
 
 bool semanticAnalysis(AstProgram *ast) {
-  if (!initializeSymtable(ast)) {
+  SemanticContext *context = arenaAlloc(sizeof(SemanticContext));
+
+  if (!initializeSymtable(ast, context)) {
     return false;
   }
-  if (!checkDeclarations(ast)) {
+  if (!checkDeclarations(ast, context)) {
     return false;
   }
-  if (!checkTypes(ast)) {
+  if (!checkTypes(ast, context)) {
     return false;
   }
-  if (!checkReturns(ast)) {
+  if (!checkReturns(ast, context)) {
     return false;
   }
-  if (!uniqueNameResolution(ast)) {
+  if (!uniqueNameResolution(ast, context)) {
     return false;
   }
 
