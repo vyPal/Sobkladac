@@ -11,6 +11,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 
 #include "ast.h"
 #include "hashtable.h"
@@ -37,6 +38,7 @@ typedef struct {
 typedef struct {
   StSymbolType type;  // variable or function
   AstLocation declarationLocation;
+  char *uniqueID;
 
   union {
     StVariableSymbol variable;
