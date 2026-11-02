@@ -9,6 +9,7 @@
 
 #include "lexer.h"
 
+#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -79,10 +80,10 @@ void numUnderscore(char *nextChar, int *position, int *line, bool isZero) {
   }
 }
 
-void numDecimal(LinkedTlist **lastToken, char prevChar, char *nextChar, int integer, int *line,
+void numDecimal(LinkedTlist **lastToken, char prevChar, char *nextChar, double integer, int *line,
                 int *position, bool *preloadedChar) {
   int nextCharInt;
-  double decimal = (double)integer;
+  double decimal = integer;
 
   if (prevChar == '.') {
     if (prevChar == *nextChar) {
@@ -228,10 +229,18 @@ LinkedTlist *lexerMain(void) {
                     addChar(&str, '"');
                     addChar(&str, '"');
                     addChar(&str, nextChar);
+                    if (nextChar == '\n') {
+                      line++;
+                      position = 0;
+                    }
                   }
                 } else {
                   addChar(&str, '"');
                   addChar(&str, nextChar);
+                  if (nextChar == '\n') {
+                    line++;
+                    position = 0;
+                  }
                 }
               } else
                 addChar(&str, nextChar);
@@ -471,16 +480,25 @@ LinkedTlist *lexerMain(void) {
           nextChar = (char)nextCharInt;
           position++;
 
-          while (nextChar == ' ' && newLine) {
-            nextCharInt = fgetc(stdin);
-            nextChar = (char)nextCharInt;
-            position++;
+          if (newLine) {
+            while (nextChar == ' ') {
+              nextCharInt = fgetc(stdin);
+              nextChar = (char)nextCharInt;
+              position++;
+            }
+            // only newline, EOF or another comment may follow a multiline comment
+            bool ok = (nextCharInt == EOF || nextChar == '\n');
+            if (nextChar == '/') {
+              int next2 = fgetc(stdin);
+              ok = (next2 == '/' || next2 == '*');
+              ungetc(next2, stdin);
+            }
+            if (!ok)
+              die(1, line,
+                  "Unexpected character at line %d colum %d, no token is allowed after multiline "
+                  "comment",
+                  line, position);
           }
-          if (nextChar != '\n' && newLine)
-            die(1, line,
-                "Unexpected character at line %d colum %d, no token is allowed after multiline "
-                "comment",
-                line, position);
           preloadedChar = true;
         } else {
           lastToken = pushToken(newToken(TK_DIVIDE, line), lastToken);
@@ -535,7 +553,7 @@ LinkedTlist *lexerMain(void) {
         }
         // number
         else if (nextChar >= '1' && nextChar <= '9') {
-          int integer = nextChar - '0';
+          double integer = nextChar - '0';
           nextCharInt = fgetc(stdin);
           nextChar = (char)nextCharInt;
           position++;
@@ -554,9 +572,11 @@ LinkedTlist *lexerMain(void) {
             die(1, line, "Unexpected character at line %d colum %d", line, position);
           } else {
             preloadedChar = true;
+            if (integer > INT_MAX)
+              die(1, line, "Integer literal out of range at line %d colum %d", line, position);
             Token *tk = newToken(TK_NUMBER, line);
             union Value *value = arenaAlloc(sizeof(union Value));
-            (*value).i = integer;
+            (*value).i = (int)integer;
             setValue(tk, value);
             lastToken = pushToken(tk, lastToken);
           }
