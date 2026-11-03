@@ -65,7 +65,6 @@ krok rozsahu).
 
 typedef struct {
   SymTable *globalSymTable;
-  int errorCode;
 } SemanticContext;
 
 bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsigned column,
@@ -85,12 +84,11 @@ bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsig
   symbol->data.function.parameterCount = paramCount;
   symbol->data.function.isBuiltin = isBuiltin;
   symbol->data.function.isMain = isMain;
-  symtableInsertSymbol(symTable, name, symbol);
-  return true;
+  return symtableInsertSymbol(symTable, name, symbol);
 }
 
-unsigned getParamCount(AstFunction *func) {
-  unsigned i = 0;
+size_t getParamCount(AstFunction *func) {
+  size_t i = 0;
   AstFunctionParameter *param = func->firstParameter;
   while (param != NULL) {
     i++;
@@ -99,9 +97,8 @@ unsigned getParamCount(AstFunction *func) {
   return i;
 }
 
-bool initializeSymtable(AstProgram *ast, SemanticContext *context) {
+void initializeSymtable(AstProgram *ast, SemanticContext *context) {
   context->globalSymTable = symtableCreate(NULL);
-  context->errorCode = 0;
 
   // built-in functions
   AstDataType *printParams = arenaAlloc(sizeof(AstDataType));
@@ -151,22 +148,19 @@ bool initializeSymtable(AstProgram *ast, SemanticContext *context) {
     // check correct main function declaration
     if (func->isMain) {
       if (foundMain == true) {
-        context->errorCode = 4;
-        return false;
+        die(ERR_REDEF, func->location.line, "second @main definition");
       }
       if (func->firstParameter != NULL) {
-        context->errorCode = 5;
-        return false;
+        die(ERR_ARGS, func->location.line, "@main parameters not NULL");
       }
       if (func->declaredReturnType != UNIT) {
-        context->errorCode = 6;
-        return false;
+        die(ERR_TYPE, func->location.line, "@main return type not UNIT");
       }
       foundMain = true;
     }
 
     // add function to SymTable
-    unsigned paramCount = getParamCount(func);
+    size_t paramCount = getParamCount(func);
     AstDataType *paramTypes = NULL;
     if (paramCount > 0) {
       paramTypes = arenaAlloc(paramCount * sizeof(AstDataType));
@@ -181,53 +175,38 @@ bool initializeSymtable(AstProgram *ast, SemanticContext *context) {
     if (!insertFunctionSymTable(context->globalSymTable, func->functionName, func->location.line,
                                 func->location.column, func->declaredReturnType, paramTypes,
                                 paramCount, false, func->isMain)) {
-      context->errorCode = 4;
-      return false;
+      die(ERR_REDEF, func->location.line, "function redefinition");
     }
     func = func->nextFunction;
   }
   // check if main function was found
   if (foundMain == false) {
-    context->errorCode = 3;
-    return false;
+    die(ERR_UNDEF, 0, "@main not found");
   }
-  return true;
 }
 
-bool checkDeclarations(AstProgram *ast, SemanticContext *context) {
-  return false;
+void checkDeclarations(AstProgram *ast, SemanticContext *context) {
+  return;
 }
 
-bool checkTypes(AstProgram *ast, SemanticContext *context) {
-  return false;
+void checkTypes(AstProgram *ast, SemanticContext *context) {
+  return;
 }
 
-bool checkReturns(AstProgram *ast, SemanticContext *context) {
-  return false;
+void checkReturns(AstProgram *ast, SemanticContext *context) {
+  return;
 }
 
-bool uniqueNameResolution(AstProgram *ast, SemanticContext *context) {
-  return false;
+void uniqueNameResolution(AstProgram *ast, SemanticContext *context) {
+  return;
 }
 
-bool semanticAnalysis(AstProgram *ast) {
+void semanticAnalysis(AstProgram *ast) {
   SemanticContext *context = arenaAlloc(sizeof(SemanticContext));
 
-  if (!initializeSymtable(ast, context)) {
-    return false;
-  }
-  if (!checkDeclarations(ast, context)) {
-    return false;
-  }
-  if (!checkTypes(ast, context)) {
-    return false;
-  }
-  if (!checkReturns(ast, context)) {
-    return false;
-  }
-  if (!uniqueNameResolution(ast, context)) {
-    return false;
-  }
-
-  return true;
+  initializeSymtable(ast, context);
+  checkDeclarations(ast, context);
+  checkTypes(ast, context);
+  checkReturns(ast, context);
+  uniqueNameResolution(ast, context);
 }

@@ -20,6 +20,6 @@
  * @param ast Program AST to analyze.
  * @return true if semantic analysis succeeds, false otherwise.
  */
-bool semanticAnalysis(AstProgram *ast);
+void semanticAnalysis(AstProgram *ast);
 
 #endif  // SEMANTIC_ANALYSIS_H
