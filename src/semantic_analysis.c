@@ -228,6 +228,7 @@ void checkCodeBlock(AstCodeBlock *block, SymTable *scope) {
     } else if (command->type == WHILE) {
     } else if (command->type == EXPRESSION) {
     }
+    command = command->nextCommand;
   }
 }
 
@@ -247,7 +248,7 @@ void checkFunctionBodies(AstProgram *ast, SemanticContext *context) {
       param = param->nextParameter;
     }
 
-    if (function->bodyType == EXPRESSION) {
+    if (function->bodyType == VALUE) {
     } else {  // check function body
       checkCodeBlock(function->body.codeBlock, function->scope);
     }
@@ -268,6 +269,7 @@ void semanticAnalysis(AstProgram *ast) {
   SemanticContext *context = arenaAlloc(sizeof(SemanticContext));
 
   initializeFunctions(ast, context);
+  // TODO check recursion
   checkFunctionBodies(ast, context);
   checkReturns(ast, context);
   uniqueNameResolution(ast, context);
