@@ -198,6 +198,10 @@ void initializeFunctions(AstProgram *ast, SemanticContext *context) {
   }
 }
 
+// checks if function is recursive (even indirectly)
+void checkRecursion(AstProgram *ast, SemanticContext *context) {
+}
+
 AstDataType getExpressionType(AstExpression *expression) {
   if (expression->expressionType == INT_LITERAL) {
     expression->deducedDataType = INT;
@@ -269,7 +273,7 @@ void semanticAnalysis(AstProgram *ast) {
   SemanticContext *context = arenaAlloc(sizeof(SemanticContext));
 
   initializeFunctions(ast, context);
-  // TODO check recursion
+  checkRecursion(ast, context);
   checkFunctionBodies(ast, context);
   checkReturns(ast, context);
   uniqueNameResolution(ast, context);
