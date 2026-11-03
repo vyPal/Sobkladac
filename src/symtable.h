@@ -62,6 +62,7 @@ StSymbol *symtableLookup(SymTable *table, const char *symbolName);
 StSymbol *symtableLookupLocal(SymTable *table, const char *symbolName);
 
 /// @brief Insert a new symbol inside a Symbol table.
+/// returns FALSE if symbol already exists
 bool symtableInsertSymbol(SymTable *table, const char *symbolName, StSymbol *symbol);
 
 #endif  // SYMTABLE_H

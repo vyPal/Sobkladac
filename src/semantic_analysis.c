@@ -67,12 +67,10 @@ typedef struct {
   SymTable *globalSymTable;
 } SemanticContext;
 
+// insert function into symTable
 bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsigned column,
                             AstDataType returnType, AstDataType *paramTypes, size_t paramCount,
                             bool isBuiltin, bool isMain) {
-  if (symtableLookupLocal(symTable, name)) {
-    return false;
-  }
   StSymbol *symbol = arenaAlloc(sizeof(StSymbol));
   symbol->type = ST_FUNCTION;
   symbol->declarationLocation.line = line;
@@ -87,6 +85,21 @@ bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsig
   return symtableInsertSymbol(symTable, name, symbol);
 }
 
+// insert variable into symTable
+bool insertVariableSymTable(SymTable *symTable, char *name, unsigned line, unsigned column,
+                            AstDataType dataType, bool isMutable) {
+  StSymbol *symbol = arenaAlloc(sizeof(StSymbol));
+  symbol->type = ST_VARIABLE;
+  symbol->declarationLocation.line = line;
+  symbol->declarationLocation.column = column;
+  symbol->uniqueID = newVar(
+      name);  // Calling this method multiple times with the same input provides different outputs
+  symbol->data.variable.dataType = dataType;
+  symbol->data.variable.isMutable = isMutable;
+  return symtableInsertSymbol(symTable, name, symbol);
+}
+
+// get function parameter count
 size_t getParamCount(AstFunction *func) {
   size_t i = 0;
   AstFunctionParameter *param = func->firstParameter;
@@ -97,10 +110,11 @@ size_t getParamCount(AstFunction *func) {
   return i;
 }
 
+// add functions to global symtable
 void initializeSymtable(AstProgram *ast, SemanticContext *context) {
   context->globalSymTable = symtableCreate(NULL);
 
-  // built-in functions
+  // add built-in functions
   AstDataType *printParams = arenaAlloc(sizeof(AstDataType));
   printParams[0] = ANY;
   insertFunctionSymTable(context->globalSymTable, "print", 0, 0, UNIT, printParams, 1, true, false);
@@ -185,8 +199,46 @@ void initializeSymtable(AstProgram *ast, SemanticContext *context) {
   }
 }
 
+// check codeBlock variable declarations
+// codeBlock always contains commands
+void checkDeclarationsCodeBlock(AstCodeBlock *block, SymTable *scope) {
+  AstCommand *command = block->firstCommand;
+  while (command != NULL) {
+    if (command->type == VARIABLE_DECLARATION) {
+    } else if (command->type == ASSIGNMENT) {
+    } else if (command->type == FUNCTION_CALL) {
+    } else if (command->type == RETURN) {
+    } else if (command->type == IF) {
+    } else if (command->type == WHILE) {
+    } else if (command->type == EXPRESSION) {
+    }
+  }
+}
+
+// check variable declarations
 void checkDeclarations(AstProgram *ast, SemanticContext *context) {
-  return;
+  // for all functions
+  AstFunction *function = ast->firstFunction;
+  while (function != NULL) {
+    function->scope = symtableCreate(context->globalSymTable);
+
+    // check function params
+    AstFunctionParameter *param = function->firstParameter;
+    while (param != NULL) {
+      if (!insertVariableSymTable(function->scope, param->parameterName, function->location.line,
+                                  function->location.column, param->dataType, false)) {
+        die(ERR_REDEF, function->location.line, "duplicate function parameter names");
+      }
+      param = param->nextParameter;
+    }
+
+    // check function body
+    if (function->bodyType == CODE_BLOCK) {
+      checkDeclarationsCodeBlock(function->body.codeBlock, function->scope);
+    }
+
+    function = function->nextFunction;
+  }
 }
 
 void checkTypes(AstProgram *ast, SemanticContext *context) {
