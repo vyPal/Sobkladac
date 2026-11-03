@@ -19,7 +19,6 @@ Semantic analysis checklist:
 - Check that variables are declared before use.
 - check function calls.
 - Check that immutable variables (val) aren't modified.
-3. Type checking
 - Infer types of expressions.
 - Check operator compatibility.
 - Check assignment compatibility.
@@ -111,7 +110,7 @@ size_t getParamCount(AstFunction *func) {
 }
 
 // add functions to global symtable
-void initializeSymtable(AstProgram *ast, SemanticContext *context) {
+void initializeFunctions(AstProgram *ast, SemanticContext *context) {
   context->globalSymTable = symtableCreate(NULL);
 
   // add built-in functions
@@ -199,9 +198,26 @@ void initializeSymtable(AstProgram *ast, SemanticContext *context) {
   }
 }
 
-// check codeBlock variable declarations
+AstDataType getExpressionType(AstExpression *expression) {
+  if (expression->expressionType == INT_LITERAL) {
+    expression->deducedDataType = INT;
+  } else if (expression->expressionType == DOUBLE_LITERAL) {
+    expression->deducedDataType = DOUBLE;
+  } else if (expression->expressionType == STRING_LITERAL) {
+    expression->deducedDataType = STRING;
+  } else if (expression->expressionType == UNIT_LITERAL) {
+    expression->deducedDataType = UNIT;
+  } else if (expression->expressionType == VARIABLE) {
+    return expression->deducedDataType;
+  } else if (expression->expressionType == UNARY) {
+  } else if (expression->expressionType == BINARY) {
+  }
+
+  return expression->deducedDataType;
+}
+
 // codeBlock always contains commands
-void checkDeclarationsCodeBlock(AstCodeBlock *block, SymTable *scope) {
+void checkCodeBlock(AstCodeBlock *block, SymTable *scope) {
   AstCommand *command = block->firstCommand;
   while (command != NULL) {
     if (command->type == VARIABLE_DECLARATION) {
@@ -215,8 +231,7 @@ void checkDeclarationsCodeBlock(AstCodeBlock *block, SymTable *scope) {
   }
 }
 
-// check variable declarations
-void checkDeclarations(AstProgram *ast, SemanticContext *context) {
+void checkFunctionBodies(AstProgram *ast, SemanticContext *context) {
   // for all functions
   AstFunction *function = ast->firstFunction;
   while (function != NULL) {
@@ -232,17 +247,13 @@ void checkDeclarations(AstProgram *ast, SemanticContext *context) {
       param = param->nextParameter;
     }
 
-    // check function body
-    if (function->bodyType == CODE_BLOCK) {
-      checkDeclarationsCodeBlock(function->body.codeBlock, function->scope);
+    if (function->bodyType == EXPRESSION) {
+    } else {  // check function body
+      checkCodeBlock(function->body.codeBlock, function->scope);
     }
 
     function = function->nextFunction;
   }
-}
-
-void checkTypes(AstProgram *ast, SemanticContext *context) {
-  return;
 }
 
 void checkReturns(AstProgram *ast, SemanticContext *context) {
@@ -256,9 +267,8 @@ void uniqueNameResolution(AstProgram *ast, SemanticContext *context) {
 void semanticAnalysis(AstProgram *ast) {
   SemanticContext *context = arenaAlloc(sizeof(SemanticContext));
 
-  initializeSymtable(ast, context);
-  checkDeclarations(ast, context);
-  checkTypes(ast, context);
+  initializeFunctions(ast, context);
+  checkFunctionBodies(ast, context);
   checkReturns(ast, context);
   uniqueNameResolution(ast, context);
 }
