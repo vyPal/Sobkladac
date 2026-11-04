@@ -175,6 +175,7 @@ struct AstCommand {
     } call;
 
     struct {  // RETURN
+      // empty return == AstExpressionType UNIT_LITERAL
       AstValue *value;
     } returnAst;
 

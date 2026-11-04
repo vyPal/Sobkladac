@@ -330,11 +330,12 @@ void checkRecursion(AstProgram *ast, SemanticContext *context) {
   }
 
   // calculate indirect function dependencies
-  for (size_t i = 0; i < functionCount; i++) {
-    for (size_t j = 0; j < functionCount; j++) {
-      for (size_t k = 0; k < functionCount; k++) {
-        if (functionDependenciesArray[k][j] && functionDependenciesArray[j][i]) {
-          functionDependenciesArray[k][i] = true;
+  // Floyd–Warshall loop
+  for (size_t k = 0; k < functionCount; k++) {
+    for (size_t i = 0; i < functionCount; i++) {
+      for (size_t j = 0; j < functionCount; j++) {
+        if (functionDependenciesArray[i][k] && functionDependenciesArray[k][j]) {
+          functionDependenciesArray[i][j] = true;
         }
       }
     }
