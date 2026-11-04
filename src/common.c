@@ -114,6 +114,8 @@ void *arenaRealloc(void *p, size_t o, size_t n) {
           die(ERR_INTERNAL, 0, "out of memory");
         if (prev != NULL)
           prev->next = new;
+        else
+          head = new;
 
         ASAN_POISON_MEMORY_REGION(p, o);
 
