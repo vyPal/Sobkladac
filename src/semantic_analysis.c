@@ -55,6 +55,20 @@ rametru funkce.
 krok rozsahu).
 */
 
+/*
+AST checklist:
+AstExpression => deducedDataType ?maybe not needed
+AstCommand VARIABLE_DECLARATION => resolvedType
+AstFunction => resolvedReturnType
+Rewrite symbol IDs.
+Rewrite function IDs.
+
+Done:
+Assign unique symbol IDs to variables. (insertFunctionSymTable)
+Assign unique function IDs to functions. (insertVariableSymTable)
+
+*/
+
 #include <stdbool.h>
 
 #include "ast.h"
