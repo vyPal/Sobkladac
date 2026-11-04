@@ -56,9 +56,11 @@ typedef struct SymTable {
 SymTable *symtableCreate(SymTable *parent);
 
 /// @brief Look up a symbol in the current scope and its parent scopes.
+/// returns NULL if symbol doesnt exist
 StSymbol *symtableLookup(SymTable *table, const char *symbolName);
 
 /// @brief Look up a symbol in the current scope.
+/// returns NULL if symbol doesnt exist
 StSymbol *symtableLookupLocal(SymTable *table, const char *symbolName);
 
 /// @brief Insert a new symbol inside a Symbol table.

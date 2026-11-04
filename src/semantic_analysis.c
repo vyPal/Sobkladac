@@ -70,6 +70,7 @@ Assign unique function IDs to functions. (insertFunctionSymTable)
 */
 
 #include <stdbool.h>
+#include <string.h>
 
 #include "ast.h"
 #include "codegen.h"
@@ -211,9 +212,141 @@ void initializeFunctions(AstProgram *ast, SemanticContext *context) {
   }
 }
 
+// checkRecursion() helper function
+// gets functionList function position using function name
+size_t getFunctionPosition(AstFunction **functionList, size_t functionCount, char *functionName) {
+  for (size_t i = 0; i < functionCount; i++) {
+    if (strcmp(functionList[i]->functionName, functionName) == 0) {
+      return i;
+    }
+  }
+  die(ERR_UNDEF, 0, "function recursion checking error (should not happen)");
+}
+
+// checkRecursion() helper function
+// registers function dependency using a function call
+void addFunctionDependency(size_t functionCount, AstFunction **functionList,
+                           bool **functionDependenciesArray, size_t functionPosition,
+                           SemanticContext *context, AstFunctionCall *functionCall) {
+  StSymbol *symbol = symtableLookup(context->globalSymTable, functionCall->functionName);
+  if (symbol == NULL) {
+    die(ERR_UNDEF, functionCall->location.line, "called function not found");
+  }
+  if (symbol->data.function.isBuiltin) {
+    return;
+  }
+  functionDependenciesArray[functionPosition][getFunctionPosition(
+      functionList, functionCount, functionCall->functionName)] = true;
+}
+
+// checkRecursion() helper function
+// registers function dependency using a code block
+void getFunctionDependencies(size_t functionCount, AstFunction **functionList,
+                             bool **functionDependenciesArray, size_t functionPosition,
+                             SemanticContext *context, AstCodeBlock *codeBlock) {
+  AstCommand *command = codeBlock->firstCommand;
+  AstFunctionCall *functionCall = NULL;
+  while (command != NULL) {
+    // variable declaration using a function call
+    if (command->type == VARIABLE_DECLARATION &&
+        command->data.variableDeclaration.value->type == VALUE_FUNCTION_CALL) {
+      functionCall = command->data.variableDeclaration.value->data.functionCall;
+      addFunctionDependency(functionCount, functionList, functionDependenciesArray,
+                            functionPosition, context, functionCall);
+      // assignement using a function call
+    } else if (command->type == ASSIGNMENT &&
+               command->data.assignment.value->type == VALUE_FUNCTION_CALL) {
+      functionCall = command->data.assignment.value->data.functionCall;
+      addFunctionDependency(functionCount, functionList, functionDependenciesArray,
+                            functionPosition, context, functionCall);
+      // function call
+    } else if (command->type == FUNCTION_CALL) {
+      functionCall = command->data.call.functionCall;
+      addFunctionDependency(functionCount, functionList, functionDependenciesArray,
+                            functionPosition, context, functionCall);
+      // return using a function call
+    } else if (command->type == RETURN &&
+               command->data.returnAst.value->type == VALUE_FUNCTION_CALL) {
+      functionCall = command->data.returnAst.value->data.functionCall;
+      addFunctionDependency(functionCount, functionList, functionDependenciesArray,
+                            functionPosition, context, functionCall);
+      // IF statement cant contain a function call according to specifications
+    } else if (command->type == IF) {
+      getFunctionDependencies(functionCount, functionList, functionDependenciesArray,
+                              functionPosition, context, command->data.ifAst.thenBlock);
+      getFunctionDependencies(functionCount, functionList, functionDependenciesArray,
+                              functionPosition, context, command->data.ifAst.elseBlock);
+      // WHILE statement cant contain a function call according to specifications
+    } else if (command->type == WHILE) {
+      getFunctionDependencies(functionCount, functionList, functionDependenciesArray,
+                              functionPosition, context, command->data.whileAst.codeBlock);
+    }
+    // EXPRESSION statement cant contain a function call according to specifications
+
+    command = command->nextCommand;
+  }
+}
+
 // checks if a function is recursive (even indirectly) and has an implicit return type (forbidden)
-// TODO
 void checkRecursion(AstProgram *ast, SemanticContext *context) {
+  // count user defined functions
+  size_t functionCount = 0;
+  AstFunction *function = ast->firstFunction;
+  while (function != NULL) {
+    functionCount++;
+    function = function->nextFunction;
+  }
+
+  // create a list of all user functions
+  AstFunction **functionList = arenaAlloc(functionCount * sizeof(AstFunction *));
+  function = ast->firstFunction;
+  for (size_t functionPosition = 0; functionPosition < functionCount; functionPosition++) {
+    functionList[functionPosition] = function;
+    function = function->nextFunction;
+  }
+
+  // create a 2D function dependency array
+  bool **functionDependenciesArray = arenaAlloc(functionCount * sizeof(bool *));
+  for (size_t functionPosition = 0; functionPosition < functionCount; functionPosition++) {
+    functionDependenciesArray[functionPosition] = arenaZalloc(functionCount * sizeof(bool));
+  }
+
+  // fill in function dependency array
+  for (size_t functionPosition = 0; functionPosition < functionCount; functionPosition++) {
+    function = functionList[functionPosition];
+    // check function body
+    if (function->bodyType == VALUE) {
+      // check one line function body
+      if (function->body.value->type == VALUE_FUNCTION_CALL) {
+        // add called function
+        AstFunctionCall *functionCall = function->body.value->data.functionCall;
+        addFunctionDependency(functionCount, functionList, functionDependenciesArray,
+                              functionPosition, context, functionCall);
+      }
+    } else {  // check function code blocks
+      getFunctionDependencies(functionCount, functionList, functionDependenciesArray,
+                              functionPosition, context, function->body.codeBlock);
+    }
+  }
+
+  // calculate indirect function dependencies
+  for (size_t i = 0; i < functionCount; i++) {
+    for (size_t j = 0; j < functionCount; j++) {
+      for (size_t k = 0; k < functionCount; k++) {
+        if (functionDependenciesArray[k][j] && functionDependenciesArray[j][i]) {
+          functionDependenciesArray[k][i] = true;
+        }
+      }
+    }
+  }
+
+  // check recursive functions have explicit return types
+  for (size_t i = 0; i < functionCount; i++) {
+    if (functionDependenciesArray[i][i] && functionList[i]->declaredReturnType == UNKNOWN) {
+      die(ERR_TYPE, functionList[i]->location.line,
+          "recursive function with an implicit return type");
+    }
+  }
 }
 
 // get expression data type recursively
