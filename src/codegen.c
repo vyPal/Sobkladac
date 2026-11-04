@@ -329,6 +329,14 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
       dst = getResultOperand(preferredDst);
       bool isIntOperation = left.ty == INT && right.ty == INT;
 
+      if (!isIntOperation && left.ty == INT) {
+        EMIT(code, FLOAT2INT, left.val, left.val);
+        left.ty = DOUBLE;
+      } else if (!isIntOperation && right.ty == INT) {
+        EMIT(code, FLOAT2INT, right.val, right.val);
+        right.ty = DOUBLE;
+      }
+
       switch (expr->data.binary.operatorAst) {
         case MULTIPLICATION:
           EMIT(code, MUL, dst, left.val, right.val);
@@ -622,6 +630,9 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
     //
     // NOTE: Could use function's declared parameter names rather than funcParam to avoid extra
     // copy, would require symbol table to be accessible
+    //
+    // BUG: Int retyping to float does not work here, the symbol table is needed to check which type
+    // each argument expects
     AstFunctionCallArgument *arg = call->firstArgument;
     unsigned argc = 0;
     while (arg != NULL) {
