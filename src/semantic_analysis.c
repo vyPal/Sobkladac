@@ -64,8 +64,8 @@ Rewrite symbol IDs.
 Rewrite function IDs.
 
 Done:
-Assign unique symbol IDs to variables. (insertFunctionSymTable)
-Assign unique function IDs to functions. (insertVariableSymTable)
+Assign unique symbol IDs to variables. (insertVariableSymTable)
+Assign unique function IDs to functions. (insertFunctionSymTable)
 
 */
 
@@ -80,7 +80,7 @@ typedef struct {
   SymTable *globalSymTable;
 } SemanticContext;
 
-// insert function into symTable
+// insert function into symTable and assign uniqueID
 bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsigned column,
                             AstDataType returnType, AstDataType *paramTypes, size_t paramCount,
                             bool isBuiltin, bool isMain) {
@@ -88,8 +88,7 @@ bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsig
   symbol->type = ST_FUNCTION;
   symbol->declarationLocation.line = line;
   symbol->declarationLocation.column = column;
-  symbol->uniqueID = newVar(
-      name);  // Calling this method multiple times with the same input provides different outputs
+  symbol->uniqueID = newVar(name);  // guarantees unique output from a string
   symbol->data.function.returnType = returnType;
   symbol->data.function.parameterTypes = paramTypes;
   symbol->data.function.parameterCount = paramCount;
@@ -98,15 +97,14 @@ bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsig
   return symtableInsertSymbol(symTable, name, symbol);
 }
 
-// insert variable into symTable
+// insert variable into symTable and assign uniqueID
 bool insertVariableSymTable(SymTable *symTable, char *name, unsigned line, unsigned column,
                             AstDataType dataType, bool isMutable) {
   StSymbol *symbol = arenaAlloc(sizeof(StSymbol));
   symbol->type = ST_VARIABLE;
   symbol->declarationLocation.line = line;
   symbol->declarationLocation.column = column;
-  symbol->uniqueID = newVar(
-      name);  // Calling this method multiple times with the same input provides different outputs
+  symbol->uniqueID = newVar(name);  // guarantees unique output from a string
   symbol->data.variable.dataType = dataType;
   symbol->data.variable.isMutable = isMutable;
   return symtableInsertSymbol(symTable, name, symbol);
@@ -123,7 +121,7 @@ size_t getParamCount(AstFunction *func) {
   return i;
 }
 
-// add functions to global symtable
+// add function declarations to global symtable
 void initializeFunctions(AstProgram *ast, SemanticContext *context) {
   context->globalSymTable = symtableCreate(NULL);
 
@@ -190,9 +188,10 @@ void initializeFunctions(AstProgram *ast, SemanticContext *context) {
     size_t paramCount = getParamCount(func);
     AstDataType *paramTypes = NULL;
     if (paramCount > 0) {
+      // create functtion paramType list
       paramTypes = arenaAlloc(paramCount * sizeof(AstDataType));
       AstFunctionParameter *param = func->firstParameter;
-      unsigned i = 0;
+      size_t i = 0;
       while (param != NULL) {
         paramTypes[i] = param->dataType;
         i++;
@@ -212,10 +211,13 @@ void initializeFunctions(AstProgram *ast, SemanticContext *context) {
   }
 }
 
-// checks if function is recursive (even indirectly)
+// checks if a function is recursive (even indirectly) and has an implicit return type (forbidden)
+// TODO
 void checkRecursion(AstProgram *ast, SemanticContext *context) {
 }
 
+// get expression data type recursively
+// TODO
 AstDataType getExpressionType(AstExpression *expression) {
   if (expression->expressionType == INT_LITERAL) {
     expression->deducedDataType = INT;
@@ -226,7 +228,6 @@ AstDataType getExpressionType(AstExpression *expression) {
   } else if (expression->expressionType == UNIT_LITERAL) {
     expression->deducedDataType = UNIT;
   } else if (expression->expressionType == VARIABLE) {
-    return expression->deducedDataType;
   } else if (expression->expressionType == UNARY) {
   } else if (expression->expressionType == BINARY) {
   }
@@ -234,7 +235,15 @@ AstDataType getExpressionType(AstExpression *expression) {
   return expression->deducedDataType;
 }
 
+// get function call data type recursively
+// TODO
+AstDataType getFunctionType(AstFunctionCall *functionCall) {
+  return;
+}
+
+// checks data types inside a code block recursively
 // codeBlock always contains commands
+// TODO
 void checkCodeBlock(AstCodeBlock *block, SymTable *scope) {
   AstCommand *command = block->firstCommand;
   while (command != NULL) {
@@ -250,13 +259,16 @@ void checkCodeBlock(AstCodeBlock *block, SymTable *scope) {
   }
 }
 
+// checks data types of functions and their bodies
+// TODO
 void checkFunctionBodies(AstProgram *ast, SemanticContext *context) {
-  // for all functions
+  // check all functions
   AstFunction *function = ast->firstFunction;
   while (function != NULL) {
+    // create a new scope for the function body
     function->scope = symtableCreate(context->globalSymTable);
 
-    // check function params
+    // check all function params and add to current scope
     AstFunctionParameter *param = function->firstParameter;
     while (param != NULL) {
       if (!insertVariableSymTable(function->scope, param->parameterName, function->location.line,
@@ -266,8 +278,12 @@ void checkFunctionBodies(AstProgram *ast, SemanticContext *context) {
       param = param->nextParameter;
     }
 
+    // check function body
     if (function->bodyType == VALUE) {
-    } else {  // check function body
+      if (function->body.value->type == VALUE_EXPRESSION) {
+      } else {  // VALUE_FUNCTION_CALL
+      }
+    } else {  // CODE_BLOCK
       checkCodeBlock(function->body.codeBlock, function->scope);
     }
 
@@ -275,14 +291,19 @@ void checkFunctionBodies(AstProgram *ast, SemanticContext *context) {
   }
 }
 
+// checks correct function returns
+// TODO
 void checkReturns(AstProgram *ast, SemanticContext *context) {
   return;
 }
 
+// rewrites AST function and variable names to uniqueID from SymTable
+// TODO
 void uniqueNameResolution(AstProgram *ast, SemanticContext *context) {
   return;
 }
 
+// main function
 void semanticAnalysis(AstProgram *ast) {
   SemanticContext *context = arenaAlloc(sizeof(SemanticContext));
 
