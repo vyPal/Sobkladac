@@ -55,15 +55,15 @@ const InstrInfo instrInfo[OP_COUNT] = {
 static bool acceptsOperand(uint8_t accepts, const Operand *arg) {
   switch (arg->type) {
     case OK_VAR:
-      return accepts & A_VAR;
+      return accepts & (unsigned)A_VAR;
     case OK_CONST:
-      if (accepts & A_CONST)
+      if (accepts & (unsigned)A_CONST)
         return true;
-      return (accepts & A_STR) && arg->value.cnst.type == CT_STRING;
+      return (accepts & (unsigned)A_STR) && arg->value.cnst.type == CT_STRING;
     case OK_LABEL:
-      return accepts & A_LABEL;
+      return accepts & (unsigned)A_LABEL;
     case OK_TYPE:
-      return (accepts & A_TYPE) && arg->value.type != CT_NIL;
+      return (accepts & (unsigned)A_TYPE) && arg->value.type != CT_NIL;
     default:
       return false;
   }

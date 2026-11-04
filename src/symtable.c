@@ -7,6 +7,7 @@
 #include "symtable.h"
 
 #include "common.h"
+#include "hashtable.h"
 
 SymTable *symtableCreate(SymTable *parent) {
   SymTable *newStSymTable = arenaAlloc(sizeof(SymTable));
