@@ -444,8 +444,8 @@ AstDataType checkExpressionType(AstExpression *expression, SymTable *scope) {
 
 // analyzeFunctions() helper function
 // check propper function call
-AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunction *function,
-                              AstFunctionCall *call, SymTable *scope) {
+AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunctionCall *call,
+                              SymTable *scope) {
   StSymbol *symbol = symtableLookup(context->globalSymTable, call->functionName);
   if (symbol == NULL || symbol->type != ST_FUNCTION) {
     die(ERR_UNDEF, call->location.line, "undefined function");
