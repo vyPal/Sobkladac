@@ -458,9 +458,9 @@ AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunc
     if (argCount > symbol->data.function.parameterCount) {
       die(ERR_ARGS, call->location.line, "too many function call parameters");
     }
-    if (symbol->data.function.parameterTypes[argCount - 1] != ANY &&
-        checkExpressionType(argument->expression, scope) !=
-            symbol->data.function.parameterTypes[argCount - 1]) {
+    if (checkExpressionType(argument->expression, scope) !=
+            symbol->data.function.parameterTypes[argCount - 1] &&
+        symbol->data.function.parameterTypes[argCount - 1] != ANY) {
       die(ERR_ARGS, call->location.line, "incorrect function call parameter type");
     }
     argument = argument->nextArgument;
@@ -567,13 +567,14 @@ AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunc
 // analyzes function and variable declarations and data types
 // cehck immutable variables arent modified
 // analyzes returns
-// TODO
+// TIP: function type resolution is saved to function->resolvedReturnType first, then
+// checkFunctionBody() updates symTable (recursive functions have explicit return type)
 void analyzeFunctions(AstProgram *ast, SemanticContext *context) {
   // check all functions
   AstFunction *function = ast->firstFunction;
   while (function != NULL) {
     // if function hasnt been already checked due to dependencies
-    if (function->resolvedReturnType != UNKNOWN) {
+    if (function->resolvedReturnType == UNKNOWN) {
       checkFunctionBody(ast, context, function);
     }
     function = function->nextFunction;
