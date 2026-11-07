@@ -122,7 +122,9 @@ size_t getParamCount(AstFunction *func) {
   return i;
 }
 
-// add function declarations to global symtable
+// creates the global scope
+// adds built in functions
+// adds user defined functions
 void initializeFunctions(AstProgram *ast, SemanticContext *context) {
   context->globalSymTable = symtableCreate(NULL);
 
@@ -213,7 +215,7 @@ void initializeFunctions(AstProgram *ast, SemanticContext *context) {
 }
 
 // checkRecursion() helper function
-// gets functionList function position using function name
+// gets functionList function position from function name
 size_t getFunctionPosition(AstFunction **functionList, size_t functionCount, char *functionName) {
   for (size_t i = 0; i < functionCount; i++) {
     if (strcmp(functionList[i]->functionName, functionName) == 0) {
@@ -224,7 +226,7 @@ size_t getFunctionPosition(AstFunction **functionList, size_t functionCount, cha
 }
 
 // checkRecursion() helper function
-// registers function dependency using a function call
+// registers function dependency from a function call
 void addFunctionDependency(size_t functionCount, AstFunction **functionList,
                            bool **functionDependenciesArray, size_t functionPosition,
                            SemanticContext *context, AstFunctionCall *functionCall) {
@@ -240,7 +242,7 @@ void addFunctionDependency(size_t functionCount, AstFunction **functionList,
 }
 
 // checkRecursion() helper function
-// registers function dependency using a code block
+// registers function dependencies from a code block
 void getFunctionDependencies(size_t functionCount, AstFunction **functionList,
                              bool **functionDependenciesArray, size_t functionPosition,
                              SemanticContext *context, AstCodeBlock *codeBlock) {
@@ -288,6 +290,8 @@ void getFunctionDependencies(size_t functionCount, AstFunction **functionList,
 }
 
 // checks if a function is recursive (even indirectly) and has an implicit return type (forbidden)
+// prevents infinite data type search loops
+// makes no changes to ast or symtable
 void checkRecursion(AstProgram *ast, SemanticContext *context) {
   // count user defined functions
   size_t functionCount = 0;
@@ -350,6 +354,7 @@ void checkRecursion(AstProgram *ast, SemanticContext *context) {
   }
 }
 
+// analyzeFunctions() helper function
 // get expression data type recursively
 // TODO
 AstDataType getExpressionType(AstExpression *expression) {
@@ -369,16 +374,14 @@ AstDataType getExpressionType(AstExpression *expression) {
   return expression->deducedDataType;
 }
 
-// get function call data type recursively
-// TODO
-AstDataType getFunctionType(AstFunctionCall *functionCall) {
-  return;
-}
-
-// checks data types inside a code block recursively
+// analyzeFunctions() helper function
+// analyzes a code block recursively
 // codeBlock always contains commands
+// last code block needs to check returns
 // TODO
-void checkCodeBlock(AstCodeBlock *block, SymTable *scope) {
+void checkCodeBlock(AstFunction *function, AstCodeBlock *block, SymTable *parentScope,
+                    bool isLast) {
+  block->scope = symtableCreate(parentScope);
   AstCommand *command = block->firstCommand;
   while (command != NULL) {
     if (command->type == VARIABLE_DECLARATION) {
@@ -393,42 +396,53 @@ void checkCodeBlock(AstCodeBlock *block, SymTable *scope) {
   }
 }
 
-// checks data types of functions and their bodies
+// analyzeFunctions() helper function
+// analyzes function body recursively
 // TODO
-void checkFunctionBodies(AstProgram *ast, SemanticContext *context) {
-  // check all functions
-  AstFunction *function = ast->firstFunction;
-  while (function != NULL) {
-    // create a new scope for the function body
-    function->scope = symtableCreate(context->globalSymTable);
+AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunction *function) {
+  // create a new scope for the function body
+  function->scope = symtableCreate(context->globalSymTable);
 
-    // check all function params and add to current scope
-    AstFunctionParameter *param = function->firstParameter;
-    while (param != NULL) {
-      if (!insertVariableSymTable(function->scope, param->parameterName, function->location.line,
-                                  function->location.column, param->dataType, false)) {
-        die(ERR_REDEF, function->location.line, "duplicate function parameter names");
-      }
-      param = param->nextParameter;
+  // resolve explicit function return type
+  if (function->declaredReturnType != NULL) {
+    function->resolvedReturnType = function->declaredReturnType;
+  }
+
+  // check all function params and add to current scope
+  AstFunctionParameter *param = function->firstParameter;
+  while (param != NULL) {
+    if (!insertVariableSymTable(function->scope, param->parameterName, function->location.line,
+                                function->location.column, param->dataType, false)) {
+      die(ERR_REDEF, function->location.line, "duplicate function parameter names");
     }
+    param = param->nextParameter;
+  }
 
-    // check function body
-    if (function->bodyType == VALUE) {
-      if (function->body.value->type == VALUE_EXPRESSION) {
-      } else {  // VALUE_FUNCTION_CALL
-      }
-    } else {  // CODE_BLOCK
-      checkCodeBlock(function->body.codeBlock, function->scope);
+  // check function body
+  if (function->bodyType == VALUE) {
+    // check expression
+    if (function->body.value->type == VALUE_EXPRESSION) {
+    } else {  // check function call
     }
-
-    function = function->nextFunction;
+  } else {  // check code blocks
+    checkCodeBlock(function, function->body.codeBlock, function->scope, true);
   }
 }
 
-// checks correct function returns
+// analyzes function and variable declarations and data types
+// cehck immutable variables arent modified
+// analyzes returns
 // TODO
-void checkReturns(AstProgram *ast, SemanticContext *context) {
-  return;
+void analyzeFunctions(AstProgram *ast, SemanticContext *context) {
+  // check all functions
+  AstFunction *function = ast->firstFunction;
+  while (function != NULL) {
+    // if function hasnt been already checked due to dependencies
+    if (function->resolvedReturnType != NULL) {
+      checkFunctionBody(ast, context, function);
+    }
+    function = function->nextFunction;
+  }
 }
 
 // rewrites AST function and variable names to uniqueID from SymTable
@@ -443,7 +457,6 @@ void semanticAnalysis(AstProgram *ast) {
 
   initializeFunctions(ast, context);
   checkRecursion(ast, context);
-  checkFunctionBodies(ast, context);
-  checkReturns(ast, context);
+  analyzeFunctions(ast, context);
   uniqueNameResolution(ast, context);
 }
