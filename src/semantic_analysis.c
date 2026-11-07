@@ -400,6 +400,7 @@ bool checkCodeBlock(AstFunction *function, AstCodeBlock *block, SymTable *parent
     }
     command = command->nextCommand;
   }
+  return false;
 }
 
 // analyzeFunctions() helper function
@@ -410,7 +411,7 @@ AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunc
   function->scope = symtableCreate(context->globalSymTable);
 
   // resolve explicit function return type
-  if (function->declaredReturnType != NULL) {
+  if (function->declaredReturnType != UNKNOWN) {
     function->resolvedReturnType = function->declaredReturnType;
   }
 
