@@ -122,6 +122,18 @@ size_t getParamCount(AstFunction *func) {
   return i;
 }
 
+// get ast function* from name
+AstFunction *getAstFunction(AstProgram *ast, char *functionName) {
+  AstFunction *function = ast->firstFunction;
+  while (function != NULL) {
+    if (strcmp(function->functionName, functionName) == 0) {
+      return function;
+    }
+    function = function->nextFunction;
+  }
+  die(ERR_INTERNAL, 99, "function not found");
+}
+
 // creates the global scope
 // adds built in functions
 // adds user defined functions
@@ -222,7 +234,7 @@ size_t getFunctionPosition(AstFunction **functionList, size_t functionCount, cha
       return i;
     }
   }
-  die(ERR_UNDEF, 99, "function recursion checking error");
+  die(ERR_INTERNAL, 99, "function recursion checking error");
 }
 
 // checkRecursion() helper function
@@ -356,7 +368,6 @@ void checkRecursion(AstProgram *ast, SemanticContext *context) {
 
 // analyzeFunctions() helper function
 // get expression data type recursively
-// TODO
 AstDataType checkExpressionType(AstExpression *expression, SymTable *scope) {
   if (expression->expressionType == INT_LITERAL) {
     return INT;
@@ -433,7 +444,6 @@ AstDataType checkExpressionType(AstExpression *expression, SymTable *scope) {
 
 // analyzeFunctions() helper function
 // check propper function call
-// TODO
 AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunction *function,
                               AstFunctionCall *call, SymTable *scope) {
   StSymbol *symbol = symtableLookup(context->globalSymTable, call->functionName);
@@ -448,8 +458,9 @@ AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunc
     if (argCount > symbol->data.function.parameterCount) {
       die(ERR_ARGS, call->location.line, "too many function call parameters");
     }
-    if (checkExpressionType(argument->expression, scope) !=
-        symbol->data.function.parameterTypes[argCount - 1]) {
+    if (symbol->data.function.parameterTypes[argCount - 1] != ANY &&
+        checkExpressionType(argument->expression, scope) !=
+            symbol->data.function.parameterTypes[argCount - 1]) {
       die(ERR_ARGS, call->location.line, "incorrect function call parameter type");
     }
     argument = argument->nextArgument;
@@ -460,7 +471,9 @@ AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunc
 
   // check return type
   if (symbol->data.function.returnType == UNKNOWN) {
-    checkFunctionBody(ast, context, function);
+    return checkFunctionBody(ast, context, getAstFunction(ast, call->functionName));
+  } else {
+    return symbol->data.function.returnType;
   }
 }
 
@@ -474,6 +487,7 @@ if declaredReturnType == UNIT return Unit
 if declaredReturnType != UNIT all if end with return
 if declaredReturnType == UNKNOWN all if end with Unit
 */
+// resolves function return type
 // TODO
 bool checkCodeBlock(AstFunction *function, AstCodeBlock *block, SymTable *parentScope,
                     bool isLast) {
@@ -495,7 +509,8 @@ bool checkCodeBlock(AstFunction *function, AstCodeBlock *block, SymTable *parent
 
 // analyzeFunctions() helper function
 // analyzes function body recursively
-// TODO
+// resolves function return type
+// saves resolved function return type to symTable
 AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunction *function) {
   // create a new scope for the function body
   function->scope = symtableCreate(context->globalSymTable);
@@ -520,16 +535,32 @@ AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunc
             checkExpressionType(function->body.value->data.expression, function->scope);
       }
       // check correct return type
-      else if (!checkExpressionType(function->body.value->data.expression, function->scope) !=
+      else if (checkExpressionType(function->body.value->data.expression, function->scope) !=
                function->resolvedReturnType) {
         die(ERR_TYPE, function->location.line, "wrong return type");
       }
       // check function call
     } else {
+      // find return type
+      if (function->resolvedReturnType == UNKNOWN) {
+        function->resolvedReturnType = checkFunctionCall(
+            ast, context, function, function->body.value->data.functionCall, function->scope);
+      }
+      // check correct return type
+      else if (checkFunctionCall(ast, context, function, function->body.value->data.functionCall,
+                                 function->scope) != function->resolvedReturnType) {
+        die(ERR_TYPE, function->location.line, "wrong return type");
+      }
     }
   } else {  // check code blocks
     checkCodeBlock(function, function->body.codeBlock, function->scope, true);
   }
+
+  if (function->resolvedReturnType == UNKNOWN) {
+    die(ERR_TYPE, function->location.line, "cannot resolve function return type");
+  }
+  StSymbol *symbol = symtableLookup(context->globalSymTable, function->functionName);
+  symbol->data.function.returnType = function->resolvedReturnType;
   return function->resolvedReturnType;
 }
 
@@ -542,7 +573,7 @@ void analyzeFunctions(AstProgram *ast, SemanticContext *context) {
   AstFunction *function = ast->firstFunction;
   while (function != NULL) {
     // if function hasnt been already checked due to dependencies
-    if (function->resolvedReturnType != NULL) {
+    if (function->resolvedReturnType != UNKNOWN) {
       checkFunctionBody(ast, context, function);
     }
     function = function->nextFunction;
