@@ -377,9 +377,15 @@ AstDataType getExpressionType(AstExpression *expression) {
 // analyzeFunctions() helper function
 // analyzes a code block recursively
 // codeBlock always contains commands
+// returns true if all paths end with a return
 // last code block needs to check returns
+/* if isLast and last command == IF:
+if declaredReturnType == UNIT return Unit
+if declaredReturnType != UNIT all if end with return
+if declaredReturnType == UNKNOWN all if end with Unit
+*/
 // TODO
-void checkCodeBlock(AstFunction *function, AstCodeBlock *block, SymTable *parentScope,
+bool checkCodeBlock(AstFunction *function, AstCodeBlock *block, SymTable *parentScope,
                     bool isLast) {
   block->scope = symtableCreate(parentScope);
   AstCommand *command = block->firstCommand;
