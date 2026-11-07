@@ -222,7 +222,7 @@ size_t getFunctionPosition(AstFunction **functionList, size_t functionCount, cha
       return i;
     }
   }
-  die(ERR_UNDEF, 0, "function recursion checking error (should not happen)");
+  die(ERR_UNDEF, 99, "function recursion checking error");
 }
 
 // checkRecursion() helper function
@@ -231,8 +231,8 @@ void addFunctionDependency(size_t functionCount, AstFunction **functionList,
                            bool **functionDependenciesArray, size_t functionPosition,
                            SemanticContext *context, AstFunctionCall *functionCall) {
   StSymbol *symbol = symtableLookup(context->globalSymTable, functionCall->functionName);
-  if (symbol == NULL) {
-    die(ERR_UNDEF, functionCall->location.line, "called function not found");
+  if (symbol == NULL || symbol->type != ST_FUNCTION) {
+    die(ERR_UNDEF, functionCall->location.line, "undefined function");
   }
   if (symbol->data.function.isBuiltin) {
     return;
@@ -357,21 +357,111 @@ void checkRecursion(AstProgram *ast, SemanticContext *context) {
 // analyzeFunctions() helper function
 // get expression data type recursively
 // TODO
-AstDataType getExpressionType(AstExpression *expression) {
+AstDataType checkExpressionType(AstExpression *expression, SymTable *scope) {
   if (expression->expressionType == INT_LITERAL) {
-    expression->deducedDataType = INT;
+    return INT;
   } else if (expression->expressionType == DOUBLE_LITERAL) {
-    expression->deducedDataType = DOUBLE;
+    return DOUBLE;
   } else if (expression->expressionType == STRING_LITERAL) {
-    expression->deducedDataType = STRING;
+    return STRING;
   } else if (expression->expressionType == UNIT_LITERAL) {
-    expression->deducedDataType = UNIT;
+    return UNIT;
   } else if (expression->expressionType == VARIABLE) {
+    StSymbol *symbol = symtableLookup(scope, expression->data.variable);
+    if (symbol == NULL || symbol->type != ST_VARIABLE) {
+      die(ERR_UNDEF, expression->location.line, "undefined variable");
+    }
+    return symbol->data.variable.dataType;
+    // unary operators only work with numers and keep their type
   } else if (expression->expressionType == UNARY) {
+    AstOperator op = expression->data.unary.operatorAst;
+    AstDataType type = checkExpressionType(expression->data.unary.expression, scope);
+    // numerical operation
+    if ((type == INT || type == DOUBLE) && op == NEGATION) {
+      return type;
+    }
+    die(ERR_TYPE, expression->location.line, "wrong data type");
   } else if (expression->expressionType == BINARY) {
+    AstOperator op = expression->data.binary.operatorAst;
+    AstDataType typeL = checkExpressionType(expression->data.binary.leftExpression, scope);
+    AstDataType typeR = checkExpressionType(expression->data.binary.rightExpression, scope);
+    // numerical operation or concantenation
+    if (op == MULTIPLICATION || op == DIVISION || op == ADDITION || op == SUBTRACTION) {
+      // numerical operation
+      if ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) {
+        // conversion to double
+        if (typeL == DOUBLE || typeR == DOUBLE) {
+          return DOUBLE;
+        }
+        // both int
+        return INT;
+      }
+      // concantenation
+      else if (typeL == STRING && typeR == STRING && op == ADDITION) {
+        return STRING;
+      }
+    }
+    // logical operation
+    else {
+      // size comparassion
+      if (op == LESSER || op == LESSER_EQUAL || op == GREATER || op == GREATER_EQUAL) {
+        // numbers
+        if ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) {
+          return BOOL;
+        }
+        // strings
+        else if (typeL == STRING && typeR == STRING) {
+          return BOOL;
+        }
+      }
+      // equality
+      else if (op == EQUAL || op == NOT_EQUAL) {
+        // numbers
+        if ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) {
+          return BOOL;
+        }
+        // same type
+        else if (typeL == typeR) {
+          return BOOL;
+        }
+      }
+    }
+    die(ERR_TYPE, expression->location.line, "wrong data type");
+  }
+  die(ERR_INTERNAL, expression->location.line, "unknown expression type");
+}
+
+// analyzeFunctions() helper function
+// check propper function call
+// TODO
+AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunction *function,
+                              AstFunctionCall *call, SymTable *scope) {
+  StSymbol *symbol = symtableLookup(context->globalSymTable, call->functionName);
+  if (symbol == NULL || symbol->type != ST_FUNCTION) {
+    die(ERR_UNDEF, call->location.line, "undefined function");
+  }
+  AstFunctionCallArgument *argument = call->firstArgument;
+  size_t argCount = 0;
+  // check all arguments
+  while (argument != NULL) {
+    argCount++;
+    if (argCount > symbol->data.function.parameterCount) {
+      die(ERR_ARGS, call->location.line, "too many function call parameters");
+    }
+    if (checkExpressionType(argument->expression, scope) !=
+        symbol->data.function.parameterTypes[argCount - 1]) {
+      die(ERR_ARGS, call->location.line, "incorrect function call parameter type");
+    }
+    argument = argument->nextArgument;
+  }
+  if (argCount != symbol->data.function.parameterCount) {
+    die(ERR_ARGS, call->location.line, "too few function call parameters");
   }
 
-  return expression->deducedDataType;
+  // check return type
+  if (symbol->data.function.returnType == UNKNOWN) {
+    checkFunctionBody(ast, context, function);
+  }
 }
 
 // analyzeFunctions() helper function
@@ -409,12 +499,7 @@ bool checkCodeBlock(AstFunction *function, AstCodeBlock *block, SymTable *parent
 AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunction *function) {
   // create a new scope for the function body
   function->scope = symtableCreate(context->globalSymTable);
-
-  // resolve explicit function return type
-  if (function->declaredReturnType != UNKNOWN) {
-    function->resolvedReturnType = function->declaredReturnType;
-  }
-
+  function->resolvedReturnType = function->declaredReturnType;
   // check all function params and add to current scope
   AstFunctionParameter *param = function->firstParameter;
   while (param != NULL) {
@@ -429,11 +514,23 @@ AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunc
   if (function->bodyType == VALUE) {
     // check expression
     if (function->body.value->type == VALUE_EXPRESSION) {
-    } else {  // check function call
+      // find return type
+      if (function->resolvedReturnType == UNKNOWN) {
+        function->resolvedReturnType =
+            checkExpressionType(function->body.value->data.expression, function->scope);
+      }
+      // check correct return type
+      else if (!checkExpressionType(function->body.value->data.expression, function->scope) !=
+               function->resolvedReturnType) {
+        die(ERR_TYPE, function->location.line, "wrong return type");
+      }
+      // check function call
+    } else {
     }
   } else {  // check code blocks
     checkCodeBlock(function, function->body.codeBlock, function->scope, true);
   }
+  return function->resolvedReturnType;
 }
 
 // analyzes function and variable declarations and data types
