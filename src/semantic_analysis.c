@@ -726,7 +726,7 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
 
     // return UNIT
     if (command->type == VARIABLE_DECLARATION || command->type == ASSIGNMENT ||
-        command->type == WHILE) {
+        command->type == WHILE || function->declaredReturnType == UNIT) {
       // set return
       if (function->resolvedReturnType == UNKNOWN) {
         function->resolvedReturnType = UNIT;
@@ -739,8 +739,8 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       }
       // create return UNIT command
       newExpression->expressionType = UNIT_LITERAL;
-      newExpression->location.line = 0;
-      newExpression->location.column = 0;
+      newExpression->location.line = command->location.line;
+      newExpression->location.column = command->location.column;
       newExpression->deducedDataType = UNIT;
       newValue->type = VALUE_EXPRESSION;
       newValue->data.expression = newExpression;
