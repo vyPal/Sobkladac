@@ -501,7 +501,12 @@ if declaredReturnType == UNIT return Unit
 if declaredReturnType != UNIT all if end with return
 if declaredReturnType == UNKNOWN all if end with Unit
 */
-// TODO
+/* TODO
+Ve funkci, která má v hlavičce explicitně uvedený návratový typ Unit, se návratová hodnota
+(určená dle kteréhokoliv pravidla) běžně vyhodnotí, ale zahodí a funkce vrací (). (To platí
+i pro return!) Jinak musí být každá explicitně i implicitně vracená hodnota kompatibilní
+s návratovým typem.
+*/
 bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *function,
                     AstCodeBlock *block, SymTable *parentScope, bool hasToReturn) {
   block->scope = symtableCreate(parentScope);
@@ -509,7 +514,7 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
   AstDataType lastFunctionCallType = UNKNOWN;
   AstCommand *command = block->firstCommand;
   AstCommand *preLastCommand = NULL;
-  while (command != NULL) {
+  while (true) {
     // VARIABLE_DECLARATION
     if (command->type == VARIABLE_DECLARATION) {
       command->data.variableDeclaration.resolvedType =
@@ -592,37 +597,48 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       // RETURN
     } else if (command->type == RETURN) {
       explicitReturnFound = true;
-      // find function type
-      if (function->resolvedReturnType == UNKNOWN) {
-        // return by expression
-        if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
-          function->resolvedReturnType =
-              checkExpressionType(command->data.returnAst.value->data.expression, block->scope);
-        }
-        // return by function call
-        else {
-          function->resolvedReturnType = checkFunctionCall(
-              ast, context, command->data.returnAst.value->data.functionCall, block->scope);
+
+      // functions with return have to have explicit return type
+      if (function->declaredReturnType == UNKNOWN) {
+        die(ERR_TYPE, function->location.line,
+            "functions with return have to have explicit return type");
+      }
+
+      // return()
+      if (command->data.returnAst.value == NULL) {
+        if (function->declaredReturnType != UNIT) {
+          die(ERR_TYPE, command->location.line,
+              "return UNIT forbidden outside explicit UNIT functions");
+        } else {
+          // create return UNIT command
+          AstExpression *newExpression = arenaAlloc(sizeof(AstExpression));
+          AstValue *newValue = arenaAlloc(sizeof(AstValue));
+          newExpression->expressionType = UNIT_LITERAL;
+          newExpression->location.line = command->location.line;
+          newExpression->location.column = command->location.column;
+          newExpression->deducedDataType = UNIT;
+          newValue->type = VALUE_EXPRESSION;
+          newValue->data.expression = newExpression;
+          command->data.returnAst.value = newValue;
         }
       }
-      // check correct return type
+      // return by expression
+      else if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
+        // check correct return type
+        if (function->resolvedReturnType !=
+            checkExpressionType(command->data.returnAst.value->data.expression, block->scope)) {
+          die(ERR_TYPE, command->location.line, "incompatible return type");
+        }
+      }
+      // return by function call
       else {
-        // return by expression
-        if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
-          if (function->resolvedReturnType !=
-              checkExpressionType(command->data.returnAst.value->data.expression, block->scope)) {
-            die(ERR_TYPE, command->location.line, "incompatible return type");
-          }
-        }
-        // return by function call
-        else {
-          if (function->resolvedReturnType !=
-              checkFunctionCall(ast, context, command->data.returnAst.value->data.functionCall,
-                                block->scope)) {
-            die(ERR_TYPE, command->location.line, "incompatible return type");
-          }
+        if (function->resolvedReturnType !=
+            checkFunctionCall(ast, context, command->data.returnAst.value->data.functionCall,
+                              block->scope)) {
+          die(ERR_TYPE, command->location.line, "incompatible return type");
         }
       }
+
       // IF
     } else if (command->type == IF) {
       // check condition
@@ -648,15 +664,17 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
     } else if (command->type == EXPRESSION) {
       checkExpressionType(command->data.expressionAst.expression, block->scope);
     }
-    command = command->nextCommand;
-    if (command->nextCommand->nextCommand == NULL) {
+
+    if (command->nextCommand != NULL) {
       preLastCommand = command;
+      command = command->nextCommand;
+    } else {
+      break;
     }
   }
 
   // resolve an implicit return and replace it with an explicit return if necessary
   if (hasToReturn && !explicitReturnFound) {
-    command = block->lastCommand;
     AstExpression *newExpression = arenaAlloc(sizeof(AstExpression));
     AstValue *newValue = arenaAlloc(sizeof(AstValue));
     AstCommand *newCommand = arenaAlloc(sizeof(AstCommand));
