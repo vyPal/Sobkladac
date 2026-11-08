@@ -458,6 +458,8 @@ AstDataType checkExpressionType(AstExpression *expression, SymTable *scope) {
   return expression->deducedDataType;
 }
 
+// prototype
+AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunction *function);
 // analyzeFunctions() helper function
 // check propper function call and return its data type (indirectly recursive)
 // if function return type is unknown, call checkFunctionBody() on called function
@@ -725,7 +727,9 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
 
       // EXPRESSION
     } else if (command->type == EXPRESSION) {
-      checkExpressionType(command->data.expressionAst.expression, block->scope);
+      if (checkExpressionType(command->data.expressionAst.expression, block->scope) == BOOL) {
+        die(ERR_TYPE, command->location.line, "standalone bool expression is forbidden");
+      }
     }
 
     if (command->nextCommand != NULL) {
