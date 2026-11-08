@@ -372,30 +372,31 @@ void checkRecursion(AstProgram *ast, SemanticContext *context) {
 
 // analyzeFunctions() helper function
 // check expression and return data type (recursive)
+// saves data type to ast
 AstDataType checkExpressionType(AstExpression *expression, SymTable *scope) {
+  expression->deducedDataType = UNKNOWN;
   if (expression->expressionType == INT_LITERAL) {
-    return INT;
+    expression->deducedDataType = INT;
   } else if (expression->expressionType == DOUBLE_LITERAL) {
-    return DOUBLE;
+    expression->deducedDataType = DOUBLE;
   } else if (expression->expressionType == STRING_LITERAL) {
-    return STRING;
+    expression->deducedDataType = STRING;
   } else if (expression->expressionType == UNIT_LITERAL) {
-    return UNIT;
+    expression->deducedDataType = UNIT;
   } else if (expression->expressionType == VARIABLE) {
     StSymbol *symbol = symtableLookup(scope, expression->data.variable);
     if (symbol == NULL || symbol->type != ST_VARIABLE) {
       die(ERR_UNDEF, expression->location.line, "undefined variable");
     }
-    return symbol->data.variable.dataType;
+    expression->deducedDataType = symbol->data.variable.dataType;
     // unary operators only work with numers and keep their type
   } else if (expression->expressionType == UNARY) {
     AstOperator op = expression->data.unary.operatorAst;
     AstDataType type = checkExpressionType(expression->data.unary.expression, scope);
     // numerical operation
     if ((type == INT || type == DOUBLE) && op == NEGATION) {
-      return type;
+      expression->deducedDataType = type;
     }
-    die(ERR_TYPE, expression->location.line, "wrong data type");
   } else if (expression->expressionType == BINARY) {
     AstOperator op = expression->data.binary.operatorAst;
     AstDataType typeL = checkExpressionType(expression->data.binary.leftExpression, scope);
@@ -406,14 +407,16 @@ AstDataType checkExpressionType(AstExpression *expression, SymTable *scope) {
       if ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) {
         // conversion to double
         if (typeL == DOUBLE || typeR == DOUBLE) {
-          return DOUBLE;
+          expression->deducedDataType = DOUBLE;
         }
         // both int
-        return INT;
+        else {
+          expression->deducedDataType = INT;
+        }
       }
       // concantenation
       else if (typeL == STRING && typeR == STRING && op == ADDITION) {
-        return STRING;
+        expression->deducedDataType = STRING;
       }
     }
     // logical operation
@@ -422,28 +425,32 @@ AstDataType checkExpressionType(AstExpression *expression, SymTable *scope) {
       if (op == LESSER || op == LESSER_EQUAL || op == GREATER || op == GREATER_EQUAL) {
         // numbers
         if ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) {
-          return BOOL;
+          expression->deducedDataType = BOOL;
         }
         // strings
         else if (typeL == STRING && typeR == STRING) {
-          return BOOL;
+          expression->deducedDataType = BOOL;
         }
       }
       // equality
       else if (op == EQUAL || op == NOT_EQUAL) {
         // numbers
         if ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) {
-          return BOOL;
+          expression->deducedDataType = BOOL;
         }
         // same type
         else if (typeL == typeR) {
-          return BOOL;
+          expression->deducedDataType = BOOL;
         }
       }
     }
+  } else {
+    die(ERR_INTERNAL, expression->location.line, "unknown expression type");
+  }
+  if (expression->deducedDataType == UNKNOWN) {
     die(ERR_TYPE, expression->location.line, "wrong data type");
   }
-  die(ERR_INTERNAL, expression->location.line, "unknown expression type");
+  return expression->deducedDataType;
 }
 
 // analyzeFunctions() helper function
@@ -486,6 +493,7 @@ AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunc
 // check propper code block body and return whether it contains a return (indirectly recursive)
 // last code block needs to check returns
 // resolves function return type
+// resolves variable types
 // codeBlock always contains commands
 // unreachable code still gets analyzed
 /* if isLast and last command == IF:
