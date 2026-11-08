@@ -271,7 +271,7 @@ void getFunctionDependencies(size_t functionCount, AstFunction **functionList,
       functionCall = command->data.variableDeclaration.value->data.functionCall;
       addFunctionDependency(functionCount, functionList, functionDependenciesArray,
                             functionPosition, context, functionCall);
-      // assignement using a function call
+      // assignment using a function call
     } else if (command->type == ASSIGNMENT &&
                command->data.assignment.value->type == VALUE_FUNCTION_CALL) {
       functionCall = command->data.assignment.value->data.functionCall;
@@ -507,6 +507,7 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
   block->scope = symtableCreate(parentScope);
   AstCommand *command = block->firstCommand;
   while (command != NULL) {
+    // VARIABLE_DECLARATION
     if (command->type == VARIABLE_DECLARATION) {
       command->data.variableDeclaration.resolvedType =
           command->data.variableDeclaration.declaredType;
@@ -517,7 +518,7 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
           command->data.variableDeclaration.resolvedType = checkExpressionType(
               command->data.variableDeclaration.value->data.expression, block->scope);
         }
-        // check correct assignement type
+        // check correct assignment type
         else {
           if (command->data.variableDeclaration.resolvedType !=
               checkExpressionType(command->data.variableDeclaration.value->data.expression,
@@ -534,7 +535,7 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
               ast, context, command->data.variableDeclaration.value->data.functionCall,
               block->scope);
         }
-        // check correct assignement type
+        // check correct assignment type
         else {
           if (command->data.variableDeclaration.resolvedType !=
               checkFunctionCall(ast, context,
@@ -551,11 +552,44 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
                                   command->data.variableDeclaration.isMutable)) {
         die(ERR_REDEF, command->location.line, "variable alredy defined");
       }
+      // ASSIGNMENT
     } else if (command->type == ASSIGNMENT) {
+      // check if variable exists
+      StSymbol *symbol = symtableLookup(block->scope, command->data.assignment.variableName);
+      if (symbol == NULL || symbol->type != ST_VARIABLE) {
+        die(ERR_UNDEF, command->location.line, "undefined variable");
+      }
+
+      // check if variable isnt immutable
+      if (!symbol->data.variable.isMutable) {
+        die(ERR_CONST, command->location.line, "immutable variable assignment attemp");
+      }
+
+      // assignment by an expression
+      if (command->data.assignment.value->type == VALUE_EXPRESSION) {
+        // check correct assignment type
+        if (symbol->data.variable.dataType !=
+            checkExpressionType(command->data.assignment.value->data.expression, block->scope)) {
+          die(ERR_TYPE, command->location.line, "incompatible assignment type");
+        }
+      }
+      // assignment by a function call
+      else {
+        if (symbol->data.variable.dataType !=
+            checkFunctionCall(ast, context, command->data.assignment.value->data.functionCall,
+                              block->scope)) {
+          die(ERR_TYPE, command->location.line, "incompatible assignment type");
+        }
+      }
+      // FUNCTION_CALL
     } else if (command->type == FUNCTION_CALL) {
+      // RETURN
     } else if (command->type == RETURN) {
+      // IF
     } else if (command->type == IF) {
+      // WHILE
     } else if (command->type == WHILE) {
+      // EXPRESSION
     } else if (command->type == EXPRESSION) {
     }
     command = command->nextCommand;
