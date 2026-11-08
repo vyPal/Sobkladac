@@ -30,12 +30,12 @@ all: build
 build: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) -lm
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 test-build: $(TEST_BINS)
 
 $(TEST_BINS): $(OBJ_DIR)/%: $(OBJ_DIR)/%.o $(LIB_OBJS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) -lm
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 test: test-build
 	@fail=0; for t in $(TEST_BINS); do ./$$t $(TEST_FLAGS) || fail=1; done; exit $$fail

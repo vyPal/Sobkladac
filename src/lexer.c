@@ -384,6 +384,12 @@ LinkedTlist *lexerMain(void) {
         if (nextChar != 'n')
           die(1, line, "Unexpected character at line %d colum %d, expected \"@main\"", line,
               position);
+        nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar != ' ')
+          die(1, line, "Unexpected character at line %d colum %d, expected \" \" after \"@main\"",
+              line, position);
         lastToken = pushToken(newToken(TK_ATMAIN, line), lastToken);
         break;
 
@@ -454,15 +460,17 @@ LinkedTlist *lexerMain(void) {
           }
           preloadedChar = true;
         } else if (nextChar == '*') {
-          bool endComment = false;
+          int depth = 1;
           bool newLine = false;
           char prevChar = 0;
-          while (!endComment) {
+          while (depth > 0) {
             nextCharInt = fgetc(stdin);
             nextChar = (char)nextCharInt;
             position++;
             if (prevChar == '*' && nextChar == '/') {
-              endComment = true;
+              depth--;
+            } else if (prevChar == '/' && nextChar == '*') {
+              depth++;
             } else if (nextChar == '\n') {
               position = 0;
               line++;
@@ -523,10 +531,12 @@ LinkedTlist *lexerMain(void) {
         break;
       default:
         // identifier
-        if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z')) {
+        if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z') ||
+            nextChar == '_') {
           StringBuilder sb = sbNew(0);
           sbAppendChar(&sb, nextChar);
-          // ident
+          bool isUnderscore = (nextChar == '_');
+          // identifier
           while (true) {
             nextCharInt = fgetc(stdin);
             nextChar = (char)nextCharInt;
@@ -534,6 +544,9 @@ LinkedTlist *lexerMain(void) {
             if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z') ||
                 (nextChar >= '0' && nextChar <= '9') || nextChar == '_') {
               sbAppendChar(&sb, nextChar);
+              isUnderscore = false;
+            } else if (isUnderscore) {
+              die(1, line, "Unexpected character at line %d colum %d", line, position);
             } else {
               preloadedChar = true;
               break;
