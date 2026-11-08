@@ -513,7 +513,7 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
   bool explicitReturnFound = false;
   AstDataType lastFunctionCallType = UNKNOWN;
   AstCommand *command = block->firstCommand;
-  AstCommand *preLastCommand = NULL;
+  AstCommand *previousCommand = NULL;
   while (true) {
     // VARIABLE_DECLARATION
     if (command->type == VARIABLE_DECLARATION) {
@@ -604,23 +604,63 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
             "functions with return have to have explicit return type");
       }
 
-      // return()
-      if (command->data.returnAst.value == NULL) {
-        if (function->declaredReturnType != UNIT) {
-          die(ERR_TYPE, command->location.line,
-              "return UNIT forbidden outside explicit UNIT functions");
-        } else {
-          // create return UNIT command
-          AstExpression *newExpression = arenaAlloc(sizeof(AstExpression));
-          AstValue *newValue = arenaAlloc(sizeof(AstValue));
-          newExpression->expressionType = UNIT_LITERAL;
-          newExpression->location.line = command->location.line;
-          newExpression->location.column = command->location.column;
-          newExpression->deducedDataType = UNIT;
-          newValue->type = VALUE_EXPRESSION;
-          newValue->data.expression = newExpression;
-          command->data.returnAst.value = newValue;
+      // UNIT functions evaluate returns but return ()
+      if (function->declaredReturnType == UNIT) {
+        // empty return
+        if (command->data.returnAst.value == NULL) {
+          // new UNIT expression
+          AstExpression *unitExpression = arenaAlloc(sizeof(AstExpression));
+          unitExpression->expressionType = UNIT_LITERAL;
+          unitExpression->location.line = command->location.line;
+          unitExpression->location.column = command->location.column;
+          unitExpression->deducedDataType = UNIT;
+          // create return() command
+          command->data.returnAst.value = arenaAlloc(sizeof(AstValue));
+          command->data.returnAst.value->type = VALUE_EXPRESSION;
+          command->data.returnAst.value->data.expression = unitExpression;
         }
+        // split return into expression or function call and return() if not done already
+        else if (command->data.returnAst.value->type != VALUE_EXPRESSION &&
+                 command->data.returnAst.value->data.expression->expressionType != UNIT_LITERAL) {
+          // new UNIT expression
+          AstExpression *unitExpression = arenaAlloc(sizeof(AstExpression));
+          unitExpression->expressionType = UNIT_LITERAL;
+          unitExpression->location.line = command->location.line;
+          unitExpression->location.column = command->location.column;
+          unitExpression->deducedDataType = UNIT;
+          // insert expression or function call in front of return
+          AstCommand *newCommand = arenaAlloc(sizeof(AstCommand));
+          newCommand->location.line = command->location.line;
+          newCommand->location.column = command->location.column;
+          newCommand->nextCommand = command;
+          if (previousCommand != NULL) {
+            previousCommand->nextCommand = newCommand;
+          }
+          // split into an expression
+          if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
+            // new expression
+            newCommand->type = EXPRESSION;
+            newCommand->data.expressionAst.expression =
+                command->data.returnAst.value->data.expression;
+          }
+          // split into a function call
+          else {
+            // new function call
+            newCommand->type = FUNCTION_CALL;
+            newCommand->data.call.functionCall = command->data.returnAst.value->data.functionCall;
+          }
+          // rewrite return
+          command->data.returnAst.value->type = VALUE_EXPRESSION;
+          command->data.returnAst.value->data.expression = unitExpression;
+          // move analysis back to newCommand
+          command = newCommand;
+          continue;
+        }
+      }
+      // return()
+      else if (command->data.returnAst.value == NULL) {
+        die(ERR_TYPE, command->location.line,
+            "return UNIT forbidden outside explicit UNIT functions");
       }
       // return by expression
       else if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
@@ -666,7 +706,7 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
     }
 
     if (command->nextCommand != NULL) {
-      preLastCommand = command;
+      previousCommand = command;
       command = command->nextCommand;
     } else {
       break;
@@ -721,8 +761,8 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       // replace function call with return
       newValue->type = VALUE_FUNCTION_CALL;
       newValue->data.functionCall = command->data.call.functionCall;
-      if (preLastCommand != NULL) {
-        preLastCommand->nextCommand = newCommand;
+      if (previousCommand != NULL) {
+        previousCommand->nextCommand = newCommand;
       }
       block->lastCommand = newCommand;
     }
@@ -741,8 +781,8 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       // replace expression with return
       newValue->type = VALUE_EXPRESSION;
       newValue->data.expression = command->data.expressionAst.expression;
-      if (preLastCommand != NULL) {
-        preLastCommand->nextCommand = newCommand;
+      if (previousCommand != NULL) {
+        previousCommand->nextCommand = newCommand;
       }
       block->lastCommand = newCommand;
     }
