@@ -82,6 +82,7 @@ typedef struct {
 } SemanticContext;
 
 // insert function into symTable and assign uniqueID
+// return FALSE if function already exists
 bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsigned column,
                             AstDataType returnType, AstDataType *paramTypes, size_t paramCount,
                             bool isBuiltin, bool isMain) {
@@ -99,6 +100,7 @@ bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsig
 }
 
 // insert variable into symTable and assign uniqueID
+// return FALSE if variable already exists
 bool insertVariableSymTable(SymTable *symTable, char *name, unsigned line, unsigned column,
                             AstDataType dataType, bool isMutable) {
   StSymbol *symbol = arenaAlloc(sizeof(StSymbol));
@@ -122,7 +124,7 @@ size_t getParamCount(AstFunction *func) {
   return i;
 }
 
-// get ast function* from name
+// get ast function* from function name
 AstFunction *getAstFunction(AstProgram *ast, char *functionName) {
   AstFunction *function = ast->firstFunction;
   while (function != NULL) {
@@ -137,6 +139,7 @@ AstFunction *getAstFunction(AstProgram *ast, char *functionName) {
 // creates the global scope
 // adds built in functions
 // adds user defined functions
+// check propper @main definition
 void initializeFunctions(AstProgram *ast, SemanticContext *context) {
   context->globalSymTable = symtableCreate(NULL);
 
@@ -246,6 +249,7 @@ void addFunctionDependency(size_t functionCount, AstFunction **functionList,
   if (symbol == NULL || symbol->type != ST_FUNCTION) {
     die(ERR_UNDEF, functionCall->location.line, "undefined function");
   }
+  // ignore built in functions
   if (symbol->data.function.isBuiltin) {
     return;
   }
@@ -284,13 +288,13 @@ void getFunctionDependencies(size_t functionCount, AstFunction **functionList,
       functionCall = command->data.returnAst.value->data.functionCall;
       addFunctionDependency(functionCount, functionList, functionDependenciesArray,
                             functionPosition, context, functionCall);
-      // IF statement cant contain a function call according to specifications
+      // IF statement condition cant contain a function call according to specifications
     } else if (command->type == IF) {
       getFunctionDependencies(functionCount, functionList, functionDependenciesArray,
                               functionPosition, context, command->data.ifAst.thenBlock);
       getFunctionDependencies(functionCount, functionList, functionDependenciesArray,
                               functionPosition, context, command->data.ifAst.elseBlock);
-      // WHILE statement cant contain a function call according to specifications
+      // WHILE statement condition cant contain a function call according to specifications
     } else if (command->type == WHILE) {
       getFunctionDependencies(functionCount, functionList, functionDependenciesArray,
                               functionPosition, context, command->data.whileAst.codeBlock);
@@ -367,7 +371,7 @@ void checkRecursion(AstProgram *ast, SemanticContext *context) {
 }
 
 // analyzeFunctions() helper function
-// get expression data type recursively
+// check expression and return data type (recursive)
 AstDataType checkExpressionType(AstExpression *expression, SymTable *scope) {
   if (expression->expressionType == INT_LITERAL) {
     return INT;
@@ -443,7 +447,8 @@ AstDataType checkExpressionType(AstExpression *expression, SymTable *scope) {
 }
 
 // analyzeFunctions() helper function
-// check propper function call
+// check propper function call and return its data type (indirectly recursive)
+// if function return type is unknown, call checkFunctionBody() on called function
 AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunctionCall *call,
                               SymTable *scope) {
   StSymbol *symbol = symtableLookup(context->globalSymTable, call->functionName);
@@ -478,16 +483,16 @@ AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunc
 }
 
 // analyzeFunctions() helper function
-// analyzes a code block recursively
-// codeBlock always contains commands
-// returns true if all paths end with a return
+// check propper code block body and return whether it contains a return (indirectly recursive)
 // last code block needs to check returns
+// resolves function return type
+// codeBlock always contains commands
+// unreachable code still gets analyzed
 /* if isLast and last command == IF:
 if declaredReturnType == UNIT return Unit
 if declaredReturnType != UNIT all if end with return
 if declaredReturnType == UNKNOWN all if end with Unit
 */
-// resolves function return type
 // TODO
 bool checkCodeBlock(AstFunction *function, AstCodeBlock *block, SymTable *parentScope,
                     bool isLast) {
@@ -508,9 +513,9 @@ bool checkCodeBlock(AstFunction *function, AstCodeBlock *block, SymTable *parent
 }
 
 // analyzeFunctions() helper function
-// analyzes function body recursively
-// resolves function return type
-// saves resolved function return type to symTable
+// check propper function body and return its data type (indirectly recursive)
+// checks correct returns
+// updates symTable function return type at the end
 AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunction *function) {
   // create a new scope for the function body
   function->scope = symtableCreate(context->globalSymTable);
@@ -544,10 +549,10 @@ AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunc
       // find return type
       if (function->resolvedReturnType == UNKNOWN) {
         function->resolvedReturnType = checkFunctionCall(
-            ast, context, function, function->body.value->data.functionCall, function->scope);
+            ast, context, function->body.value->data.functionCall, function->scope);
       }
       // check correct return type
-      else if (checkFunctionCall(ast, context, function, function->body.value->data.functionCall,
+      else if (checkFunctionCall(ast, context, function->body.value->data.functionCall,
                                  function->scope) != function->resolvedReturnType) {
         die(ERR_TYPE, function->location.line, "wrong return type");
       }
@@ -566,9 +571,6 @@ AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunc
 
 // analyzes function and variable declarations and data types
 // cehck immutable variables arent modified
-// analyzes returns
-// TIP: function type resolution is saved to function->resolvedReturnType first, then
-// checkFunctionBody() updates symTable (recursive functions have explicit return type)
 void analyzeFunctions(AstProgram *ast, SemanticContext *context) {
   // check all functions
   AstFunction *function = ast->firstFunction;
