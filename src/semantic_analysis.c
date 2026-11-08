@@ -490,22 +490,25 @@ AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunc
 }
 
 // analyzeFunctions() helper function
-// check propper code block body and return whether it contains a return (recursive)
+// check propper code block body and return whether it contains an explicit return (recursive)
 // last code block needs to check returns
 // resolves function return type
 // resolves variable types
 // codeBlock always contains commands
 // unreachable code still gets analyzed
-/* if isLast and last command == IF:
+/* if hasToReturn and last command == IF:
 if declaredReturnType == UNIT return Unit
 if declaredReturnType != UNIT all if end with return
 if declaredReturnType == UNKNOWN all if end with Unit
 */
 // TODO
 bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *function,
-                    AstCodeBlock *block, SymTable *parentScope, bool isLast) {
+                    AstCodeBlock *block, SymTable *parentScope, bool hasToReturn) {
   block->scope = symtableCreate(parentScope);
+  bool explicitReturnFound = false;
+  AstDataType lastFunctionCallType = UNKNOWN;
   AstCommand *command = block->firstCommand;
+  AstCommand *preLastCommand = NULL;
   while (command != NULL) {
     // VARIABLE_DECLARATION
     if (command->type == VARIABLE_DECLARATION) {
@@ -513,7 +516,7 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
           command->data.variableDeclaration.declaredType;
       // inicialized by an expression
       if (command->data.variableDeclaration.value->type == VALUE_EXPRESSION) {
-        // find return type
+        // find variable type
         if (command->data.variableDeclaration.resolvedType == UNKNOWN) {
           command->data.variableDeclaration.resolvedType = checkExpressionType(
               command->data.variableDeclaration.value->data.expression, block->scope);
@@ -529,7 +532,7 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       }
       // inicialized by a function call
       else {
-        // find return type
+        // find variable type
         if (command->data.variableDeclaration.resolvedType == UNKNOWN) {
           command->data.variableDeclaration.resolvedType = checkFunctionCall(
               ast, context, command->data.variableDeclaration.value->data.functionCall,
@@ -575,6 +578,7 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       }
       // assignment by a function call
       else {
+        // check correct assignment type
         if (symbol->data.variable.dataType !=
             checkFunctionCall(ast, context, command->data.assignment.value->data.functionCall,
                               block->scope)) {
@@ -583,18 +587,149 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       }
       // FUNCTION_CALL
     } else if (command->type == FUNCTION_CALL) {
+      lastFunctionCallType =
+          checkFunctionCall(ast, context, command->data.call.functionCall, block->scope);
       // RETURN
     } else if (command->type == RETURN) {
+      explicitReturnFound = true;
+      // find function type
+      if (function->resolvedReturnType == UNKNOWN) {
+        // return by expression
+        if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
+          function->resolvedReturnType =
+              checkExpressionType(command->data.returnAst.value->data.expression, block->scope);
+        }
+        // return by function call
+        else {
+          function->resolvedReturnType = checkFunctionCall(
+              ast, context, command->data.returnAst.value->data.functionCall, block->scope);
+        }
+      }
+      // check correct return type
+      else {
+        // return by expression
+        if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
+          if (function->resolvedReturnType !=
+              checkExpressionType(command->data.returnAst.value->data.expression, block->scope)) {
+            die(ERR_TYPE, command->location.line, "incompatible return type");
+          }
+        }
+        // return by function call
+        else {
+          if (function->resolvedReturnType !=
+              checkFunctionCall(ast, context, command->data.returnAst.value->data.functionCall,
+                                block->scope)) {
+            die(ERR_TYPE, command->location.line, "incompatible return type");
+          }
+        }
+      }
       // IF
     } else if (command->type == IF) {
+      // check condition
+      if (checkExpressionType(command->data.ifAst.condition, block->scope) != BOOL) {
+        die(ERR_TYPE, command->location.line, "if statement condition is not boolean");
+      }
+      // check code blocks
+      checkCodeBlock(ast, context, function, command->data.ifAst.thenBlock, block->scope,
+                     (command->nextCommand == NULL && hasToReturn && !explicitReturnFound));
+      checkCodeBlock(ast, context, function, command->data.ifAst.elseBlock, block->scope,
+                     (command->nextCommand == NULL && hasToReturn && !explicitReturnFound));
       // WHILE
     } else if (command->type == WHILE) {
+      // check condition
+      if (checkExpressionType(command->data.whileAst.condition, block->scope) != BOOL) {
+        die(ERR_TYPE, command->location.line, "while statement condition is not boolean");
+      }
+
+      // check code blocks
+      checkCodeBlock(ast, context, function, command->data.whileAst.codeBlock, block->scope, false);
+
       // EXPRESSION
     } else if (command->type == EXPRESSION) {
+      checkExpressionType(command->data.expressionAst.expression, block->scope);
     }
     command = command->nextCommand;
+    if (command->nextCommand->nextCommand == NULL) {
+      preLastCommand = command;
+    }
   }
-  return false;
+
+  // resolve an implicit return and replace it with an explicit return if necessary
+  if (hasToReturn && !explicitReturnFound) {
+    command = block->lastCommand;
+    AstExpression *newExpression = arenaAlloc(sizeof(AstExpression));
+    AstValue *newValue = arenaAlloc(sizeof(AstValue));
+    AstCommand *newCommand = arenaAlloc(sizeof(AstCommand));
+    newCommand->type = RETURN;
+    newCommand->location.line = command->location.line;
+    newCommand->location.column = command->location.column;
+    newCommand->nextCommand = NULL;
+    newCommand->data.returnAst.value = newValue;
+
+    // return UNIT
+    if (command->type == VARIABLE_DECLARATION || command->type == ASSIGNMENT ||
+        command->type == WHILE) {
+      // set return
+      if (function->resolvedReturnType == UNKNOWN) {
+        function->resolvedReturnType = UNIT;
+      }
+      // check correct return
+      else {
+        if (function->resolvedReturnType != UNIT) {
+          die(ERR_TYPE, command->location.line, "incompatible implicit return type");
+        }
+      }
+      // create return UNIT command
+      newExpression->expressionType = UNIT_LITERAL;
+      newExpression->location.line = 0;
+      newExpression->location.column = 0;
+      newExpression->deducedDataType = UNIT;
+      newValue->type = VALUE_EXPRESSION;
+      newValue->data.expression = newExpression;
+      command->nextCommand = newCommand;
+      block->lastCommand = newCommand;
+    }
+
+    // return function call
+    else if (command->type == FUNCTION_CALL) {
+      // set return
+      if (function->resolvedReturnType == UNKNOWN) {
+        function->resolvedReturnType = lastFunctionCallType;
+      }
+      // check correct return
+      else if (function->resolvedReturnType != lastFunctionCallType) {
+        die(ERR_TYPE, command->location.line, "incompatible implicit return type");
+      }
+      // replace function call with return
+      newValue->type = VALUE_FUNCTION_CALL;
+      newValue->data.functionCall = command->data.call.functionCall;
+      if (preLastCommand != NULL) {
+        preLastCommand->nextCommand = newCommand;
+      }
+      block->lastCommand = newCommand;
+    }
+
+    // return expression
+    else if (command->type == EXPRESSION) {
+      // set return
+      if (function->resolvedReturnType == UNKNOWN) {
+        function->resolvedReturnType = command->data.expressionAst.expression->deducedDataType;
+      }
+      // check correct return
+      else if (function->resolvedReturnType !=
+               command->data.expressionAst.expression->deducedDataType) {
+        die(ERR_TYPE, command->location.line, "incompatible implicit return type");
+      }
+      // replace expression with return
+      newValue->type = VALUE_EXPRESSION;
+      newValue->data.expression = command->data.expressionAst.expression;
+      if (preLastCommand != NULL) {
+        preLastCommand->nextCommand = newCommand;
+      }
+      block->lastCommand = newCommand;
+    }
+  }
+  return explicitReturnFound;
 }
 
 // analyzeFunctions() helper function
