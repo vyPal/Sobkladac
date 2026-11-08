@@ -490,7 +490,7 @@ AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunc
 }
 
 // analyzeFunctions() helper function
-// check propper code block body and return whether it contains a return (indirectly recursive)
+// check propper code block body and return whether it contains a return (recursive)
 // last code block needs to check returns
 // resolves function return type
 // resolves variable types
@@ -502,12 +502,55 @@ if declaredReturnType != UNIT all if end with return
 if declaredReturnType == UNKNOWN all if end with Unit
 */
 // TODO
-bool checkCodeBlock(AstFunction *function, AstCodeBlock *block, SymTable *parentScope,
-                    bool isLast) {
+bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *function,
+                    AstCodeBlock *block, SymTable *parentScope, bool isLast) {
   block->scope = symtableCreate(parentScope);
   AstCommand *command = block->firstCommand;
   while (command != NULL) {
     if (command->type == VARIABLE_DECLARATION) {
+      command->data.variableDeclaration.resolvedType =
+          command->data.variableDeclaration.declaredType;
+      // inicialized by an expression
+      if (command->data.variableDeclaration.value->type == VALUE_EXPRESSION) {
+        // find return type
+        if (command->data.variableDeclaration.resolvedType == UNKNOWN) {
+          command->data.variableDeclaration.resolvedType = checkExpressionType(
+              command->data.variableDeclaration.value->data.expression, block->scope);
+        }
+        // check correct assignement type
+        else {
+          if (command->data.variableDeclaration.resolvedType !=
+              checkExpressionType(command->data.variableDeclaration.value->data.expression,
+                                  block->scope)) {
+            die(ERR_TYPE, command->location.line, "wrong initialization type");
+          }
+        }
+      }
+      // inicialized by a function call
+      else {
+        // find return type
+        if (command->data.variableDeclaration.resolvedType == UNKNOWN) {
+          command->data.variableDeclaration.resolvedType = checkFunctionCall(
+              ast, context, command->data.variableDeclaration.value->data.functionCall,
+              block->scope);
+        }
+        // check correct assignement type
+        else {
+          if (command->data.variableDeclaration.resolvedType !=
+              checkFunctionCall(ast, context,
+                                command->data.variableDeclaration.value->data.functionCall,
+                                block->scope)) {
+            die(ERR_TYPE, command->location.line, "wrong initialization type");
+          }
+        }
+      }
+      // add variable to current scope
+      if (!insertVariableSymTable(block->scope, command->data.variableDeclaration.variableName,
+                                  command->location.line, command->location.column,
+                                  command->data.variableDeclaration.resolvedType,
+                                  command->data.variableDeclaration.isMutable)) {
+        die(ERR_REDEF, command->location.line, "variable alredy defined");
+      }
     } else if (command->type == ASSIGNMENT) {
     } else if (command->type == FUNCTION_CALL) {
     } else if (command->type == RETURN) {
@@ -528,7 +571,7 @@ AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunc
   // create a new scope for the function body
   function->scope = symtableCreate(context->globalSymTable);
   function->resolvedReturnType = function->declaredReturnType;
-  // check all function params and add to current scope
+  // check all function params and add them to the current scope
   AstFunctionParameter *param = function->firstParameter;
   while (param != NULL) {
     if (!insertVariableSymTable(function->scope, param->parameterName, function->location.line,
@@ -548,8 +591,8 @@ AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunc
             checkExpressionType(function->body.value->data.expression, function->scope);
       }
       // check correct return type
-      else if (checkExpressionType(function->body.value->data.expression, function->scope) !=
-               function->resolvedReturnType) {
+      else if (function->resolvedReturnType !=
+               checkExpressionType(function->body.value->data.expression, function->scope)) {
         die(ERR_TYPE, function->location.line, "wrong return type");
       }
       // check function call
@@ -560,13 +603,14 @@ AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunc
             ast, context, function->body.value->data.functionCall, function->scope);
       }
       // check correct return type
-      else if (checkFunctionCall(ast, context, function->body.value->data.functionCall,
-                                 function->scope) != function->resolvedReturnType) {
+      else if (function->resolvedReturnType !=
+               checkFunctionCall(ast, context, function->body.value->data.functionCall,
+                                 function->scope)) {
         die(ERR_TYPE, function->location.line, "wrong return type");
       }
     }
   } else {  // check code blocks
-    checkCodeBlock(function, function->body.codeBlock, function->scope, true);
+    checkCodeBlock(ast, context, function, function->body.codeBlock, function->scope, true);
   }
 
   if (function->resolvedReturnType == UNKNOWN) {
