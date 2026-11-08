@@ -629,11 +629,11 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       if (checkExpressionType(command->data.ifAst.condition, block->scope) != BOOL) {
         die(ERR_TYPE, command->location.line, "if statement condition is not boolean");
       }
-      // check code blocks
-      checkCodeBlock(ast, context, function, command->data.ifAst.thenBlock, block->scope,
-                     (command->nextCommand == NULL && hasToReturn && !explicitReturnFound));
-      checkCodeBlock(ast, context, function, command->data.ifAst.elseBlock, block->scope,
-                     (command->nextCommand == NULL && hasToReturn && !explicitReturnFound));
+      // check code blocks ("if" as a return handeled at the end)
+      if (command->nextCommand != NULL || !hasToReturn || explicitReturnFound) {
+        checkCodeBlock(ast, context, function, command->data.ifAst.thenBlock, block->scope, false);
+        checkCodeBlock(ast, context, function, command->data.ifAst.elseBlock, block->scope, false);
+      }
       // WHILE
     } else if (command->type == WHILE) {
       // check condition
@@ -727,6 +727,45 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
         preLastCommand->nextCommand = newCommand;
       }
       block->lastCommand = newCommand;
+    }
+
+    // IF return
+    if (command->type == IF) {
+      // exlicit funtion type UNIT
+      if (function->declaredReturnType == UNIT) {
+        // create return UNIT command
+        newExpression->expressionType = UNIT_LITERAL;
+        newExpression->location.line = 0;
+        newExpression->location.column = 0;
+        newExpression->deducedDataType = UNIT;
+        newValue->type = VALUE_EXPRESSION;
+        newValue->data.expression = newExpression;
+        command->nextCommand = newCommand;
+        block->lastCommand = newCommand;
+
+        // analyze "if" as non return
+        checkCodeBlock(ast, context, function, command->data.ifAst.thenBlock, block->scope, false);
+        checkCodeBlock(ast, context, function, command->data.ifAst.elseBlock, block->scope, false);
+      }
+
+      else {
+        bool explicitReturnFoundLeft = checkCodeBlock(
+            ast, context, function, command->data.ifAst.thenBlock, block->scope, true);
+        bool explicitReturnFoundRight = checkCodeBlock(
+            ast, context, function, command->data.ifAst.elseBlock, block->scope, true);
+
+        // all "if" end with explicit return
+        if (explicitReturnFoundLeft && explicitReturnFoundRight) {
+          explicitReturnFound = true;
+        }
+        // all "if" end with implicit return UNIT
+        else {
+          if (function->resolvedReturnType != UNIT) {
+            die(ERR_TYPE, command->location.line,
+                "function ends with an implicit return if statement that does not return UNIT");
+          }
+        }
+      }
     }
   }
   return explicitReturnFound;
