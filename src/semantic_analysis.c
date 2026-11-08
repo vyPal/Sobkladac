@@ -475,8 +475,8 @@ AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunc
     if (argCount > symbol->data.function.parameterCount) {
       die(ERR_ARGS, call->location.line, "too many function call parameters");
     }
-    if (checkExpressionType(argument->expression, scope) !=
-            symbol->data.function.parameterTypes[argCount - 1] &&
+    if (!isTypeCompatible(symbol->data.function.parameterTypes[argCount - 1],
+                          checkExpressionType(argument->expression, scope)) &&
         symbol->data.function.parameterTypes[argCount - 1] != ANY) {
       die(ERR_ARGS, call->location.line, "incorrect function call parameter type");
     }
@@ -524,6 +524,9 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
         if (command->data.variableDeclaration.resolvedType == UNKNOWN) {
           command->data.variableDeclaration.resolvedType = checkExpressionType(
               command->data.variableDeclaration.value->data.expression, block->scope);
+          if (command->data.variableDeclaration.resolvedType == BOOL) {
+            die(ERR_TYPE, command->location.line, "bool initialization type is forbidden");
+          }
         }
         // check correct assignment type
         else {
@@ -913,6 +916,9 @@ AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunc
 
   if (function->resolvedReturnType == UNKNOWN) {
     die(ERR_TYPE, function->location.line, "cannot resolve function return type");
+  }
+  if (function->resolvedReturnType == BOOL) {
+    die(ERR_TYPE, function->location.line, "bool initialization type is forbidden");
   }
   StSymbol *symbol = symtableLookup(context->globalSymTable, function->functionName);
   symbol->data.function.returnType = function->resolvedReturnType;
