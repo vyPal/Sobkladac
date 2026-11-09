@@ -77,7 +77,7 @@ AstFunction *getAstFunction(AstProgram *ast, const char *functionName) {
 // adds built in functions
 // adds user defined functions
 // check propper @main definition
-void initializeFunctions(AstProgram *ast, SymTable *globalSymTable) {
+void initializeFunctions(const AstProgram *ast, SymTable *globalSymTable) {
   // add built-in functions
   AstDataType *printParams = arenaAlloc(sizeof(AstDataType));
   printParams[0] = ANY;
