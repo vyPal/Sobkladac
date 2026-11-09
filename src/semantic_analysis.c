@@ -117,7 +117,7 @@ void initializeFunctions(AstProgram *ast, SymTable *globalSymTable) {
   insertFunctionSymTable(globalSymTable, "chr", 0, 0, STRING, chrParams, 1, true, false);
 
   // add user functions
-  AstFunction *func = ast->firstFunction;
+  const AstFunction *func = ast->firstFunction;
   bool foundMain = false;
   while (func != NULL) {
     // check correct main function declaration
@@ -769,7 +769,7 @@ AstDataType analyzeFunctionBody(AstProgram *ast, SymTable *globalSymTable, AstFu
   }
   // check all function params and add them to the current symTable
 
-  AstFunctionParameter *param = function->firstParameter;
+  const AstFunctionParameter *param = function->firstParameter;
   while (param != NULL) {
     if (!insertVariableSymTable(function->symTable, param->parameterName, function->location.line,
                                 function->location.column, param->dataType, false)) {
