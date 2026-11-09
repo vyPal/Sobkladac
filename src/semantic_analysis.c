@@ -15,7 +15,8 @@ Semantic analysis checklist:
 - Check that exactly one valid main exists.
 2. Declaration and reference checking
 - Check variable declarations.
-- Check duplicate declarations in the same scope.
+- Check duplicate declarations in the same symTable
+.
 - Check that variables are declared before use.
 - check function calls.
 - Check that immutable variables (val) aren't modified.
@@ -33,7 +34,8 @@ Semantic analysis checklist:
 - Assign unique symbol IDs to variables.
 - Assign unique function IDs to functions.
 - Store resolved IDs in AST references.
-- Ensure the code generator can distinguish variables with identical names in different scopes.
+- Ensure the code generator can distinguish variables with identical names in different symTable
+s.
 */
 
 /*
@@ -75,10 +77,6 @@ Assign unique function IDs to functions. (insertFunctionSymTable)
 #include "codegen.h"
 #include "common.h"
 #include "symtable.h"
-
-typedef struct {
-  SymTable *globalSymTable;
-} SemanticContext;
 
 // insert function into symTable and assign uniqueID
 // return FALSE if function already exists
@@ -140,53 +138,47 @@ AstFunction *getAstFunction(AstProgram *ast, char *functionName) {
   die(ERR_INTERNAL, 99, "function not found");
 }
 
-// creates the global scope
 // adds built in functions
 // adds user defined functions
 // check propper @main definition
-void initializeFunctions(AstProgram *ast, SemanticContext *context) {
-  context->globalSymTable = symtableCreate(NULL);
-
+void initializeFunctions(AstProgram *ast, SymTable *globalSymTable) {
   // add built-in functions
   AstDataType *printParams = arenaAlloc(sizeof(AstDataType));
   printParams[0] = ANY;
-  insertFunctionSymTable(context->globalSymTable, "print", 0, 0, UNIT, printParams, 1, true, false);
+  insertFunctionSymTable(globalSymTable, "print", 0, 0, UNIT, printParams, 1, true, false);
 
-  insertFunctionSymTable(context->globalSymTable, "readLine", 0, 0, STRING, NULL, 0, true, false);
+  insertFunctionSymTable(globalSymTable, "readLine", 0, 0, STRING, NULL, 0, true, false);
 
-  insertFunctionSymTable(context->globalSymTable, "readInt", 0, 0, INT, NULL, 0, true, false);
+  insertFunctionSymTable(globalSymTable, "readInt", 0, 0, INT, NULL, 0, true, false);
 
-  insertFunctionSymTable(context->globalSymTable, "readDouble", 0, 0, DOUBLE, NULL, 0, true, false);
+  insertFunctionSymTable(globalSymTable, "readDouble", 0, 0, DOUBLE, NULL, 0, true, false);
 
   AstDataType *toStrParams = arenaAlloc(sizeof(AstDataType));
   toStrParams[0] = ANY;
-  insertFunctionSymTable(context->globalSymTable, "toStr", 0, 0, STRING, toStrParams, 1, true,
-                         false);
+  insertFunctionSymTable(globalSymTable, "toStr", 0, 0, STRING, toStrParams, 1, true, false);
 
   AstDataType *toIntParams = arenaAlloc(sizeof(AstDataType));
   toIntParams[0] = DOUBLE;
-  insertFunctionSymTable(context->globalSymTable, "toInt", 0, 0, INT, toIntParams, 1, true, false);
+  insertFunctionSymTable(globalSymTable, "toInt", 0, 0, INT, toIntParams, 1, true, false);
 
   AstDataType *strLengthParams = arenaAlloc(sizeof(AstDataType));
   strLengthParams[0] = STRING;
-  insertFunctionSymTable(context->globalSymTable, "strLength", 0, 0, INT, strLengthParams, 1, true,
-                         false);
+  insertFunctionSymTable(globalSymTable, "strLength", 0, 0, INT, strLengthParams, 1, true, false);
 
   AstDataType *subStrParams = arenaAlloc(3 * sizeof(AstDataType));
   subStrParams[0] = STRING;
   subStrParams[1] = INT;
   subStrParams[2] = INT;
-  insertFunctionSymTable(context->globalSymTable, "subStr", 0, 0, STRING, subStrParams, 3, true,
-                         false);
+  insertFunctionSymTable(globalSymTable, "subStr", 0, 0, STRING, subStrParams, 3, true, false);
 
   AstDataType *ordParams = arenaAlloc(2 * sizeof(AstDataType));
   ordParams[0] = STRING;
   ordParams[1] = INT;
-  insertFunctionSymTable(context->globalSymTable, "ord", 0, 0, INT, ordParams, 2, true, false);
+  insertFunctionSymTable(globalSymTable, "ord", 0, 0, INT, ordParams, 2, true, false);
 
   AstDataType *chrParams = arenaAlloc(sizeof(AstDataType));
   chrParams[0] = INT;
-  insertFunctionSymTable(context->globalSymTable, "chr", 0, 0, STRING, chrParams, 1, true, false);
+  insertFunctionSymTable(globalSymTable, "chr", 0, 0, STRING, chrParams, 1, true, false);
 
   // add user functions
   AstFunction *func = ast->firstFunction;
@@ -220,7 +212,7 @@ void initializeFunctions(AstProgram *ast, SemanticContext *context) {
         param = param->nextParameter;
       }
     }
-    if (!insertFunctionSymTable(context->globalSymTable, func->functionName, func->location.line,
+    if (!insertFunctionSymTable(globalSymTable, func->functionName, func->location.line,
                                 func->location.column, func->declaredReturnType, paramTypes,
                                 paramCount, false, func->isMain)) {
       die(ERR_REDEF, func->location.line, "function redefinition");
@@ -248,8 +240,8 @@ size_t getFunctionPosition(AstFunction **functionList, size_t functionCount, cha
 // registers function dependency from a function call
 void addFunctionDependency(size_t functionCount, AstFunction **functionList,
                            bool **functionDependenciesArray, size_t functionPosition,
-                           SemanticContext *context, AstFunctionCall *functionCall) {
-  StSymbol *symbol = symtableLookup(context->globalSymTable, functionCall->functionName);
+                           SymTable *globalSymTable, AstFunctionCall *functionCall) {
+  StSymbol *symbol = symtableLookup(globalSymTable, functionCall->functionName);
   if (symbol == NULL || symbol->type != ST_FUNCTION) {
     die(ERR_UNDEF, functionCall->location.line, "undefined function");
   }
@@ -265,7 +257,7 @@ void addFunctionDependency(size_t functionCount, AstFunction **functionList,
 // registers function dependencies from a code block
 void getFunctionCodeBlockDependencies(size_t functionCount, AstFunction **functionList,
                                       bool **functionDependenciesArray, size_t functionPosition,
-                                      SemanticContext *context, AstCodeBlock *codeBlock) {
+                                      SymTable *globalSymTable, AstCodeBlock *codeBlock) {
   AstCommand *command = codeBlock->firstCommand;
   AstFunctionCall *functionCall = NULL;
   while (command != NULL) {
@@ -274,34 +266,37 @@ void getFunctionCodeBlockDependencies(size_t functionCount, AstFunction **functi
         command->data.variableDeclaration.value->type == VALUE_FUNCTION_CALL) {
       functionCall = command->data.variableDeclaration.value->data.functionCall;
       addFunctionDependency(functionCount, functionList, functionDependenciesArray,
-                            functionPosition, context, functionCall);
+                            functionPosition, globalSymTable, functionCall);
       // assignment using a function call
     } else if (command->type == ASSIGNMENT &&
                command->data.assignment.value->type == VALUE_FUNCTION_CALL) {
       functionCall = command->data.assignment.value->data.functionCall;
       addFunctionDependency(functionCount, functionList, functionDependenciesArray,
-                            functionPosition, context, functionCall);
+                            functionPosition, globalSymTable, functionCall);
       // function call
     } else if (command->type == FUNCTION_CALL) {
       functionCall = command->data.call.functionCall;
       addFunctionDependency(functionCount, functionList, functionDependenciesArray,
-                            functionPosition, context, functionCall);
+                            functionPosition, globalSymTable, functionCall);
       // return using a function call
     } else if (command->type == RETURN && command->data.returnAst.value != NULL &&
                command->data.returnAst.value->type == VALUE_FUNCTION_CALL) {
       functionCall = command->data.returnAst.value->data.functionCall;
       addFunctionDependency(functionCount, functionList, functionDependenciesArray,
-                            functionPosition, context, functionCall);
+                            functionPosition, globalSymTable, functionCall);
       // IF statement condition cant contain a function call according to specifications
     } else if (command->type == IF) {
       getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
-                                       functionPosition, context, command->data.ifAst.thenBlock);
+                                       functionPosition, globalSymTable,
+                                       command->data.ifAst.thenBlock);
       getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
-                                       functionPosition, context, command->data.ifAst.elseBlock);
+                                       functionPosition, globalSymTable,
+                                       command->data.ifAst.elseBlock);
       // WHILE statement condition cant contain a function call according to specifications
     } else if (command->type == WHILE) {
       getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
-                                       functionPosition, context, command->data.whileAst.codeBlock);
+                                       functionPosition, globalSymTable,
+                                       command->data.whileAst.codeBlock);
     }
     // EXPRESSION statement cant contain a function call according to specifications
 
@@ -312,7 +307,7 @@ void getFunctionCodeBlockDependencies(size_t functionCount, AstFunction **functi
 // checks if a function is recursive (even indirectly) and has an implicit return type (forbidden)
 // prevents infinite data type search loops
 // makes no changes to ast or symtable
-void checkRecursion(AstProgram *ast, SemanticContext *context) {
+void checkRecursion(AstProgram *ast, SymTable *globalSymTable) {
   // count user defined functions
   size_t functionCount = 0;
   AstFunction *function = ast->firstFunction;
@@ -345,11 +340,11 @@ void checkRecursion(AstProgram *ast, SemanticContext *context) {
         // add called function
         AstFunctionCall *functionCall = function->body.value->data.functionCall;
         addFunctionDependency(functionCount, functionList, functionDependenciesArray,
-                              functionPosition, context, functionCall);
+                              functionPosition, globalSymTable, functionCall);
       }
     } else {  // check function code blocks
       getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
-                                       functionPosition, context, function->body.codeBlock);
+                                       functionPosition, globalSymTable, function->body.codeBlock);
     }
   }
 
@@ -377,7 +372,7 @@ void checkRecursion(AstProgram *ast, SemanticContext *context) {
 // analyzeFunctions() helper function
 // analyze expression and return data type (recursive)
 // saves data type to ast
-AstDataType analyzeExpression(AstExpression *expression, SymTable *scope) {
+AstDataType analyzeExpression(AstExpression *expression, SymTable *symTable) {
   expression->deducedDataType = UNKNOWN;
   if (expression->expressionType == INT_LITERAL) {
     expression->deducedDataType = INT;
@@ -388,7 +383,7 @@ AstDataType analyzeExpression(AstExpression *expression, SymTable *scope) {
   } else if (expression->expressionType == UNIT_LITERAL) {
     expression->deducedDataType = UNIT;
   } else if (expression->expressionType == VARIABLE) {
-    StSymbol *symbol = symtableLookup(scope, expression->data.variable);
+    StSymbol *symbol = symtableLookup(symTable, expression->data.variable);
     if (symbol == NULL || symbol->type != ST_VARIABLE) {
       die(ERR_UNDEF, expression->location.line, "undefined variable");
     }
@@ -396,15 +391,15 @@ AstDataType analyzeExpression(AstExpression *expression, SymTable *scope) {
     // unary operators only work with numers and keep their type
   } else if (expression->expressionType == UNARY) {
     AstOperator op = expression->data.unary.operatorAst;
-    AstDataType type = analyzeExpression(expression->data.unary.expression, scope);
+    AstDataType type = analyzeExpression(expression->data.unary.expression, symTable);
     // unary + is removed before semantic analysis
     if ((type == INT || type == DOUBLE) && op == NEGATION) {
       expression->deducedDataType = type;
     }
   } else if (expression->expressionType == BINARY) {
     AstOperator op = expression->data.binary.operatorAst;
-    AstDataType typeL = analyzeExpression(expression->data.binary.leftExpression, scope);
-    AstDataType typeR = analyzeExpression(expression->data.binary.rightExpression, scope);
+    AstDataType typeL = analyzeExpression(expression->data.binary.leftExpression, symTable);
+    AstDataType typeR = analyzeExpression(expression->data.binary.rightExpression, symTable);
     // numerical operation or concantenation
     if (op == MULTIPLICATION || op == DIVISION || op == ADDITION || op == SUBTRACTION) {
       // numerical operation
@@ -458,13 +453,13 @@ AstDataType analyzeExpression(AstExpression *expression, SymTable *scope) {
 }
 
 // prototype
-AstDataType analyzeFunctionBody(AstProgram *ast, SemanticContext *context, AstFunction *function);
+AstDataType analyzeFunctionBody(AstProgram *ast, SymTable *globalSymTable, AstFunction *function);
 // analyzeFunctions() helper function
 // analyze function call and return its data type (indirectly recursive)
 // if function return type is unknown, call analyzeFunctionBody() on called function
-AstDataType analyzeFunctionCall(AstProgram *ast, SemanticContext *context, AstFunctionCall *call,
-                                SymTable *scope) {
-  StSymbol *symbol = symtableLookup(context->globalSymTable, call->functionName);
+AstDataType analyzeFunctionCall(AstProgram *ast, SymTable *globalSymTable, AstFunctionCall *call,
+                                SymTable *symTable) {
+  StSymbol *symbol = symtableLookup(globalSymTable, call->functionName);
   if (symbol == NULL || symbol->type != ST_FUNCTION) {
     die(ERR_UNDEF, call->location.line, "undefined function");
   }
@@ -477,7 +472,7 @@ AstDataType analyzeFunctionCall(AstProgram *ast, SemanticContext *context, AstFu
       die(ERR_ARGS, call->location.line, "too many function call parameters");
     }
     if (!isTypeCompatible(symbol->data.function.parameterTypes[argCount - 1],
-                          analyzeExpression(argument->expression, scope)) &&
+                          analyzeExpression(argument->expression, symTable)) &&
         symbol->data.function.parameterTypes[argCount - 1] != ANY) {
       die(ERR_ARGS, call->location.line, "incorrect function call parameter type");
     }
@@ -489,7 +484,7 @@ AstDataType analyzeFunctionCall(AstProgram *ast, SemanticContext *context, AstFu
 
   // check return type
   if (symbol->data.function.returnType == UNKNOWN) {
-    return analyzeFunctionBody(ast, context, getAstFunction(ast, call->functionName));
+    return analyzeFunctionBody(ast, globalSymTable, getAstFunction(ast, call->functionName));
   } else {
     return symbol->data.function.returnType;
   }
@@ -507,9 +502,9 @@ if declaredReturnType == UNIT return Unit
 if declaredReturnType != UNIT all if end with return
 if declaredReturnType == UNKNOWN all if end with Unit
 */
-bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *function,
-                      AstCodeBlock *block, SymTable *parentScope, bool hasToReturn) {
-  block->scope = symtableCreate(parentScope);
+bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *function,
+                      AstCodeBlock *block, SymTable *parentSymTable, bool hasToReturn) {
+  block->symTable = symtableCreate(parentSymTable);
   bool explicitReturnFound = false;
   AstDataType lastFunctionCallType = UNKNOWN;
   AstCommand *command = block->firstCommand;
@@ -524,7 +519,7 @@ bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *fu
         // find variable type
         if (command->data.variableDeclaration.resolvedType == UNKNOWN) {
           command->data.variableDeclaration.resolvedType = analyzeExpression(
-              command->data.variableDeclaration.value->data.expression, block->scope);
+              command->data.variableDeclaration.value->data.expression, block->symTable);
           if (command->data.variableDeclaration.resolvedType == BOOL) {
             die(ERR_TYPE, command->location.line, "bool initialization type is forbidden");
           }
@@ -534,7 +529,7 @@ bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *fu
           if (!isTypeCompatible(
                   command->data.variableDeclaration.resolvedType,
                   analyzeExpression(command->data.variableDeclaration.value->data.expression,
-                                    block->scope))) {
+                                    block->symTable))) {
             die(ERR_TYPE, command->location.line, "wrong initialization type");
           }
         }
@@ -544,22 +539,23 @@ bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *fu
         // find variable type
         if (command->data.variableDeclaration.resolvedType == UNKNOWN) {
           command->data.variableDeclaration.resolvedType = analyzeFunctionCall(
-              ast, context, command->data.variableDeclaration.value->data.functionCall,
-              block->scope);
+              ast, globalSymTable, command->data.variableDeclaration.value->data.functionCall,
+              block->symTable);
         }
         // check correct assignment type
         else {
           if (!isTypeCompatible(
                   command->data.variableDeclaration.resolvedType,
-                  analyzeFunctionCall(ast, context,
+                  analyzeFunctionCall(ast, globalSymTable,
                                       command->data.variableDeclaration.value->data.functionCall,
-                                      block->scope))) {
+                                      block->symTable))) {
             die(ERR_TYPE, command->location.line, "wrong initialization type");
           }
         }
       }
-      // add variable to current scope
-      if (!insertVariableSymTable(block->scope, command->data.variableDeclaration.variableName,
+      // add variable to current symTable
+
+      if (!insertVariableSymTable(block->symTable, command->data.variableDeclaration.variableName,
                                   command->location.line, command->location.column,
                                   command->data.variableDeclaration.resolvedType,
                                   command->data.variableDeclaration.isMutable)) {
@@ -568,7 +564,7 @@ bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *fu
       // ASSIGNMENT
     } else if (command->type == ASSIGNMENT) {
       // check if variable exists
-      StSymbol *symbol = symtableLookup(block->scope, command->data.assignment.variableName);
+      StSymbol *symbol = symtableLookup(block->symTable, command->data.assignment.variableName);
       if (symbol == NULL || symbol->type != ST_VARIABLE) {
         die(ERR_UNDEF, command->location.line, "undefined variable");
       }
@@ -581,26 +577,26 @@ bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *fu
       // assignment by an expression
       if (command->data.assignment.value->type == VALUE_EXPRESSION) {
         // check correct assignment type
-        if (!isTypeCompatible(
-                symbol->data.variable.dataType,
-                analyzeExpression(command->data.assignment.value->data.expression, block->scope))) {
+        if (!isTypeCompatible(symbol->data.variable.dataType,
+                              analyzeExpression(command->data.assignment.value->data.expression,
+                                                block->symTable))) {
           die(ERR_TYPE, command->location.line, "incompatible assignment type");
         }
       }
       // assignment by a function call
       else {
         // check correct assignment type
-        if (!isTypeCompatible(
-                symbol->data.variable.dataType,
-                analyzeFunctionCall(ast, context, command->data.assignment.value->data.functionCall,
-                                    block->scope))) {
+        if (!isTypeCompatible(symbol->data.variable.dataType,
+                              analyzeFunctionCall(ast, globalSymTable,
+                                                  command->data.assignment.value->data.functionCall,
+                                                  block->symTable))) {
           die(ERR_TYPE, command->location.line, "incompatible assignment type");
         }
       }
       // FUNCTION_CALL
     } else if (command->type == FUNCTION_CALL) {
-      lastFunctionCallType =
-          analyzeFunctionCall(ast, context, command->data.call.functionCall, block->scope);
+      lastFunctionCallType = analyzeFunctionCall(ast, globalSymTable,
+                                                 command->data.call.functionCall, block->symTable);
       // RETURN
     } else if (command->type == RETURN) {
       explicitReturnFound = true;
@@ -682,18 +678,18 @@ bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *fu
       // return by expression
       else if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
         // check correct return type
-        if (!isTypeCompatible(
-                function->resolvedReturnType,
-                analyzeExpression(command->data.returnAst.value->data.expression, block->scope))) {
+        if (!isTypeCompatible(function->resolvedReturnType,
+                              analyzeExpression(command->data.returnAst.value->data.expression,
+                                                block->symTable))) {
           die(ERR_TYPE, command->location.line, "incompatible return type");
         }
       }
       // return by function call
       else {
-        if (!isTypeCompatible(
-                function->resolvedReturnType,
-                analyzeFunctionCall(ast, context, command->data.returnAst.value->data.functionCall,
-                                    block->scope))) {
+        if (!isTypeCompatible(function->resolvedReturnType,
+                              analyzeFunctionCall(ast, globalSymTable,
+                                                  command->data.returnAst.value->data.functionCall,
+                                                  block->symTable))) {
           die(ERR_TYPE, command->location.line, "incompatible return type");
         }
       }
@@ -701,15 +697,15 @@ bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *fu
       // IF
     } else if (command->type == IF) {
       // check condition
-      if (analyzeExpression(command->data.ifAst.condition, block->scope) != BOOL) {
+      if (analyzeExpression(command->data.ifAst.condition, block->symTable) != BOOL) {
         die(ERR_TYPE, command->location.line, "if statement condition is not boolean");
       }
       // check code blocks ("if" as a return handeled at the end)
       if (command->nextCommand != NULL || !hasToReturn || explicitReturnFound) {
         bool explicitReturnFoundLeft = analyzeCodeBlock(
-            ast, context, function, command->data.ifAst.thenBlock, block->scope, false);
+            ast, globalSymTable, function, command->data.ifAst.thenBlock, block->symTable, false);
         bool explicitReturnFoundRight = analyzeCodeBlock(
-            ast, context, function, command->data.ifAst.elseBlock, block->scope, false);
+            ast, globalSymTable, function, command->data.ifAst.elseBlock, block->symTable, false);
         if (explicitReturnFoundLeft && explicitReturnFoundRight) {
           explicitReturnFound = true;
         }
@@ -717,17 +713,17 @@ bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *fu
       // WHILE
     } else if (command->type == WHILE) {
       // check condition
-      if (analyzeExpression(command->data.whileAst.condition, block->scope) != BOOL) {
+      if (analyzeExpression(command->data.whileAst.condition, block->symTable) != BOOL) {
         die(ERR_TYPE, command->location.line, "while statement condition is not boolean");
       }
 
       // check code blocks
-      analyzeCodeBlock(ast, context, function, command->data.whileAst.codeBlock, block->scope,
-                       false);
+      analyzeCodeBlock(ast, globalSymTable, function, command->data.whileAst.codeBlock,
+                       block->symTable, false);
 
       // EXPRESSION
     } else if (command->type == EXPRESSION) {
-      if (analyzeExpression(command->data.expressionAst.expression, block->scope) == BOOL) {
+      if (analyzeExpression(command->data.expressionAst.expression, block->symTable) == BOOL) {
         die(ERR_TYPE, command->location.line, "standalone bool expression is forbidden");
       }
     }
@@ -785,7 +781,7 @@ bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *fu
       else if (!isTypeCompatible(function->resolvedReturnType, lastFunctionCallType)) {
         die(ERR_TYPE, command->location.line, "incompatible implicit return type");
       }
-      // replace function call with return
+      // replace function call with return function call
       newValue->type = VALUE_FUNCTION_CALL;
       newValue->data.functionCall = command->data.call.functionCall;
       if (previousCommand != NULL) {
@@ -807,7 +803,7 @@ bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *fu
                                  command->data.expressionAst.expression->deducedDataType)) {
         die(ERR_TYPE, command->location.line, "incompatible implicit return type");
       }
-      // replace expression with return
+      // replace expression with return expression
       newValue->type = VALUE_EXPRESSION;
       newValue->data.expression = command->data.expressionAst.expression;
       if (previousCommand != NULL) {
@@ -833,17 +829,17 @@ bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *fu
         block->lastCommand = newCommand;
 
         // analyze "if" as non return
-        analyzeCodeBlock(ast, context, function, command->data.ifAst.thenBlock, block->scope,
-                         false);
-        analyzeCodeBlock(ast, context, function, command->data.ifAst.elseBlock, block->scope,
-                         false);
+        analyzeCodeBlock(ast, globalSymTable, function, command->data.ifAst.thenBlock,
+                         block->symTable, false);
+        analyzeCodeBlock(ast, globalSymTable, function, command->data.ifAst.elseBlock,
+                         block->symTable, false);
       }
 
       else {
         bool explicitReturnFoundLeft = analyzeCodeBlock(
-            ast, context, function, command->data.ifAst.thenBlock, block->scope, true);
+            ast, globalSymTable, function, command->data.ifAst.thenBlock, block->symTable, true);
         bool explicitReturnFoundRight = analyzeCodeBlock(
-            ast, context, function, command->data.ifAst.elseBlock, block->scope, true);
+            ast, globalSymTable, function, command->data.ifAst.elseBlock, block->symTable, true);
 
         // all "if" end with explicit return
         if (explicitReturnFoundLeft && explicitReturnFoundRight) {
@@ -866,18 +862,19 @@ bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *fu
 // analyze function body and return its data type (indirectly recursive)
 // checks correct returns
 // updates symTable function return type at the end
-AstDataType analyzeFunctionBody(AstProgram *ast, SemanticContext *context, AstFunction *function) {
-  // create a new scope for the function body
-  function->scope = symtableCreate(context->globalSymTable);
+AstDataType analyzeFunctionBody(AstProgram *ast, SymTable *globalSymTable, AstFunction *function) {
+  // create a new symTable for the function body
+  function->symTable = symtableCreate(globalSymTable);
   if (function->isMain) {
     function->resolvedReturnType = UNIT;
   } else {
     function->resolvedReturnType = function->declaredReturnType;
   }
-  // check all function params and add them to the current scope
+  // check all function params and add them to the current symTable
+
   AstFunctionParameter *param = function->firstParameter;
   while (param != NULL) {
-    if (!insertVariableSymTable(function->scope, param->parameterName, function->location.line,
+    if (!insertVariableSymTable(function->symTable, param->parameterName, function->location.line,
                                 function->location.column, param->dataType, false)) {
       die(ERR_REDEF, function->location.line, "duplicate function parameter names");
     }
@@ -891,12 +888,12 @@ AstDataType analyzeFunctionBody(AstProgram *ast, SemanticContext *context, AstFu
       // find return type
       if (function->resolvedReturnType == UNKNOWN) {
         function->resolvedReturnType =
-            analyzeExpression(function->body.value->data.expression, function->scope);
+            analyzeExpression(function->body.value->data.expression, function->symTable);
       }
       // check correct return type
       else if (!isTypeCompatible(
                    function->resolvedReturnType,
-                   analyzeExpression(function->body.value->data.expression, function->scope)) &&
+                   analyzeExpression(function->body.value->data.expression, function->symTable)) &&
                function->declaredReturnType != UNIT) {
         die(ERR_TYPE, function->location.line, "wrong return type");
       }
@@ -905,19 +902,20 @@ AstDataType analyzeFunctionBody(AstProgram *ast, SemanticContext *context, AstFu
       // find return type
       if (function->resolvedReturnType == UNKNOWN) {
         function->resolvedReturnType = analyzeFunctionCall(
-            ast, context, function->body.value->data.functionCall, function->scope);
+            ast, globalSymTable, function->body.value->data.functionCall, function->symTable);
       }
       // check correct return type
       else if (!isTypeCompatible(
                    function->resolvedReturnType,
-                   analyzeFunctionCall(ast, context, function->body.value->data.functionCall,
-                                       function->scope)) &&
+                   analyzeFunctionCall(ast, globalSymTable, function->body.value->data.functionCall,
+                                       function->symTable)) &&
                function->declaredReturnType != UNIT) {
         die(ERR_TYPE, function->location.line, "wrong return type");
       }
     }
   } else {  // check code blocks
-    analyzeCodeBlock(ast, context, function, function->body.codeBlock, function->scope, true);
+    analyzeCodeBlock(ast, globalSymTable, function, function->body.codeBlock, function->symTable,
+                     true);
   }
 
   if (function->resolvedReturnType == UNKNOWN) {
@@ -926,46 +924,46 @@ AstDataType analyzeFunctionBody(AstProgram *ast, SemanticContext *context, AstFu
   if (function->resolvedReturnType == BOOL) {
     die(ERR_TYPE, function->location.line, "bool initialization type is forbidden");
   }
-  StSymbol *symbol = symtableLookup(context->globalSymTable, function->functionName);
+  StSymbol *symbol = symtableLookup(globalSymTable, function->functionName);
   symbol->data.function.returnType = function->resolvedReturnType;
   return function->resolvedReturnType;
 }
 
 // analyzes function and variable declarations and data types
 // cehck immutable variables arent modified
-void analyzeFunctions(AstProgram *ast, SemanticContext *context) {
+void analyzeFunctions(AstProgram *ast, SymTable *globalSymTable) {
   // check all functions
   AstFunction *function = ast->firstFunction;
   while (function != NULL) {
     // if function hasnt been already checked due to dependencies
     if (function->resolvedReturnType == UNKNOWN) {
-      analyzeFunctionBody(ast, context, function);
+      analyzeFunctionBody(ast, globalSymTable, function);
     }
     function = function->nextFunction;
   }
 }
 
 // uniqueNameResolution() helper function
-void expressionUniqueNameResolution(AstProgram *ast, SemanticContext *context) {
+void expressionUniqueNameResolution(AstProgram *ast, SymTable *globalSymTable) {
 }
 
 // uniqueNameResolution() helper function
-void functionCallUniqueNameResolution(AstProgram *ast, SemanticContext *context) {
+void functionCallUniqueNameResolution(AstProgram *ast, SymTable *globalSymTable) {
 }
 
 // uniqueNameResolution() helper function
-void codeBlockUniqueNameResolution(AstProgram *ast, SemanticContext *context) {
+void codeBlockUniqueNameResolution(AstProgram *ast, SymTable *globalSymTable) {
 }
 
 // rewrites AST function and variable names to uniqueID from SymTable
 // TODO
-void uniqueNameResolution(AstProgram *ast, SemanticContext *context) {
+void uniqueNameResolution(AstProgram *ast, SymTable *globalSymTable) {
   // resolve all functions
   AstFunction *function = ast->firstFunction;
   StSymbol *symbol;
   while (function != NULL) {
     // rename function
-    symbol = symtableLookup(function->scope, function->functionName);
+    symbol = symtableLookup(globalSymTable, function->functionName);
     if (symbol == NULL) {
       die(ERR_INTERNAL, function->location.line, "symbol not found during name resolution");
     }
@@ -977,10 +975,10 @@ void uniqueNameResolution(AstProgram *ast, SemanticContext *context) {
 
 // main function
 void semanticAnalysis(AstProgram *ast) {
-  SemanticContext *context = arenaAlloc(sizeof(SemanticContext));
+  SymTable *globalSymTable = symtableCreate(NULL);
 
-  initializeFunctions(ast, context);
-  checkRecursion(ast, context);
-  analyzeFunctions(ast, context);
-  uniqueNameResolution(ast, context);
+  initializeFunctions(ast, globalSymTable);
+  checkRecursion(ast, globalSymTable);
+  analyzeFunctions(ast, globalSymTable);
+  uniqueNameResolution(ast, globalSymTable);
 }

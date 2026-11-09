@@ -200,7 +200,7 @@ struct AstCommand {
 struct AstCodeBlock {
   AstCommand *firstCommand;
   AstCommand *lastCommand;
-  SymTable *scope;
+  SymTable *symTable;
 };
 
 /// @brief IFJ26 function parameter
@@ -215,7 +215,7 @@ struct AstFunction {
   char *functionName;
   bool isMain;  // @main
   AstLocation location;
-  SymTable *scope;
+  SymTable *symTable;
 
   AstFunctionParameter *firstParameter;
   AstFunctionParameter *lastParameter;
