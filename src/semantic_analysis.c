@@ -616,8 +616,9 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
       if (analyzeExpression(command->data.ifAst.condition, block->symTable) != BOOL) {
         die(ERR_TYPE, command->location.line, "if statement condition is not boolean");
       }
-      // check code blocks ("if" as a return handeled at the end)
-      if (command->nextCommand != NULL || !hasToReturn || explicitReturnFound) {
+      // doesnt have to return
+      if (command->nextCommand != NULL || !hasToReturn || explicitReturnFound ||
+          function->declaredReturnType == UNIT) {
         bool explicitReturnFoundLeft = analyzeCodeBlock(
             ast, globalSymTable, function, command->data.ifAst.thenBlock, block->symTable, false);
         bool explicitReturnFoundRight = analyzeCodeBlock(
@@ -733,28 +734,19 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
       block->lastCommand = newCommand;
     }
     // IF return
-    if (command->type == IF) {
-      // exlicit funtion type UNIT
-      if (function->declaredReturnType == UNIT) {
-        // analyze "if" as non return
-        analyzeCodeBlock(ast, globalSymTable, function, command->data.ifAst.thenBlock,
-                         block->symTable, false);
-        analyzeCodeBlock(ast, globalSymTable, function, command->data.ifAst.elseBlock,
-                         block->symTable, false);
-      } else {
-        bool explicitReturnFoundLeft = analyzeCodeBlock(
-            ast, globalSymTable, function, command->data.ifAst.thenBlock, block->symTable, true);
-        bool explicitReturnFoundRight = analyzeCodeBlock(
-            ast, globalSymTable, function, command->data.ifAst.elseBlock, block->symTable, true);
+    if (command->type == IF && function->declaredReturnType != UNIT) {
+      bool explicitReturnFoundLeft = analyzeCodeBlock(
+          ast, globalSymTable, function, command->data.ifAst.thenBlock, block->symTable, true);
+      bool explicitReturnFoundRight = analyzeCodeBlock(
+          ast, globalSymTable, function, command->data.ifAst.elseBlock, block->symTable, true);
 
-        // all "if" end with explicit return
-        if (explicitReturnFoundLeft && explicitReturnFoundRight) {
-          explicitReturnFound = true;
-        } else {  // all "if" end with implicit return UNIT
-          if (function->resolvedReturnType != UNIT) {
-            die(ERR_TYPE, command->location.line,
-                "function ends with an implicit return if statement that does not return UNIT");
-          }
+      // all "if" end with explicit return
+      if (explicitReturnFoundLeft && explicitReturnFoundRight) {
+        explicitReturnFound = true;
+      } else {  // all "if" end with implicit return UNIT
+        if (function->resolvedReturnType != UNIT) {
+          die(ERR_TYPE, command->location.line,
+              "function ends with an implicit return if statement that does not return UNIT");
         }
       }
     }
