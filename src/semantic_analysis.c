@@ -653,6 +653,7 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
   }
 
   // resolve an implicit return and replace it with an explicit return if necessary
+  // command = last command
   if (hasToReturn && !explicitReturnFound) {
     AstExpression *newExpression = arenaAlloc(sizeof(AstExpression));
     AstValue *newValue = arenaAlloc(sizeof(AstValue));
