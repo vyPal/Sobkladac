@@ -57,7 +57,6 @@ krok rozsahu).
 
 /*
 AST checklist:
-AstExpression => deducedDataType ?maybe not needed
 AstCommand VARIABLE_DECLARATION => resolvedType
 AstFunction => resolvedReturnType
 Rewrite symbol IDs.
@@ -264,9 +263,9 @@ void addFunctionDependency(size_t functionCount, AstFunction **functionList,
 
 // checkRecursion() helper function
 // registers function dependencies from a code block
-void getFunctionDependencies(size_t functionCount, AstFunction **functionList,
-                             bool **functionDependenciesArray, size_t functionPosition,
-                             SemanticContext *context, AstCodeBlock *codeBlock) {
+void getFunctionCodeBlockDependencies(size_t functionCount, AstFunction **functionList,
+                                      bool **functionDependenciesArray, size_t functionPosition,
+                                      SemanticContext *context, AstCodeBlock *codeBlock) {
   AstCommand *command = codeBlock->firstCommand;
   AstFunctionCall *functionCall = NULL;
   while (command != NULL) {
@@ -295,14 +294,14 @@ void getFunctionDependencies(size_t functionCount, AstFunction **functionList,
                             functionPosition, context, functionCall);
       // IF statement condition cant contain a function call according to specifications
     } else if (command->type == IF) {
-      getFunctionDependencies(functionCount, functionList, functionDependenciesArray,
-                              functionPosition, context, command->data.ifAst.thenBlock);
-      getFunctionDependencies(functionCount, functionList, functionDependenciesArray,
-                              functionPosition, context, command->data.ifAst.elseBlock);
+      getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
+                                       functionPosition, context, command->data.ifAst.thenBlock);
+      getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
+                                       functionPosition, context, command->data.ifAst.elseBlock);
       // WHILE statement condition cant contain a function call according to specifications
     } else if (command->type == WHILE) {
-      getFunctionDependencies(functionCount, functionList, functionDependenciesArray,
-                              functionPosition, context, command->data.whileAst.codeBlock);
+      getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
+                                       functionPosition, context, command->data.whileAst.codeBlock);
     }
     // EXPRESSION statement cant contain a function call according to specifications
 
@@ -349,8 +348,8 @@ void checkRecursion(AstProgram *ast, SemanticContext *context) {
                               functionPosition, context, functionCall);
       }
     } else {  // check function code blocks
-      getFunctionDependencies(functionCount, functionList, functionDependenciesArray,
-                              functionPosition, context, function->body.codeBlock);
+      getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
+                                       functionPosition, context, function->body.codeBlock);
     }
   }
 
@@ -376,9 +375,9 @@ void checkRecursion(AstProgram *ast, SemanticContext *context) {
 }
 
 // analyzeFunctions() helper function
-// check expression and return data type (recursive)
+// analyze expression and return data type (recursive)
 // saves data type to ast
-AstDataType checkExpressionType(AstExpression *expression, SymTable *scope) {
+AstDataType analyzeExpression(AstExpression *expression, SymTable *scope) {
   expression->deducedDataType = UNKNOWN;
   if (expression->expressionType == INT_LITERAL) {
     expression->deducedDataType = INT;
@@ -397,15 +396,15 @@ AstDataType checkExpressionType(AstExpression *expression, SymTable *scope) {
     // unary operators only work with numers and keep their type
   } else if (expression->expressionType == UNARY) {
     AstOperator op = expression->data.unary.operatorAst;
-    AstDataType type = checkExpressionType(expression->data.unary.expression, scope);
+    AstDataType type = analyzeExpression(expression->data.unary.expression, scope);
     // unary + is removed before semantic analysis
     if ((type == INT || type == DOUBLE) && op == NEGATION) {
       expression->deducedDataType = type;
     }
   } else if (expression->expressionType == BINARY) {
     AstOperator op = expression->data.binary.operatorAst;
-    AstDataType typeL = checkExpressionType(expression->data.binary.leftExpression, scope);
-    AstDataType typeR = checkExpressionType(expression->data.binary.rightExpression, scope);
+    AstDataType typeL = analyzeExpression(expression->data.binary.leftExpression, scope);
+    AstDataType typeR = analyzeExpression(expression->data.binary.rightExpression, scope);
     // numerical operation or concantenation
     if (op == MULTIPLICATION || op == DIVISION || op == ADDITION || op == SUBTRACTION) {
       // numerical operation
@@ -459,12 +458,12 @@ AstDataType checkExpressionType(AstExpression *expression, SymTable *scope) {
 }
 
 // prototype
-AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunction *function);
+AstDataType analyzeFunctionBody(AstProgram *ast, SemanticContext *context, AstFunction *function);
 // analyzeFunctions() helper function
-// check propper function call and return its data type (indirectly recursive)
-// if function return type is unknown, call checkFunctionBody() on called function
-AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunctionCall *call,
-                              SymTable *scope) {
+// analyze function call and return its data type (indirectly recursive)
+// if function return type is unknown, call analyzeFunctionBody() on called function
+AstDataType analyzeFunctionCall(AstProgram *ast, SemanticContext *context, AstFunctionCall *call,
+                                SymTable *scope) {
   StSymbol *symbol = symtableLookup(context->globalSymTable, call->functionName);
   if (symbol == NULL || symbol->type != ST_FUNCTION) {
     die(ERR_UNDEF, call->location.line, "undefined function");
@@ -478,7 +477,7 @@ AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunc
       die(ERR_ARGS, call->location.line, "too many function call parameters");
     }
     if (!isTypeCompatible(symbol->data.function.parameterTypes[argCount - 1],
-                          checkExpressionType(argument->expression, scope)) &&
+                          analyzeExpression(argument->expression, scope)) &&
         symbol->data.function.parameterTypes[argCount - 1] != ANY) {
       die(ERR_ARGS, call->location.line, "incorrect function call parameter type");
     }
@@ -490,14 +489,14 @@ AstDataType checkFunctionCall(AstProgram *ast, SemanticContext *context, AstFunc
 
   // check return type
   if (symbol->data.function.returnType == UNKNOWN) {
-    return checkFunctionBody(ast, context, getAstFunction(ast, call->functionName));
+    return analyzeFunctionBody(ast, context, getAstFunction(ast, call->functionName));
   } else {
     return symbol->data.function.returnType;
   }
 }
 
 // analyzeFunctions() helper function
-// check propper code block body and return whether it contains an explicit return (recursive)
+// analyze code block body and return whether it contains an explicit return (recursive)
 // last code block needs to check returns
 // resolves function return type
 // resolves variable types
@@ -508,8 +507,8 @@ if declaredReturnType == UNIT return Unit
 if declaredReturnType != UNIT all if end with return
 if declaredReturnType == UNKNOWN all if end with Unit
 */
-bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *function,
-                    AstCodeBlock *block, SymTable *parentScope, bool hasToReturn) {
+bool analyzeCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *function,
+                      AstCodeBlock *block, SymTable *parentScope, bool hasToReturn) {
   block->scope = symtableCreate(parentScope);
   bool explicitReturnFound = false;
   AstDataType lastFunctionCallType = UNKNOWN;
@@ -524,7 +523,7 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       if (command->data.variableDeclaration.value->type == VALUE_EXPRESSION) {
         // find variable type
         if (command->data.variableDeclaration.resolvedType == UNKNOWN) {
-          command->data.variableDeclaration.resolvedType = checkExpressionType(
+          command->data.variableDeclaration.resolvedType = analyzeExpression(
               command->data.variableDeclaration.value->data.expression, block->scope);
           if (command->data.variableDeclaration.resolvedType == BOOL) {
             die(ERR_TYPE, command->location.line, "bool initialization type is forbidden");
@@ -534,8 +533,8 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
         else {
           if (!isTypeCompatible(
                   command->data.variableDeclaration.resolvedType,
-                  checkExpressionType(command->data.variableDeclaration.value->data.expression,
-                                      block->scope))) {
+                  analyzeExpression(command->data.variableDeclaration.value->data.expression,
+                                    block->scope))) {
             die(ERR_TYPE, command->location.line, "wrong initialization type");
           }
         }
@@ -544,7 +543,7 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       else {
         // find variable type
         if (command->data.variableDeclaration.resolvedType == UNKNOWN) {
-          command->data.variableDeclaration.resolvedType = checkFunctionCall(
+          command->data.variableDeclaration.resolvedType = analyzeFunctionCall(
               ast, context, command->data.variableDeclaration.value->data.functionCall,
               block->scope);
         }
@@ -552,9 +551,9 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
         else {
           if (!isTypeCompatible(
                   command->data.variableDeclaration.resolvedType,
-                  checkFunctionCall(ast, context,
-                                    command->data.variableDeclaration.value->data.functionCall,
-                                    block->scope))) {
+                  analyzeFunctionCall(ast, context,
+                                      command->data.variableDeclaration.value->data.functionCall,
+                                      block->scope))) {
             die(ERR_TYPE, command->location.line, "wrong initialization type");
           }
         }
@@ -582,9 +581,9 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       // assignment by an expression
       if (command->data.assignment.value->type == VALUE_EXPRESSION) {
         // check correct assignment type
-        if (!isTypeCompatible(symbol->data.variable.dataType,
-                              checkExpressionType(command->data.assignment.value->data.expression,
-                                                  block->scope))) {
+        if (!isTypeCompatible(
+                symbol->data.variable.dataType,
+                analyzeExpression(command->data.assignment.value->data.expression, block->scope))) {
           die(ERR_TYPE, command->location.line, "incompatible assignment type");
         }
       }
@@ -593,15 +592,15 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
         // check correct assignment type
         if (!isTypeCompatible(
                 symbol->data.variable.dataType,
-                checkFunctionCall(ast, context, command->data.assignment.value->data.functionCall,
-                                  block->scope))) {
+                analyzeFunctionCall(ast, context, command->data.assignment.value->data.functionCall,
+                                    block->scope))) {
           die(ERR_TYPE, command->location.line, "incompatible assignment type");
         }
       }
       // FUNCTION_CALL
     } else if (command->type == FUNCTION_CALL) {
       lastFunctionCallType =
-          checkFunctionCall(ast, context, command->data.call.functionCall, block->scope);
+          analyzeFunctionCall(ast, context, command->data.call.functionCall, block->scope);
       // RETURN
     } else if (command->type == RETURN) {
       explicitReturnFound = true;
@@ -683,9 +682,9 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       // return by expression
       else if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
         // check correct return type
-        if (!isTypeCompatible(function->resolvedReturnType,
-                              checkExpressionType(command->data.returnAst.value->data.expression,
-                                                  block->scope))) {
+        if (!isTypeCompatible(
+                function->resolvedReturnType,
+                analyzeExpression(command->data.returnAst.value->data.expression, block->scope))) {
           die(ERR_TYPE, command->location.line, "incompatible return type");
         }
       }
@@ -693,8 +692,8 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       else {
         if (!isTypeCompatible(
                 function->resolvedReturnType,
-                checkFunctionCall(ast, context, command->data.returnAst.value->data.functionCall,
-                                  block->scope))) {
+                analyzeFunctionCall(ast, context, command->data.returnAst.value->data.functionCall,
+                                    block->scope))) {
           die(ERR_TYPE, command->location.line, "incompatible return type");
         }
       }
@@ -702,14 +701,14 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       // IF
     } else if (command->type == IF) {
       // check condition
-      if (checkExpressionType(command->data.ifAst.condition, block->scope) != BOOL) {
+      if (analyzeExpression(command->data.ifAst.condition, block->scope) != BOOL) {
         die(ERR_TYPE, command->location.line, "if statement condition is not boolean");
       }
       // check code blocks ("if" as a return handeled at the end)
       if (command->nextCommand != NULL || !hasToReturn || explicitReturnFound) {
-        bool explicitReturnFoundLeft = checkCodeBlock(
+        bool explicitReturnFoundLeft = analyzeCodeBlock(
             ast, context, function, command->data.ifAst.thenBlock, block->scope, false);
-        bool explicitReturnFoundRight = checkCodeBlock(
+        bool explicitReturnFoundRight = analyzeCodeBlock(
             ast, context, function, command->data.ifAst.elseBlock, block->scope, false);
         if (explicitReturnFoundLeft && explicitReturnFoundRight) {
           explicitReturnFound = true;
@@ -718,16 +717,17 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
       // WHILE
     } else if (command->type == WHILE) {
       // check condition
-      if (checkExpressionType(command->data.whileAst.condition, block->scope) != BOOL) {
+      if (analyzeExpression(command->data.whileAst.condition, block->scope) != BOOL) {
         die(ERR_TYPE, command->location.line, "while statement condition is not boolean");
       }
 
       // check code blocks
-      checkCodeBlock(ast, context, function, command->data.whileAst.codeBlock, block->scope, false);
+      analyzeCodeBlock(ast, context, function, command->data.whileAst.codeBlock, block->scope,
+                       false);
 
       // EXPRESSION
     } else if (command->type == EXPRESSION) {
-      if (checkExpressionType(command->data.expressionAst.expression, block->scope) == BOOL) {
+      if (analyzeExpression(command->data.expressionAst.expression, block->scope) == BOOL) {
         die(ERR_TYPE, command->location.line, "standalone bool expression is forbidden");
       }
     }
@@ -833,14 +833,16 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
         block->lastCommand = newCommand;
 
         // analyze "if" as non return
-        checkCodeBlock(ast, context, function, command->data.ifAst.thenBlock, block->scope, false);
-        checkCodeBlock(ast, context, function, command->data.ifAst.elseBlock, block->scope, false);
+        analyzeCodeBlock(ast, context, function, command->data.ifAst.thenBlock, block->scope,
+                         false);
+        analyzeCodeBlock(ast, context, function, command->data.ifAst.elseBlock, block->scope,
+                         false);
       }
 
       else {
-        bool explicitReturnFoundLeft = checkCodeBlock(
+        bool explicitReturnFoundLeft = analyzeCodeBlock(
             ast, context, function, command->data.ifAst.thenBlock, block->scope, true);
-        bool explicitReturnFoundRight = checkCodeBlock(
+        bool explicitReturnFoundRight = analyzeCodeBlock(
             ast, context, function, command->data.ifAst.elseBlock, block->scope, true);
 
         // all "if" end with explicit return
@@ -861,10 +863,10 @@ bool checkCodeBlock(AstProgram *ast, SemanticContext *context, AstFunction *func
 }
 
 // analyzeFunctions() helper function
-// check propper function body and return its data type (indirectly recursive)
+// analyze function body and return its data type (indirectly recursive)
 // checks correct returns
 // updates symTable function return type at the end
-AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunction *function) {
+AstDataType analyzeFunctionBody(AstProgram *ast, SemanticContext *context, AstFunction *function) {
   // create a new scope for the function body
   function->scope = symtableCreate(context->globalSymTable);
   if (function->isMain) {
@@ -889,12 +891,12 @@ AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunc
       // find return type
       if (function->resolvedReturnType == UNKNOWN) {
         function->resolvedReturnType =
-            checkExpressionType(function->body.value->data.expression, function->scope);
+            analyzeExpression(function->body.value->data.expression, function->scope);
       }
       // check correct return type
       else if (!isTypeCompatible(
                    function->resolvedReturnType,
-                   checkExpressionType(function->body.value->data.expression, function->scope)) &&
+                   analyzeExpression(function->body.value->data.expression, function->scope)) &&
                function->declaredReturnType != UNIT) {
         die(ERR_TYPE, function->location.line, "wrong return type");
       }
@@ -902,20 +904,20 @@ AstDataType checkFunctionBody(AstProgram *ast, SemanticContext *context, AstFunc
     } else {
       // find return type
       if (function->resolvedReturnType == UNKNOWN) {
-        function->resolvedReturnType = checkFunctionCall(
+        function->resolvedReturnType = analyzeFunctionCall(
             ast, context, function->body.value->data.functionCall, function->scope);
       }
       // check correct return type
       else if (!isTypeCompatible(
                    function->resolvedReturnType,
-                   checkFunctionCall(ast, context, function->body.value->data.functionCall,
-                                     function->scope)) &&
+                   analyzeFunctionCall(ast, context, function->body.value->data.functionCall,
+                                       function->scope)) &&
                function->declaredReturnType != UNIT) {
         die(ERR_TYPE, function->location.line, "wrong return type");
       }
     }
   } else {  // check code blocks
-    checkCodeBlock(ast, context, function, function->body.codeBlock, function->scope, true);
+    analyzeCodeBlock(ast, context, function, function->body.codeBlock, function->scope, true);
   }
 
   if (function->resolvedReturnType == UNKNOWN) {
@@ -937,16 +939,40 @@ void analyzeFunctions(AstProgram *ast, SemanticContext *context) {
   while (function != NULL) {
     // if function hasnt been already checked due to dependencies
     if (function->resolvedReturnType == UNKNOWN) {
-      checkFunctionBody(ast, context, function);
+      analyzeFunctionBody(ast, context, function);
     }
     function = function->nextFunction;
   }
 }
 
+// uniqueNameResolution() helper function
+void expressionUniqueNameResolution(AstProgram *ast, SemanticContext *context) {
+}
+
+// uniqueNameResolution() helper function
+void functionCallUniqueNameResolution(AstProgram *ast, SemanticContext *context) {
+}
+
+// uniqueNameResolution() helper function
+void codeBlockUniqueNameResolution(AstProgram *ast, SemanticContext *context) {
+}
+
 // rewrites AST function and variable names to uniqueID from SymTable
 // TODO
 void uniqueNameResolution(AstProgram *ast, SemanticContext *context) {
-  return;
+  // resolve all functions
+  AstFunction *function = ast->firstFunction;
+  StSymbol *symbol;
+  while (function != NULL) {
+    // rename function
+    symbol = symtableLookup(function->scope, function->functionName);
+    if (symbol == NULL) {
+      die(ERR_INTERNAL, function->location.line, "symbol not found during name resolution");
+    }
+
+    // next function
+    function = function->nextFunction;
+  }
 }
 
 // main function
