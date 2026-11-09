@@ -53,7 +53,7 @@ HashTable *htCreate(size_t initialCapacity) {
 
   table = arenaAlloc(sizeof(HashTable));
 
-  table->buckets = arenaZalloc(initialCapacity * sizeof(HTEntry *));
+  table->buckets = (HTEntry **)arenaZalloc(initialCapacity * sizeof(HTEntry *));
   table->capacity = initialCapacity;
   table->size = 0;
 
@@ -67,7 +67,7 @@ static bool resizeTable(HashTable *table) {
   size_t i;
 
   newCapacity = table->capacity * 2;
-  newBuckets = arenaZalloc(newCapacity * sizeof(HTEntry *));
+  newBuckets = (HTEntry **)arenaZalloc(newCapacity * sizeof(HTEntry *));
 
   for (i = 0; i < table->capacity; i++) {
     HTEntry *entry = table->buckets[i];
@@ -153,7 +153,7 @@ bool htContains(HashTable *table, const char *key) {
 
 void *htGet(HashTable *table, const char *key) {
   size_t index;
-  HTEntry *entry;
+  const HTEntry *entry;
 
   if (table == NULL || key == NULL) {
     return NULL;

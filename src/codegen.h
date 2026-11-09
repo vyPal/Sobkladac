@@ -73,14 +73,14 @@ typedef struct {
 /// Bitfield of all possible "acceptance criteria"
 /// I don't have any better name for this ig
 enum {
-  A_NONE = 0,
-  A_VAR = 1u << 0,
-  A_CONST = 1u << 1,
-  A_LABEL = 1u << 2,
-  A_TYPE = 1u << 3,
-  A_STR = 1u << 4,
-  A_SYMB = A_VAR | A_CONST,
-  A_JUMP = A_LABEL | A_VAR | A_STR,
+  A_NONE = 0U,
+  A_VAR = 1U << 0U,
+  A_CONST = 1U << 1U,
+  A_LABEL = 1U << 2U,
+  A_TYPE = 1U << 3U,
+  A_STR = 1U << 4U,
+  A_SYMB = (unsigned)A_VAR | (unsigned)A_CONST,
+  A_JUMP = (unsigned)A_LABEL | (unsigned)A_VAR | (unsigned)A_STR,
 };
 
 /// X-Macro definitions of all instructions possible in IFJcode26 including which operand types they
