@@ -16,7 +16,7 @@
 
 // insert function into symTable and assign uniqueID
 // return FALSE if function already exists
-bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsigned column,
+bool insertFunctionSymTable(SymTable *symTable, const char *name, unsigned line, unsigned column,
                             AstDataType returnType, AstDataType *paramTypes, size_t paramCount,
                             bool isBuiltin, bool isMain) {
   StSymbol *symbol = arenaAlloc(sizeof(StSymbol));
@@ -34,7 +34,7 @@ bool insertFunctionSymTable(SymTable *symTable, char *name, unsigned line, unsig
 
 // insert variable into symTable and assign uniqueID
 // return FALSE if variable already exists
-bool insertVariableSymTable(SymTable *symTable, char *name, unsigned line, unsigned column,
+bool insertVariableSymTable(SymTable *symTable, const char *name, unsigned line, unsigned column,
                             AstDataType dataType, bool isMutable) {
   StSymbol *symbol = arenaAlloc(sizeof(StSymbol));
   symbol->type = ST_VARIABLE;
@@ -49,7 +49,7 @@ bool insertVariableSymTable(SymTable *symTable, char *name, unsigned line, unsig
 // get function parameter count
 size_t getParamCount(AstFunction *func) {
   size_t i = 0;
-  AstFunctionParameter *param = func->firstParameter;
+  const AstFunctionParameter *param = func->firstParameter;
   while (param != NULL) {
     i++;
     param = param->nextParameter;
@@ -63,7 +63,7 @@ bool isTypeCompatible(AstDataType expected, AstDataType actual) {
 }
 
 // get ast function* from function name
-AstFunction *getAstFunction(AstProgram *ast, char *functionName) {
+AstFunction *getAstFunction(AstProgram *ast, const char *functionName) {
   AstFunction *function = ast->firstFunction;
   while (function != NULL) {
     if (strcmp(function->functionName, functionName) == 0) {
@@ -140,7 +140,7 @@ void initializeFunctions(AstProgram *ast, SymTable *globalSymTable) {
     if (paramCount > 0) {
       // create functtion paramType list
       paramTypes = arenaAlloc(paramCount * sizeof(AstDataType));
-      AstFunctionParameter *param = func->firstParameter;
+      const AstFunctionParameter *param = func->firstParameter;
       size_t i = 0;
       while (param != NULL) {
         paramTypes[i] = param->dataType;
@@ -163,7 +163,8 @@ void initializeFunctions(AstProgram *ast, SymTable *globalSymTable) {
 
 // checkRecursion() helper function
 // gets functionList function position from function name
-size_t getFunctionPosition(AstFunction **functionList, size_t functionCount, char *functionName) {
+size_t getFunctionPosition(AstFunction **functionList, size_t functionCount,
+                           const char *functionName) {
   for (size_t i = 0; i < functionCount; i++) {
     if (strcmp(functionList[i]->functionName, functionName) == 0) {
       return i;
@@ -177,7 +178,7 @@ size_t getFunctionPosition(AstFunction **functionList, size_t functionCount, cha
 void addFunctionDependency(size_t functionCount, AstFunction **functionList,
                            bool **functionDependenciesArray, size_t functionPosition,
                            SymTable *globalSymTable, AstFunctionCall *functionCall) {
-  StSymbol *symbol = symtableLookup(globalSymTable, functionCall->functionName);
+  const StSymbol *symbol = symtableLookup(globalSymTable, functionCall->functionName);
   if (symbol == NULL || symbol->type != ST_FUNCTION) {
     die(ERR_UNDEF, functionCall->location.line, "undefined function");
   }
@@ -488,7 +489,8 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
       // ASSIGNMENT
     } else if (command->type == ASSIGNMENT) {
       // check if variable exists
-      StSymbol *symbol = symtableLookup(block->symTable, command->data.assignment.variableName);
+      const StSymbol *symbol =
+          symtableLookup(block->symTable, command->data.assignment.variableName);
       if (symbol == NULL || symbol->type != ST_VARIABLE) {
         die(ERR_UNDEF, command->location.line, "undefined variable");
       }
