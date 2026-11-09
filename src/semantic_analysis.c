@@ -451,9 +451,6 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
         if (command->data.variableDeclaration.resolvedType == UNKNOWN) {
           command->data.variableDeclaration.resolvedType = analyzeExpression(
               command->data.variableDeclaration.value->data.expression, block->symTable);
-          if (command->data.variableDeclaration.resolvedType == BOOL) {
-            die(ERR_TYPE, command->location.line, "bool initialization type is forbidden");
-          }
         } else {  // check correct assignment type
           if (!isTypeCompatible(
                   command->data.variableDeclaration.resolvedType,
@@ -478,8 +475,10 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
           }
         }
       }
+      if (command->data.variableDeclaration.resolvedType == BOOL) {
+        die(ERR_TYPE, command->location.line, "bool initialization type is forbidden");
+      }
       // add variable to current symTable
-
       if (!insertVariableSymTable(block->symTable, command->data.variableDeclaration.variableName,
                                   command->location.line, command->location.column,
                                   command->data.variableDeclaration.resolvedType,
@@ -875,7 +874,7 @@ void functionCallUniqueNameResolution(SymTable *globalSymTable, AstFunctionCall 
 void codeBlockUniqueNameResolution(SymTable *globalSymTable, AstCodeBlock *block) {
   AstCommand *command = block->firstCommand;
   StSymbol *symbol;
-  while (true) {
+  while (command != NULL) {
     // VARIABLE_DECLARATION
     if (command->type == VARIABLE_DECLARATION) {
       // rename variable
@@ -959,6 +958,7 @@ void uniqueNameResolution(AstProgram *ast, SymTable *globalSymTable) {
     while (param != NULL) {
       symbol = symtableLookup(function->symTable, param->parameterName);
       param->parameterName = symbol->uniqueID;
+      param = param->nextParameter;
     }
 
     // rename function body
