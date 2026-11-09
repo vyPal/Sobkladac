@@ -6,70 +6,6 @@
  * Memory is managed by arena allocator.
  */
 
-/*
-Semantic analysis checklist:
-1. Symbol table initialization
-- Add built-in functions to the symbol table.
-- Add all user-defined functions to the symbol table.
-- Check duplicate function names.
-- Check that exactly one valid main exists.
-2. Declaration and reference checking
-- Check variable declarations.
-- Check duplicate declarations in the same symTable
-.
-- Check that variables are declared before use.
-- check function calls.
-- Check that immutable variables (val) aren't modified.
-- Infer types of expressions.
-- Check operator compatibility.
-- Check assignment compatibility.
-- Check function argument types.
-- Check function return types.
-- Check conditions in if and while.
-4. Return checking
-- Check that return statements match the declared return type.
-- Check that functions return on all required execution paths.
-- Check that main follows its required return rules.
-5. AST resolution for code generation
-- Assign unique symbol IDs to variables.
-- Assign unique function IDs to functions.
-- Store resolved IDs in AST references.
-- Ensure the code generator can distinguish variables with identical names in different symTable
-s.
-*/
-
-/*
-Error codes:
-1 chyba v programu v rámci lexikální analýzy (chybná struktura aktuálního lexému, komen-
-táře nebo odsazení).
-2 chyba v programu v rámci syntaktické analýzy (chybná syntaxe, chybějící prolog, nepo-
-volená konstrukce nebo porušení struktury odsazených bloků).
-3 sémantická chyba – použití nedefinované funkce, proměnné nebo typu; chybějící funkce
-s anotací @main.
-4 sémantická chyba – nepovolená redefinice funkce, proměnné, typu.
-5 sémantická chyba – nesprávný počet nebo typ argumentů při volání funkce, nepovolené
-parametry funkce s anotací @main.
-6 sémantická chyba typové kompatibility nebo odvození typu ve výrazu, přiřazení, iniciali-
-zaci, návratové hodnotě či řídicí konstrukci.
-7 sémantická chyba – pokus o zápis do nemodifikovatelné proměnné nebo formálního pa-
-rametru funkce.
-10 ostatní sémantické chyby (např. nepovolený return, nevyčerpávající match nebo nulový
-krok rozsahu).
-*/
-
-/*
-AST checklist:
-AstCommand VARIABLE_DECLARATION => resolvedType
-AstFunction => resolvedReturnType
-Rewrite symbol IDs.
-Rewrite function IDs.
-
-Done:
-Assign unique symbol IDs to variables. (insertVariableSymTable)
-Assign unique function IDs to functions. (insertFunctionSymTable)
-
-*/
-
 #include <stdbool.h>
 #include <string.h>
 
@@ -502,7 +438,6 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
                       AstCodeBlock *block, SymTable *parentSymTable, bool hasToReturn) {
   block->symTable = symtableCreate(parentSymTable);
   bool explicitReturnFound = false;
-  AstDataType lastFunctionCallType = UNKNOWN;
   AstCommand *command = block->firstCommand;
   AstCommand *previousCommand = NULL;
   while (true) {
@@ -583,8 +518,7 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
       }
       // FUNCTION_CALL
     } else if (command->type == FUNCTION_CALL) {
-      lastFunctionCallType = analyzeFunctionCall(ast, globalSymTable,
-                                                 command->data.call.functionCall, block->symTable);
+      analyzeFunctionCall(ast, globalSymTable, command->data.call.functionCall, block->symTable);
       // RETURN
     } else if (command->type == RETURN) {
       explicitReturnFound = true;
@@ -752,14 +686,18 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
       command->nextCommand = newCommand;
       block->lastCommand = newCommand;
     }
-    // return function call
-    else if (command->type == FUNCTION_CALL) {
+    // return FUNCTION_CALL
+    if (command->type == FUNCTION_CALL && function->declaredReturnType != UNIT) {
       // set return
       if (function->resolvedReturnType == UNKNOWN) {
-        function->resolvedReturnType = lastFunctionCallType;
+        function->resolvedReturnType = analyzeFunctionCall(
+            ast, globalSymTable, command->data.call.functionCall, block->symTable);
       }
       // check correct return
-      else if (!isTypeCompatible(function->resolvedReturnType, lastFunctionCallType)) {
+      else if (!isTypeCompatible(
+                   function->resolvedReturnType,
+                   analyzeFunctionCall(ast, globalSymTable, command->data.call.functionCall,
+                                       block->symTable))) {
         die(ERR_TYPE, command->location.line, "incompatible implicit return type");
       }
       // replace function call with return function call
@@ -772,9 +710,8 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
       }
       block->lastCommand = newCommand;
     }
-
-    // return expression
-    else if (command->type == EXPRESSION) {
+    // return EXPRESSION
+    else if (command->type == EXPRESSION && function->declaredReturnType != UNIT) {
       // set return
       if (function->resolvedReturnType == UNKNOWN) {
         function->resolvedReturnType = command->data.expressionAst.expression->deducedDataType;
@@ -794,21 +731,10 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
       }
       block->lastCommand = newCommand;
     }
-
     // IF return
     if (command->type == IF) {
       // exlicit funtion type UNIT
       if (function->declaredReturnType == UNIT) {
-        // create return UNIT command
-        newExpression->expressionType = UNIT_LITERAL;
-        newExpression->location.line = 0;
-        newExpression->location.column = 0;
-        newExpression->deducedDataType = UNIT;
-        newValue->type = VALUE_EXPRESSION;
-        newValue->data.expression = newExpression;
-        command->nextCommand = newCommand;
-        block->lastCommand = newCommand;
-
         // analyze "if" as non return
         analyzeCodeBlock(ast, globalSymTable, function, command->data.ifAst.thenBlock,
                          block->symTable, false);
@@ -1026,7 +952,6 @@ void codeBlockUniqueNameResolution(SymTable *globalSymTable, AstCodeBlock *block
 }
 
 // rewrites AST function and variable names to uniqueID from SymTable
-// TODO
 void uniqueNameResolution(AstProgram *ast, SymTable *globalSymTable) {
   // resolve all functions
   AstFunction *function = ast->firstFunction;
