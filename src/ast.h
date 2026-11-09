@@ -100,7 +100,7 @@ typedef enum {
 struct AstExpression {
   AstExpressionType expressionType;  // determines union
   AstLocation location;
-  AstDataType deducedDataType;  // for semantic analysis, TODO: maybe useless
+  AstDataType deducedDataType;  // for semantic analysis
 
   union {
     int32_t intValue;    // INT_LITERAL
