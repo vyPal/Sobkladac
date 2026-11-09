@@ -47,7 +47,7 @@ bool insertVariableSymTable(SymTable *symTable, const char *name, unsigned line,
 }
 
 // get function parameter count
-size_t getParamCount(AstFunction *func) {
+size_t getParamCount(const AstFunction *func) {
   size_t i = 0;
   const AstFunctionParameter *param = func->firstParameter;
   while (param != NULL) {
@@ -177,7 +177,7 @@ size_t getFunctionPosition(AstFunction **functionList, size_t functionCount,
 // registers function dependency from a function call
 void addFunctionDependency(size_t functionCount, AstFunction **functionList,
                            bool **functionDependenciesArray, size_t functionPosition,
-                           SymTable *globalSymTable, AstFunctionCall *functionCall) {
+                           SymTable *globalSymTable, const AstFunctionCall *functionCall) {
   const StSymbol *symbol = symtableLookup(globalSymTable, functionCall->functionName);
   if (symbol == NULL || symbol->type != ST_FUNCTION) {
     die(ERR_UNDEF, functionCall->location.line, "undefined function");
@@ -196,7 +196,7 @@ void getFunctionCodeBlockDependencies(size_t functionCount, AstFunction **functi
                                       bool **functionDependenciesArray, size_t functionPosition,
                                       SymTable *globalSymTable, AstCodeBlock *codeBlock) {
   AstCommand *command = codeBlock->firstCommand;
-  AstFunctionCall *functionCall = NULL;
+  const AstFunctionCall *functionCall = NULL;
   while (command != NULL) {
     // variable declaration using a function call
     if (command->type == VARIABLE_DECLARATION &&
@@ -275,7 +275,7 @@ void checkRecursion(AstProgram *ast, SymTable *globalSymTable) {
       // check one line function body
       if (function->body.value->type == VALUE_FUNCTION_CALL) {
         // add called function
-        AstFunctionCall *functionCall = function->body.value->data.functionCall;
+        const AstFunctionCall *functionCall = function->body.value->data.functionCall;
         addFunctionDependency(functionCount, functionList, functionDependenciesArray,
                               functionPosition, globalSymTable, functionCall);
       }
