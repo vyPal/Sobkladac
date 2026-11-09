@@ -97,14 +97,43 @@ void *arenaRealloc(void *p, size_t o, size_t n) {
   size_t ro = alignUp(o);
   size_t no = alignUp(n);
 
-  if (head && head->data + head->used == (uint8_t *)p + ro &&
-      no <= head->size - (head->used - ro)) {
-    if (n > o)
-      ASAN_UNPOISON_MEMORY_REGION(p, n);
-    else if (n < o)
-      ASAN_POISON_MEMORY_REGION((uint8_t *)p + n, o - n);
-    head->used += no - ro;
-    return p;
+  ArenaChunk *prev = NULL;
+  // Check other chunks for the base rather than just the head
+  for (ArenaChunk *cHead = head; cHead != NULL; cHead = cHead->next) {
+    // If p is equal to the last pointer given out in this chunk
+    if (cHead->data + cHead->used == (uint8_t *)p + ro) {
+      // If p is also equal to the first pointer given out and the whole chunk is used
+      //
+      // If p is both the first and last pointer given out in this region and it occupies the full
+      // size which is larger than or equal to the chunk prealloc size, and the new size is larger
+      // than the old size, then this is a fully size or oversized chunk and we can realloc
+      if ((uint8_t *)p == cHead->data && cHead->used == cHead->size &&
+          cHead->size >= ARENA_CHUNK_SIZE && no > ro) {
+        ArenaChunk *new = realloc(cHead, sizeof(ArenaChunk) + no);
+        if (new == NULL)
+          die(ERR_INTERNAL, 0, "out of memory");
+        if (prev != NULL)
+          prev->next = new;
+        else
+          head = new;
+
+        ASAN_POISON_MEMORY_REGION(p, o);
+
+        new->size = no;
+        new->used = no;
+        return new->data;
+      }
+      // If the requested size will fit in the chunk
+      if (no <= cHead->size - (cHead->used - ro)) {
+        if (n > o)
+          ASAN_UNPOISON_MEMORY_REGION(p, n);
+        else if (n < o)
+          ASAN_POISON_MEMORY_REGION((uint8_t *)p + n, o - n);
+        cHead->used += no - ro;
+        return p;
+      }
+    }
+    prev = cHead;
   }
   if (n < o) {
     ASAN_POISON_MEMORY_REGION((uint8_t *)p + n, o - n);
