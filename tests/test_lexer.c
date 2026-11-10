@@ -10,10 +10,8 @@
 // AI-BEGIN [Claude Sonnet 5.5, claude.ai]
 // Prompt: "create me one file with tests for lexer.c and another one with tests for token.c
 // tests based on tst.h"
-// Context: Uploaded tst.h (test framework), lexer_1.c (lexer), token.c, token.h, lexer.h, strbuf.c
-// and strbuf.h. Earlier in the same conversation the AI fixed the lexer (integer overflow, exact
-// decimals via strtod, line counting in multi-line strings, text after block comments) and switched
-// it to StringBuilder; these tests cover those fixes. The tests were verified by compiling them
+// Context: Uploaded tst.h (test framework), lexer.c, token.c, token.h, lexer.h.
+// The tests were verified by compiling them
 // against the uploaded sources and running them under ASan/UBSan.
 #define _POSIX_C_SOURCE 200809L
 

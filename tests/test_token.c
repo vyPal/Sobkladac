@@ -11,10 +11,9 @@
 // AI-BEGIN [Claude Sonnet 5.5, claude.ai]
 // Prompt: "create me one file with tests for lexer.c and another one with tests for token.c
 // tests based on tst.h"
-// Context: Uploaded tst.h (test framework), token.c and token.h; the lexer sources were also
-// available from the same conversation. Only the public API from token.h is used because struct
-// Token is opaque. The tests were verified by compiling them against the uploaded sources and
-// running them under ASan/UBSan.
+// Context: Uploaded tst.h (test framework), lexer.c, token.c, token.h, lexer.h.
+// The tests were verified by compiling them
+// against the uploaded sources and running them under ASan/UBSan.
 #define _POSIX_C_SOURCE 200809L
 
 #include <string.h>
