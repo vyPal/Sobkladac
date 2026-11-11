@@ -22,6 +22,9 @@
 #include "token.h"
 #include "tst.h"
 
+// tstcase() and tstsuite() take an optional, variadic list of tags. The tag list is always passed,
+// empty if there are no tags, because omitting a variadic argument is not ISO C99 (-Wpedantic).
+
 /// Number of token types; TK_EOF is the last enumerator.
 #define TK_COUNT ((int)TK_EOF + 1)
 
@@ -83,10 +86,10 @@ static struct LinkedTlist *listOf(struct Token **tokens, int count) {
 // tests
 // ---------------------------------------------------------------------------------------------
 
-tstsuite("token") {
+tstsuite("token", ) {
   // ----- tokens -----------------------------------------------------------------------------
 
-  tstcase("newToken stores type and line, value starts as NULL") {
+  tstcase("newToken stores type and line, value starts as NULL", ) {
     struct Token *t = newToken(TK_PLUS, 7);
     tstassert(t != NULL, "newToken returns a token");
     tstcheck(getTkType(t) == TK_PLUS, "type is stored");
@@ -94,7 +97,7 @@ tstsuite("token") {
     tstcheck(getValue(t) == NULL, "value is NULL until set");
   }
 
-  tstcase("newToken works for every token type") {
+  tstcase("newToken works for every token type", ) {
     for (int type = 0; type < TK_COUNT; type++) {
       struct Token *t = newToken((enum TkType)type, type + 1);
       tstexpect(t != NULL && getTkType(t) == (enum TkType)type && getLine(t) == type + 1,
@@ -102,13 +105,13 @@ tstsuite("token") {
     }
   }
 
-  tstcase("newToken accepts boundary line numbers") {
+  tstcase("newToken accepts boundary line numbers", ) {
     tstcheck(getLine(newToken(TK_EOF, 0)) == 0, "line 0");
     tstcheck(getLine(newToken(TK_EOF, 1)) == 1, "line 1");
     tstcheck(getLine(newToken(TK_EOF, 2147483647)) == 2147483647, "line INT_MAX");
   }
 
-  tstcase("tokens are independent objects") {
+  tstcase("tokens are independent objects", ) {
     struct Token *a = newToken(TK_PLUS, 1);
     struct Token *b = newToken(TK_MINUS, 2);
     tstcheck(a != b, "two calls return two different tokens");
@@ -120,7 +123,7 @@ tstsuite("token") {
     tstcheck(getValue(b) == NULL, "setting a value on one token does not affect another");
   }
 
-  tstcase("setValue / getValue with an int") {
+  tstcase("setValue / getValue with an int", ) {
     struct Token *t = newToken(TK_NUMBER, 1);
     union Value v = {.i = -42};
     setValue(t, &v);
@@ -128,7 +131,7 @@ tstsuite("token") {
     tstcheck(getValue(t)->i == -42, "int value is readable");
   }
 
-  tstcase("setValue / getValue with a double") {
+  tstcase("setValue / getValue with a double", ) {
     struct Token *t = newToken(TK_DECIMAL, 1);
     union Value v = {.d = 3.5};
     setValue(t, &v);
@@ -136,7 +139,7 @@ tstsuite("token") {
     tstcheck(getValue(t)->d == 3.5, "double value is readable");
   }
 
-  tstcase("setValue / getValue with a string") {
+  tstcase("setValue / getValue with a string", ) {
     struct Token *t = newToken(TK_STRING, 1);
     char text[] = "abc";
     struct String *s = newString(text, 3);
@@ -146,7 +149,7 @@ tstsuite("token") {
     tstcheck(getValue(t)->s == s, "string pointer is readable");
   }
 
-  tstcase("setValue replaces the previous value and can clear it") {
+  tstcase("setValue replaces the previous value and can clear it", ) {
     struct Token *t = newToken(TK_NUMBER, 1);
     union Value first = {.i = 1};
     union Value second = {.i = 2};
@@ -157,7 +160,7 @@ tstsuite("token") {
     tstcheck(getValue(t) == NULL, "setValue(NULL) clears the value");
   }
 
-  tstcase("getters work on a const token") {
+  tstcase("getters work on a const token", ) {
     const struct Token *t = newToken(TK_COMMA, 9);
     tstcheck(getTkType(t) == TK_COMMA, "getTkType");
     tstcheck(getLine(t) == 9, "getLine");
@@ -166,7 +169,7 @@ tstsuite("token") {
 
   // ----- strings ----------------------------------------------------------------------------
 
-  tstcase("newString keeps the text pointer and the length") {
+  tstcase("newString keeps the text pointer and the length", ) {
     char text[] = "hello";
     struct String *s = newString(text, 5);
     tstassert(s != NULL, "newString returns a string");
@@ -175,28 +178,28 @@ tstsuite("token") {
     tstcheck(strcmp(getString(s), "hello") == 0, "content is readable");
   }
 
-  tstcase("newString does not copy: later changes of the buffer are visible") {
+  tstcase("newString does not copy: later changes of the buffer are visible", ) {
     char text[] = "hello";
     struct String *s = newString(text, 5);
     text[0] = 'j';
     tstcheck(strcmp(getString(s), "jello") == 0, "the string sees the change");
   }
 
-  tstcase("newString with an empty string") {
+  tstcase("newString with an empty string", ) {
     char text[] = "";
     struct String *s = newString(text, 0);
     tstcheck(getStringLength(s) == 0, "length is 0");
     tstcheck(getString(s)[0] == '\0', "content is empty");
   }
 
-  tstcase("newString length is the stored length, not strlen") {
+  tstcase("newString length is the stored length, not strlen", ) {
     char text[] = {'a', '\0', 'b', '\0'};
     struct String *s = newString(text, 3);
     tstcheck(getStringLength(s) == 3, "length counts the embedded NUL");
     tstcheck(memcmp(getString(s), "a\0b", 3) == 0, "all three bytes are reachable");
   }
 
-  tstcase("newString strings are independent objects") {
+  tstcase("newString strings are independent objects", ) {
     char a[] = "a";
     char b[] = "bb";
     struct String *sa = newString(a, 1);
@@ -208,18 +211,18 @@ tstsuite("token") {
 
   // ----- token list: creation and push ------------------------------------------------------
 
-  tstcase("newTlist creates an empty list") {
+  tstcase("newTlist creates an empty list", ) {
     struct LinkedTlist *l = newTlist();
     tstassert(l != NULL, "newTlist returns a list");
     tstcheck(lookAheadToken(l, 0) == NULL, "there is no first token");
     tstcheck(popToken(l) == NULL, "popping an empty list returns NULL");
   }
 
-  tstcase("newTlist returns a new list every time") {
+  tstcase("newTlist returns a new list every time", ) {
     tstcheck(newTlist() != newTlist(), "two lists are two objects");
   }
 
-  tstcase("pushToken onto NULL creates a new list") {
+  tstcase("pushToken onto NULL creates a new list", ) {
     struct Token *a = newToken(TK_PLUS, 1);
     struct LinkedTlist *l = pushToken(a, NULL);
     tstassert(l != NULL, "a list is returned");
@@ -227,7 +230,7 @@ tstsuite("token") {
     tstcheck(lookAheadToken(l, 1) == NULL, "and the only one");
   }
 
-  tstcase("pushToken fills an empty head node in place") {
+  tstcase("pushToken fills an empty head node in place", ) {
     struct LinkedTlist *head = newTlist();
     struct Token *a = newToken(TK_PLUS, 1);
     struct LinkedTlist *tail = pushToken(a, head);
@@ -236,7 +239,7 @@ tstsuite("token") {
     tstcheck(lookAheadToken(head, 1) == NULL, "list has one token");
   }
 
-  tstcase("pushToken appends and returns the new tail") {
+  tstcase("pushToken appends and returns the new tail", ) {
     struct LinkedTlist *head = newTlist();
     struct Token *a = newToken(TK_PLUS, 1);
     struct Token *b = newToken(TK_MINUS, 2);
@@ -249,7 +252,7 @@ tstsuite("token") {
     tstcheck(lookAheadToken(tail2, 0) == b, "the returned tail starts at the last token");
   }
 
-  tstcase("pushToken keeps the order of many tokens") {
+  tstcase("pushToken keeps the order of many tokens", ) {
     enum { N = 100 };
     struct Token *tokens[N];
     struct LinkedTlist *head = newTlist();
@@ -266,11 +269,11 @@ tstsuite("token") {
 
   // ----- token list: popToken ---------------------------------------------------------------
 
-  tstcase("popToken on NULL returns NULL") {
+  tstcase("popToken on NULL returns NULL", ) {
     tstcheck(popToken(NULL) == NULL, "NULL list is tolerated");
   }
 
-  tstcase("popToken on a one-token list empties it") {
+  tstcase("popToken on a one-token list empties it", ) {
     struct Token *a = newToken(TK_PLUS, 1);
     struct LinkedTlist *l = pushToken(a, NULL);
     tstcheck(popToken(l) == a, "returns the token");
@@ -278,7 +281,7 @@ tstsuite("token") {
     tstcheck(popToken(l) == NULL, "popping again returns NULL");
   }
 
-  tstcase("popToken returns the tokens in FIFO order") {
+  tstcase("popToken returns the tokens in FIFO order", ) {
     struct Token *tokens[4] = {newToken(TK_PLUS, 1), newToken(TK_MINUS, 2),
                                newToken(TK_MULTIPLY, 3), newToken(TK_DIVIDE, 4)};
     struct LinkedTlist *l = listOf(tokens, 4);
@@ -289,7 +292,7 @@ tstsuite("token") {
     tstcheck(lookAheadToken(l, 0) == NULL, "and empty");
   }
 
-  tstcase("popToken moves the rest of the list forward") {
+  tstcase("popToken moves the rest of the list forward", ) {
     struct Token *tokens[3] = {newToken(TK_PLUS, 1), newToken(TK_MINUS, 2),
                                newToken(TK_MULTIPLY, 3)};
     struct LinkedTlist *l = listOf(tokens, 3);
@@ -301,19 +304,19 @@ tstsuite("token") {
 
   // ----- token list: lookAheadToken ---------------------------------------------------------
 
-  tstcase("lookAheadToken on NULL returns NULL") {
+  tstcase("lookAheadToken on NULL returns NULL", ) {
     tstcheck(lookAheadToken(NULL, 0) == NULL, "n = 0");
     tstcheck(lookAheadToken(NULL, 3) == NULL, "n = 3");
   }
 
-  tstcase("lookAheadToken with a negative index returns NULL") {
+  tstcase("lookAheadToken with a negative index returns NULL", ) {
     struct Token *tokens[2] = {newToken(TK_PLUS, 1), newToken(TK_MINUS, 2)};
     struct LinkedTlist *l = listOf(tokens, 2);
     tstcheck(lookAheadToken(l, -1) == NULL, "n = -1");
     tstcheck(lookAheadToken(l, -100) == NULL, "n = -100");
   }
 
-  tstcase("lookAheadToken returns the n-th token, head is 0") {
+  tstcase("lookAheadToken returns the n-th token, head is 0", ) {
     struct Token *tokens[3] = {newToken(TK_PLUS, 1), newToken(TK_MINUS, 2),
                                newToken(TK_MULTIPLY, 3)};
     struct LinkedTlist *l = listOf(tokens, 3);
@@ -322,7 +325,7 @@ tstsuite("token") {
     tstcheck(lookAheadToken(l, 2) == tokens[2], "n = 2");
   }
 
-  tstcase("lookAheadToken past the end returns NULL") {
+  tstcase("lookAheadToken past the end returns NULL", ) {
     struct Token *tokens[3] = {newToken(TK_PLUS, 1), newToken(TK_MINUS, 2),
                                newToken(TK_MULTIPLY, 3)};
     struct LinkedTlist *l = listOf(tokens, 3);
@@ -331,7 +334,7 @@ tstsuite("token") {
     tstcheck(lookAheadToken(l, 100000) == NULL, "n much larger than the list");
   }
 
-  tstcase("lookAheadToken does not remove anything") {
+  tstcase("lookAheadToken does not remove anything", ) {
     struct Token *tokens[2] = {newToken(TK_PLUS, 1), newToken(TK_MINUS, 2)};
     struct LinkedTlist *l = listOf(tokens, 2);
     tstcheck(lookAheadToken(l, 1) == tokens[1], "first look");
@@ -340,7 +343,7 @@ tstsuite("token") {
     tstcheck(popToken(l) == tokens[0], "and can still be popped");
   }
 
-  tstcase("lookAheadToken works from a node in the middle of the list") {
+  tstcase("lookAheadToken works from a node in the middle of the list", ) {
     struct Token *tokens[3] = {newToken(TK_PLUS, 1), newToken(TK_MINUS, 2),
                                newToken(TK_MULTIPLY, 3)};
     struct LinkedTlist *head = newTlist();
@@ -354,11 +357,11 @@ tstsuite("token") {
 
   // ----- printToken -------------------------------------------------------------------------
 
-  tstcase("printToken(NULL) prints nothing") {
+  tstcase("printToken(NULL) prints nothing", ) {
     tstcheck(strcmp(printed(NULL), "") == 0, "no output for NULL");
   }
 
-  tstcase("printToken without a value prints (null)") {
+  tstcase("printToken without a value prints (null)", ) {
     char expected[128];
     snprintf(expected, sizeof expected, "%svalue: (null)\n", header(TK_PLUS, 3));
     tstcheck(strcmp(printed(newToken(TK_PLUS, 3)), expected) == 0, "operator token");
@@ -366,7 +369,7 @@ tstsuite("token") {
     tstcheck(strcmp(printed(newToken(TK_IDENT, 3)), expected) == 0, "identifier token");
   }
 
-  tstcase("printToken prints the string of TK_IDENT and TK_STRING") {
+  tstcase("printToken prints the string of TK_IDENT and TK_STRING", ) {
     char text[] = "name";
     union Value v = {.s = newString(text, 4)};
     char expected[128];
@@ -382,7 +385,7 @@ tstsuite("token") {
     tstcheck(strcmp(printed(str), expected) == 0, "string");
   }
 
-  tstcase("printToken prints the int of TK_NUMBER and TK_INDENT") {
+  tstcase("printToken prints the int of TK_NUMBER and TK_INDENT", ) {
     union Value v = {.i = 42};
     char expected[128];
 
@@ -403,16 +406,16 @@ tstsuite("token") {
     tstcheck(strcmp(printed(n2), expected) == 0, "negative number");
   }
 
-  tstcase("printToken prints the double of TK_DECIMAL") {
+  tstcase("printToken prints the double of TK_DECIMAL", ) {
     union Value v = {.d = 3.5};
     struct Token *t = newToken(TK_DECIMAL, 6);
     setValue(t, &v);
     char expected[128];
     snprintf(expected, sizeof expected, "%svalue: 3.500000\n", header(TK_DECIMAL, 6));
-    tstcheck(strcmp(printed(t), expected) == 0, "decimal uses %f");
+    tstcheck(strcmp(printed(t), expected) == 0, "decimal is printed with six decimal places");
   }
 
-  tstcase("printToken says (not applicable) for types without a printable value") {
+  tstcase("printToken says (not applicable) for types without a printable value", ) {
     union Value v = {.i = 1};
     struct Token *t = newToken(TK_PLUS, 8);
     setValue(t, &v);
