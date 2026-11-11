@@ -8,6 +8,7 @@
 #include <stdbool.h>
 
 AstProgram *topDown(struct LinkedTlist *tokenList) {
+  tokenList = layoutFilter(tokenList);
   // Check for prologue
   bool prologCorrect = false;
   Token *newToken = popToken(tokenList);
