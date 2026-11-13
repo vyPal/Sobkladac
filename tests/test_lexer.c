@@ -294,7 +294,7 @@ tstsuite("lexer", ) {
 
   // ----- operators and punctuation ----------------------------------------------------------
 
-  tstcase("every operaTK_OR and punctuation token", ) {
+  tstcase("every operator and punctuation token", ) {
     static const struct {
       const char *src;
       enum TkType type;
@@ -318,7 +318,7 @@ tstsuite("lexer", ) {
     tstcheck(tokSeq(lex("a.b"), TK_IDENT, TK_DOT, TK_IDENT, TK_EOF), "a.b");
     tstcheck(tokSeq(lex("()"), TK_LPAREN, TK_RPAREN, TK_EOF), "the Unit literal () is two tokens");
     tstcheck(tokSeq(lex("==="), TK_EQUAL, TK_ASSIGN, TK_EOF), "two-character operators are greedy");
-    tstcheck(tokSeq(lex("= ="), TK_ASSIGN, TK_ASSIGN, TK_EOF), "a space splits an operaTK_OR");
+    tstcheck(tokSeq(lex("= ="), TK_ASSIGN, TK_ASSIGN, TK_EOF), "a space splits an operator");
 
     // a negative number is the unary minus and a positive literal
     LinkedTlist *l = lex("-5");
