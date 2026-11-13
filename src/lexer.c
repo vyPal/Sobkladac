@@ -328,12 +328,13 @@ LinkedTlist *lexerMain(void) {
         char prev = nextChar;
         nextChar = (char)nextCharInt;
         position++;
-        preloadedChar = true;
         if (nextChar >= '0' && nextChar <= '9') {
           StringBuilder lex = sbNew(0);
           numDecimal(&lastToken, prev, &nextChar, &lex, &line, &position, &preloadedChar);
-        } else
+        } else {
+          preloadedChar = true;
           lastToken = pushToken(newToken(TK_DOT, line), lastToken);
+        }
         break;
       // other
       case '\n':
@@ -387,9 +388,11 @@ LinkedTlist *lexerMain(void) {
         nextCharInt = fgetc(stdin);
         nextChar = (char)nextCharInt;
         position++;
-        if (nextChar != ' ')
+        if (nextChar != ' ' && nextChar != '\n' && nextCharInt != EOF)
           die(1, line, "Unexpected character at line %d colum %d, expected \" \" after \"@main\"",
               line, position);
+        if (nextChar == '\n' || nextCharInt == EOF)
+          preloadedChar = true;
         lastToken = pushToken(newToken(TK_ATMAIN, line), lastToken);
         break;
 
