@@ -44,7 +44,11 @@ enum TkType {
   TK_NEWLINE,    // \n
   TK_INDENT,     // int (number of spaces)
   TK_ATMAIN,     // @main
-  TK_EOF         // end of file
+  TK_EOF,        // end of file
+  // boolthen
+  TK_NOT,  // !
+  TK_AND,  // &&
+  TK_OR    // ||
 };
 
 /**

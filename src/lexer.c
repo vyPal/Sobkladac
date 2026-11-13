@@ -434,10 +434,11 @@ LinkedTlist *lexerMain(void) {
         nextCharInt = fgetc(stdin);
         nextChar = (char)nextCharInt;
         position++;
-        if (nextChar != '=') {
-          die(1, line, "Unexpected character at line %d colum %d, expected \"!=\"", line, position);
-        } else {
+        if (nextChar == '=') {
           lastToken = pushToken(newToken(TK_NOT_EQUAL, line), lastToken);
+        } else {
+          lastToken = pushToken(newToken(TK_NOT, line), lastToken);
+          preloadedChar = true;
         }
         break;
 
@@ -528,7 +529,24 @@ LinkedTlist *lexerMain(void) {
         lastToken = pushToken(newToken(TK_COMMA, line), lastToken);
         break;
       case '|':
-        lastToken = pushToken(newToken(TK_PIPE, line), lastToken);
+        nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar == '|') {
+          lastToken = pushToken(newToken(TK_OR, line), lastToken);
+        } else {
+          preloadedChar = true;
+          lastToken = pushToken(newToken(TK_PIPE, line), lastToken);
+        }
+        break;
+      case '&':
+        nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar == '&')
+          lastToken = pushToken(newToken(TK_AND, line), lastToken);
+        else
+          die(1, line, "Unexpected character at line %d colum %d, expected \"&&\"", line, position);
         break;
       case ' ':
         break;
