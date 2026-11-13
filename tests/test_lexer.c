@@ -292,7 +292,7 @@ tstsuite("lexer", ) {
     tstcheck(tokSeq(lex("     "), TK_EOF), "spaces only");
   }
 
-  // ----- operaTK_ORs and punctuation ----------------------------------------------------------
+  // ----- operators and punctuation ----------------------------------------------------------
 
   tstcase("every operaTK_OR and punctuation token", ) {
     static const struct {
@@ -309,7 +309,7 @@ tstsuite("lexer", ) {
     }
   }
 
-  tstcase("operaTK_ORs next to other tokens", ) {
+  tstcase("operators next to other tokens", ) {
     tstcheck(tokSeq(lex("a+b"), TK_IDENT, TK_PLUS, TK_IDENT, TK_EOF), "a+b");
     tstcheck(tokSeq(lex("a / b"), TK_IDENT, TK_DIVIDE, TK_IDENT, TK_EOF), "a / b");
     tstcheck(tokSeq(lex("f(a,b);"), TK_IDENT, TK_LPAREN, TK_IDENT, TK_COMMA, TK_IDENT, TK_RPAREN,
@@ -317,8 +317,7 @@ tstsuite("lexer", ) {
              "f(a,b);");
     tstcheck(tokSeq(lex("a.b"), TK_IDENT, TK_DOT, TK_IDENT, TK_EOF), "a.b");
     tstcheck(tokSeq(lex("()"), TK_LPAREN, TK_RPAREN, TK_EOF), "the Unit literal () is two tokens");
-    tstcheck(tokSeq(lex("==="), TK_EQUAL, TK_ASSIGN, TK_EOF),
-             "two-character operaTK_ORs are greedy");
+    tstcheck(tokSeq(lex("==="), TK_EQUAL, TK_ASSIGN, TK_EOF), "two-character operators are greedy");
     tstcheck(tokSeq(lex("= ="), TK_ASSIGN, TK_ASSIGN, TK_EOF), "a space splits an operaTK_OR");
 
     // a negative number is the unary minus and a positive literal
@@ -715,7 +714,7 @@ tstsuite("lexer", ) {
     // section 2 of the specification (the comments are shortened to ASCII)
     LinkedTlist *l =
         lex("import ifj26.*\n"
-            "def facTK_ORial(n: Int): Int =\n"
+            "def factorial(n: Int): Int =\n"
             "  var result = 1\n"
             "  var i: Int = n // the type is optional\n"
             "  while i > 1 do\n"
@@ -724,14 +723,14 @@ tstsuite("lexer", ) {
             "  result // the last expression is the result\n"
             "@main def runFoo(): Unit =\n"
             "  val n = readInt()\n"
-            "  val result = facTK_ORial(n)\n"
+            "  val result = factorial(n)\n"
             "  print(result)\n"
             "  print(\"\\n\")\n");
     tstcheck(
         tokSeq(l,
                // import ifj26.*
                TK_IDENT, TK_IDENT, TK_DOT, TK_MULTIPLY, TK_NEWLINE,
-               // def facTK_ORial(n: Int): Int =
+               // def factorial(n: Int): Int =
                TK_INDENT, TK_IDENT, TK_IDENT, TK_LPAREN, TK_IDENT, TK_COLON, TK_IDENT, TK_RPAREN,
                TK_COLON, TK_IDENT, TK_ASSIGN, TK_NEWLINE,
                // var result = 1
@@ -751,7 +750,7 @@ tstsuite("lexer", ) {
                TK_ASSIGN, TK_NEWLINE,
                // val n = readInt()
                TK_INDENT, TK_IDENT, TK_IDENT, TK_ASSIGN, TK_IDENT, TK_LPAREN, TK_RPAREN, TK_NEWLINE,
-               // val result = facTK_ORial(n)
+               // val result = factorial(n)
                TK_INDENT, TK_IDENT, TK_IDENT, TK_ASSIGN, TK_IDENT, TK_LPAREN, TK_IDENT, TK_RPAREN,
                TK_NEWLINE,
                // print(result)
