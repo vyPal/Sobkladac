@@ -292,9 +292,9 @@ tstsuite("lexer", ) {
     tstcheck(tokSeq(lex("     "), TK_EOF), "spaces only");
   }
 
-  // ----- operators and punctuation ----------------------------------------------------------
+  // ----- operaTK_ORs and punctuation ----------------------------------------------------------
 
-  tstcase("every operator and punctuation token", ) {
+  tstcase("every operaTK_OR and punctuation token", ) {
     static const struct {
       const char *src;
       enum TkType type;
@@ -309,7 +309,7 @@ tstsuite("lexer", ) {
     }
   }
 
-  tstcase("operators next to other tokens", ) {
+  tstcase("operaTK_ORs next to other tokens", ) {
     tstcheck(tokSeq(lex("a+b"), TK_IDENT, TK_PLUS, TK_IDENT, TK_EOF), "a+b");
     tstcheck(tokSeq(lex("a / b"), TK_IDENT, TK_DIVIDE, TK_IDENT, TK_EOF), "a / b");
     tstcheck(tokSeq(lex("f(a,b);"), TK_IDENT, TK_LPAREN, TK_IDENT, TK_COMMA, TK_IDENT, TK_RPAREN,
@@ -317,8 +317,9 @@ tstsuite("lexer", ) {
              "f(a,b);");
     tstcheck(tokSeq(lex("a.b"), TK_IDENT, TK_DOT, TK_IDENT, TK_EOF), "a.b");
     tstcheck(tokSeq(lex("()"), TK_LPAREN, TK_RPAREN, TK_EOF), "the Unit literal () is two tokens");
-    tstcheck(tokSeq(lex("==="), TK_EQUAL, TK_ASSIGN, TK_EOF), "two-character operators are greedy");
-    tstcheck(tokSeq(lex("= ="), TK_ASSIGN, TK_ASSIGN, TK_EOF), "a space splits an operator");
+    tstcheck(tokSeq(lex("==="), TK_EQUAL, TK_ASSIGN, TK_EOF),
+             "two-character operaTK_ORs are greedy");
+    tstcheck(tokSeq(lex("= ="), TK_ASSIGN, TK_ASSIGN, TK_EOF), "a space splits an operaTK_OR");
 
     // a negative number is the unary minus and a positive literal
     LinkedTlist *l = lex("-5");
@@ -663,12 +664,10 @@ tstsuite("lexer", ) {
       tstexpect(tokCount(l) == 2 && tokIs(l, 1, TK_EOF), "'%s' is one token", one[i]);
     }
 
-    int tNot = tokType(lex("!"), 0);
-    int tAnd = tokType(lex("&&"), 0);
-    int tOr = tokType(lex("||"), 0);
-    tstcheck(tNot >= 0 && tAnd >= 0 && tOr >= 0 && tNot != tAnd && tNot != tOr && tAnd != tOr,
+    tstcheck(TK_NOT >= 0 && TK_AND >= 0 && TK_OR >= 0 && TK_NOT != TK_AND && TK_NOT != TK_OR &&
+                 TK_AND != TK_OR,
              "!, && and || are three different tokens");
-    tstcheck(tOr != (int)TK_PIPE && tNot != (int)TK_NOT_EQUAL, "|| is not a pipe, ! is not !=");
+    tstcheck(TK_OR != (int)TK_PIPE && TK_NOT != (int)TK_NOT_EQUAL, "|| is not a pipe, ! is not !=");
 
     // the tokens of the base language are not affected
     tstcheck(tokSeq(lex("!="), TK_NOT_EQUAL, TK_EOF), "!= is still one token");
@@ -676,11 +675,12 @@ tstsuite("lexer", ) {
     tstcheck(lexStatus("a & b") == LEX_ERROR, "a single & is still an unknown character");
 
     // in expressions, with and without spaces
-    tstcheck(tokSeq(lex("!a && b || c"), tNot, TK_IDENT, tAnd, TK_IDENT, tOr, TK_IDENT, TK_EOF),
-             "!a && b || c");
-    tstcheck(tokSeq(lex("x&&y"), TK_IDENT, tAnd, TK_IDENT, TK_EOF), "x&&y");
     tstcheck(
-        tokSeq(lex("!(a<b)"), tNot, TK_LPAREN, TK_IDENT, TK_SMALLER, TK_IDENT, TK_RPAREN, TK_EOF),
+        tokSeq(lex("!a && b || c"), TK_NOT, TK_IDENT, TK_AND, TK_IDENT, TK_OR, TK_IDENT, TK_EOF),
+        "!a && b || c");
+    tstcheck(tokSeq(lex("x&&y"), TK_IDENT, TK_AND, TK_IDENT, TK_EOF), "x&&y");
+    tstcheck(
+        tokSeq(lex("!(a<b)"), TK_NOT, TK_LPAREN, TK_IDENT, TK_SMALLER, TK_IDENT, TK_RPAREN, TK_EOF),
         "!(a<b)");
   }
 
@@ -715,7 +715,7 @@ tstsuite("lexer", ) {
     // section 2 of the specification (the comments are shortened to ASCII)
     LinkedTlist *l =
         lex("import ifj26.*\n"
-            "def factorial(n: Int): Int =\n"
+            "def facTK_ORial(n: Int): Int =\n"
             "  var result = 1\n"
             "  var i: Int = n // the type is optional\n"
             "  while i > 1 do\n"
@@ -724,14 +724,14 @@ tstsuite("lexer", ) {
             "  result // the last expression is the result\n"
             "@main def runFoo(): Unit =\n"
             "  val n = readInt()\n"
-            "  val result = factorial(n)\n"
+            "  val result = facTK_ORial(n)\n"
             "  print(result)\n"
             "  print(\"\\n\")\n");
     tstcheck(
         tokSeq(l,
                // import ifj26.*
                TK_IDENT, TK_IDENT, TK_DOT, TK_MULTIPLY, TK_NEWLINE,
-               // def factorial(n: Int): Int =
+               // def facTK_ORial(n: Int): Int =
                TK_INDENT, TK_IDENT, TK_IDENT, TK_LPAREN, TK_IDENT, TK_COLON, TK_IDENT, TK_RPAREN,
                TK_COLON, TK_IDENT, TK_ASSIGN, TK_NEWLINE,
                // var result = 1
@@ -751,7 +751,7 @@ tstsuite("lexer", ) {
                TK_ASSIGN, TK_NEWLINE,
                // val n = readInt()
                TK_INDENT, TK_IDENT, TK_IDENT, TK_ASSIGN, TK_IDENT, TK_LPAREN, TK_RPAREN, TK_NEWLINE,
-               // val result = factorial(n)
+               // val result = facTK_ORial(n)
                TK_INDENT, TK_IDENT, TK_IDENT, TK_ASSIGN, TK_IDENT, TK_LPAREN, TK_IDENT, TK_RPAREN,
                TK_NEWLINE,
                // print(result)
