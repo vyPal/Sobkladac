@@ -129,8 +129,3 @@ void astCallAppendArgument(AstFunctionCall *call, AstFunctionCallArgument *argum
     call->lastArgument = argument;
   }
 }
-
-// Uses arena allocator so no freeing is needed, not sure why this method was defined
-void astFreeProgram(AstProgram *program) {
-  (void)(program);
-}
