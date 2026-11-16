@@ -95,6 +95,12 @@ static void attachToCommands(AstCommand *cmd, SymTable *table) {
     if (cmd->type == VARIABLE_DECLARATION) {
       insertVariable(table, cmd->data.variableDeclaration.variableName,
                      cmd->data.variableDeclaration.resolvedType);
+    } else if (cmd->type == ASSIGNMENT) {
+      // Semantic analysis records the type of the assigned variable
+      const StSymbol *symbol = symtableLookup(table, cmd->data.assignment.variableName);
+      if (symbol == NULL)
+        die(ERR_INTERNAL, 0, "test assigns to undeclared %s", cmd->data.assignment.variableName);
+      cmd->data.assignment.resolvedType = symbol->data.variable.dataType;
     } else if (cmd->type == IF) {
       attachToBlock(cmd->data.ifAst.thenBlock, table);
       attachToBlock(cmd->data.ifAst.elseBlock, table);

@@ -352,7 +352,6 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
       dst = getResultOperand(preferredDst);
       bool isIntOperation = left.ty == INT && right.ty == INT;
 
-      // Mixed Int and Double operands, the Int one gets converted to Double
       if (left.ty == DOUBLE || right.ty == DOUBLE) {
         left = intToDouble(code, left, NULL);
         right = intToDouble(code, right, NULL);
@@ -695,14 +694,6 @@ void lowerCodeBlock(StringBuilder *code, AstCodeBlock *block);
 /// Function currently being lowered, needed to know the type returned values are converted to
 static AstFunction *currentFunction;
 
-/// Looks up the declared type of a variable
-static AstDataType variableType(SymTable *table, const char *name) {
-  const StSymbol *sym = symtableLookup(table, name);
-  if (sym == NULL || sym->type != ST_VARIABLE)
-    die(ERR_INTERNAL, 0, "Could not find variable %s in symbol table", name);
-  return sym->data.variable.dataType;
-}
-
 /// Lowers a command
 void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
   switch (cmd->type) {
@@ -717,7 +708,7 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
     case ASSIGNMENT: {
       Operand dst = varOp(FT_LF, cmd->data.assignment.variableName);
       ValueInfo value = lowerValue(code, cmd->data.assignment.value, &dst, table);
-      storeTyped(code, dst, variableType(table, cmd->data.assignment.variableName), value);
+      storeTyped(code, dst, cmd->data.assignment.resolvedType, value);
       break;
     }
     case FUNCTION_CALL:

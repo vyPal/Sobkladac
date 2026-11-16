@@ -521,8 +521,9 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
           die(ERR_TYPE, command->location.line, "incompatible assignment type");
         }
       }
-      // rename variable
+      // rename variable and remember its type, codegen can't look it up by the new name
       command->data.assignment.variableName = symbol->uniqueID;
+      command->data.assignment.resolvedType = symbol->data.variable.dataType;
       // FUNCTION_CALL
     } else if (command->type == FUNCTION_CALL) {
       lastFunctionCallType = analyzeFunctionCall(ast, globalSymTable,
