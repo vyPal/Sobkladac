@@ -322,6 +322,8 @@ AstDataType analyzeExpression(AstExpression *expression, SymTable *symTable) {
       die(ERR_UNDEF, expression->location.line, "undefined variable");
     }
     expression->deducedDataType = symbol->data.variable.dataType;
+    // rename variable
+    expression->data.variable = symbol->uniqueID;
     // unary operators only work with numers and keep their type
   } else if (expression->expressionType == UNARY) {
     AstOperator op = expression->data.unary.operatorAst;
@@ -438,6 +440,7 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
   bool explicitReturnFound = false;
   AstCommand *command = block->firstCommand;
   AstCommand *previousCommand = NULL;
+  AstDataType lastFunctionCallType = UNKNOWN;
   while (true) {
     // VARIABLE_DECLARATION
     if (command->type == VARIABLE_DECLARATION) {
@@ -483,6 +486,10 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
                                   command->data.variableDeclaration.isMutable)) {
         die(ERR_REDEF, command->location.line, "variable alredy defined");
       }
+      // rename variable
+      StSymbol *symbol =
+          symtableLookup(block->symTable, command->data.variableDeclaration.variableName);
+      command->data.variableDeclaration.variableName = symbol->uniqueID;
       // ASSIGNMENT
     } else if (command->type == ASSIGNMENT) {
       // check if variable exists
@@ -514,9 +521,12 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
           die(ERR_TYPE, command->location.line, "incompatible assignment type");
         }
       }
+      // rename variable
+      command->data.assignment.variableName = symbol->uniqueID;
       // FUNCTION_CALL
     } else if (command->type == FUNCTION_CALL) {
-      analyzeFunctionCall(ast, globalSymTable, command->data.call.functionCall, block->symTable);
+      lastFunctionCallType = analyzeFunctionCall(ast, globalSymTable,
+                                                 command->data.call.functionCall, block->symTable);
       // RETURN
     } else if (command->type == RETURN) {
       explicitReturnFound = true;
@@ -690,14 +700,10 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
     if (command->type == FUNCTION_CALL && function->declaredReturnType != UNIT) {
       // set return
       if (function->resolvedReturnType == UNKNOWN) {
-        function->resolvedReturnType = analyzeFunctionCall(
-            ast, globalSymTable, command->data.call.functionCall, block->symTable);
+        function->resolvedReturnType = lastFunctionCallType;
       }
       // check correct return
-      else if (!isTypeCompatible(
-                   function->resolvedReturnType,
-                   analyzeFunctionCall(ast, globalSymTable, command->data.call.functionCall,
-                                       block->symTable))) {
+      else if (!isTypeCompatible(function->resolvedReturnType, lastFunctionCallType)) {
         die(ERR_TYPE, command->location.line, "incompatible implicit return type");
       }
       // replace function call with return function call
@@ -766,12 +772,16 @@ AstDataType analyzeFunctionBody(AstProgram *ast, SymTable *globalSymTable, AstFu
   }
   // check all function params and add them to the current symTable
 
-  const AstFunctionParameter *param = function->firstParameter;
+  AstFunctionParameter *param = function->firstParameter;
+  StSymbol *symbol;
   while (param != NULL) {
     if (!insertVariableSymTable(function->symTable, param->parameterName, function->location.line,
                                 function->location.column, param->dataType, false)) {
       die(ERR_REDEF, function->location.line, "duplicate function parameter names");
     }
+    // rename function params
+    symbol = symtableLookup(function->symTable, param->parameterName);
+    param->parameterName = symbol->uniqueID;
     param = param->nextParameter;
   }
 
@@ -817,7 +827,7 @@ AstDataType analyzeFunctionBody(AstProgram *ast, SymTable *globalSymTable, AstFu
   if (function->resolvedReturnType == BOOL) {
     die(ERR_TYPE, function->location.line, "bool initialization type is forbidden");
   }
-  StSymbol *symbol = symtableLookup(globalSymTable, function->functionName);
+  symbol = symtableLookup(globalSymTable, function->functionName);
   symbol->data.function.returnType = function->resolvedReturnType;
   return function->resolvedReturnType;
 }
@@ -836,139 +846,6 @@ void analyzeFunctions(AstProgram *ast, SymTable *globalSymTable) {
   }
 }
 
-// uniqueNameResolution() helper function
-void expressionUniqueNameResolution(AstExpression *expression, SymTable *symTable) {
-  if (expression->expressionType == VARIABLE) {
-    // rename variable
-    StSymbol *symbol = symtableLookup(symTable, expression->data.variable);
-    expression->data.variable = symbol->uniqueID;
-  } else if (expression->expressionType == UNARY) {
-    // look for variables
-    expressionUniqueNameResolution(expression->data.unary.expression, symTable);
-  } else if (expression->expressionType == BINARY) {
-    // look for variables
-    expressionUniqueNameResolution(expression->data.binary.leftExpression, symTable);
-    expressionUniqueNameResolution(expression->data.binary.rightExpression, symTable);
-    return;
-  }
-}
-
-// uniqueNameResolution() helper function
-void functionCallUniqueNameResolution(SymTable *globalSymTable, AstFunctionCall *call,
-                                      SymTable *symTable) {
-  // rename all arguments
-  AstFunctionCallArgument *argument = call->firstArgument;
-  while (argument != NULL) {
-    expressionUniqueNameResolution(argument->expression, symTable);
-    argument = argument->nextArgument;
-  }
-  return;
-}
-
-// uniqueNameResolution() helper function
-void codeBlockUniqueNameResolution(SymTable *globalSymTable, AstCodeBlock *block) {
-  AstCommand *command = block->firstCommand;
-  StSymbol *symbol;
-  while (command != NULL) {
-    // VARIABLE_DECLARATION
-    if (command->type == VARIABLE_DECLARATION) {
-      // rename variable
-      symbol = symtableLookup(block->symTable, command->data.variableDeclaration.variableName);
-      command->data.variableDeclaration.variableName = symbol->uniqueID;
-      // inicialized by an expression
-      if (command->data.variableDeclaration.value->type == VALUE_EXPRESSION) {
-        expressionUniqueNameResolution(command->data.variableDeclaration.value->data.expression,
-                                       block->symTable);
-      } else {  // inicialized by a function call
-        functionCallUniqueNameResolution(globalSymTable,
-                                         command->data.variableDeclaration.value->data.functionCall,
-                                         block->symTable);
-      }
-    }
-    // ASSIGNMENT
-    if (command->type == ASSIGNMENT) {
-      // rename variable
-      symbol = symtableLookup(block->symTable, command->data.assignment.variableName);
-      command->data.assignment.variableName = symbol->uniqueID;
-      // assignement using an expression
-      if (command->data.assignment.value->type == VALUE_EXPRESSION) {
-        expressionUniqueNameResolution(command->data.assignment.value->data.expression,
-                                       block->symTable);
-      } else {  // assignement using a function call
-        functionCallUniqueNameResolution(
-            globalSymTable, command->data.assignment.value->data.functionCall, block->symTable);
-      }
-    }
-    // FUNCTION_CALL
-    if (command->type == FUNCTION_CALL) {
-      functionCallUniqueNameResolution(globalSymTable, command->data.call.functionCall,
-                                       block->symTable);
-    }
-    // RETURN
-    if (command->type == RETURN) {
-      // return using an expression
-      if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
-        expressionUniqueNameResolution(command->data.returnAst.value->data.expression,
-                                       block->symTable);
-      } else {  // return using a function call
-        functionCallUniqueNameResolution(
-            globalSymTable, command->data.returnAst.value->data.functionCall, block->symTable);
-      }
-    }
-    // IF
-    if (command->type == IF) {
-      // rename condition variables
-      expressionUniqueNameResolution(command->data.ifAst.condition, block->symTable);
-      // rename if blocks
-      codeBlockUniqueNameResolution(globalSymTable, command->data.ifAst.thenBlock);
-      codeBlockUniqueNameResolution(globalSymTable, command->data.ifAst.elseBlock);
-    }
-    // WHILE
-    if (command->type == WHILE) {
-      // rename condition variables
-      expressionUniqueNameResolution(command->data.whileAst.condition, block->symTable);
-      // rename code block
-      codeBlockUniqueNameResolution(globalSymTable, command->data.whileAst.codeBlock);
-    }
-    // EXPRESSION
-    if (command->type == EXPRESSION) {
-      expressionUniqueNameResolution(command->data.expressionAst.expression, block->symTable);
-    }
-    command = command->nextCommand;
-  }
-}
-
-// rewrites AST function and variable names to uniqueID from SymTable
-void uniqueNameResolution(AstProgram *ast, SymTable *globalSymTable) {
-  // resolve all functions
-  AstFunction *function = ast->firstFunction;
-  StSymbol *symbol;
-  while (function != NULL) {
-    // rename all function params
-    AstFunctionParameter *param = function->firstParameter;
-    while (param != NULL) {
-      symbol = symtableLookup(function->symTable, param->parameterName);
-      param->parameterName = symbol->uniqueID;
-      param = param->nextParameter;
-    }
-
-    // rename function body
-    if (function->bodyType == VALUE) {
-      // rename expression
-      if (function->body.value->type == VALUE_EXPRESSION) {
-        expressionUniqueNameResolution(function->body.value->data.expression, function->symTable);
-      } else {  // rename function call
-        functionCallUniqueNameResolution(globalSymTable, function->body.value->data.functionCall,
-                                         function->symTable);
-      }
-    } else {  // rename code blocks
-      codeBlockUniqueNameResolution(globalSymTable, function->body.codeBlock);
-    }
-    // next function
-    function = function->nextFunction;
-  }
-}
-
 // main function
 void semanticAnalysis(AstProgram *ast) {
   SymTable *globalSymTable = symtableCreate(NULL);
@@ -976,5 +853,4 @@ void semanticAnalysis(AstProgram *ast) {
   initializeFunctions(ast, globalSymTable);
   checkRecursion(ast, globalSymTable);
   analyzeFunctions(ast, globalSymTable);
-  uniqueNameResolution(ast, globalSymTable);
 }
