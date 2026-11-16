@@ -84,7 +84,6 @@ void astProgramAppendFunction(AstProgram *program, AstFunction *function) {
   if (program->firstFunction == NULL) {
     program->lastFunction = function;
     program->firstFunction = function;
-    function->nextFunction = NULL;
   } else {
     program->lastFunction->nextFunction = function;
     program->lastFunction = function;
