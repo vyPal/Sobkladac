@@ -70,7 +70,7 @@ AstFunction *getAstFunction(AstProgram *ast, const char *functionName) {
     }
     function = function->nextFunction;
   }
-  die(ERR_INTERNAL, 99, "function not found");
+  die(ERR_INTERNAL, 0, "function not found");
 }
 
 // adds built in functions
@@ -167,7 +167,7 @@ size_t getFunctionPosition(AstFunction **functionList, size_t functionCount,
       return i;
     }
   }
-  die(ERR_INTERNAL, 99, "function recursion checking error");
+  die(ERR_INTERNAL, 0, "function recursion checking error");
 }
 
 // checkRecursion() helper function
