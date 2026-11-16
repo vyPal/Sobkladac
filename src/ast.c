@@ -1,7 +1,7 @@
 /**
  * @file ast.c
  * Project: IFJ26 compiler
- * @brief Header file for codegen
+ * @brief Implementation of ast.h
  * @author Jakub Palacky <xpalacj00>
  *
  * Implementation of methods defined in ast.h
