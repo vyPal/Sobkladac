@@ -40,6 +40,7 @@ enum TkType {
   TK_PIPE,       // |
   TK_LPAREN,     // (
   TK_RPAREN,     // )
+  TK_DOT,        // .
   TK_NEWLINE,    // \n
   TK_INDENT,     // int (number of spaces)
   TK_ATMAIN,     // @main
@@ -109,6 +110,8 @@ union Value *getValue(const struct Token *token);
  * @return Line number of the token.
  */
 int getLine(const struct Token *token);
+
+void printToken(const struct Token *token);
 
 // STRING FUNCTIONS
 

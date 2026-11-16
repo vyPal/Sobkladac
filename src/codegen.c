@@ -8,6 +8,7 @@
 #include "ast.h"
 #include "common.h"
 #include "strbuf.h"
+#include "symtable.h"
 
 /// Global counter for name mangling
 static unsigned nameCounter;
@@ -55,15 +56,15 @@ const InstrInfo instrInfo[OP_COUNT] = {
 static bool acceptsOperand(uint8_t accepts, const Operand *arg) {
   switch (arg->type) {
     case OK_VAR:
-      return accepts & A_VAR;
+      return accepts & (unsigned)A_VAR;
     case OK_CONST:
-      if (accepts & A_CONST)
+      if (accepts & (unsigned)A_CONST)
         return true;
-      return (accepts & A_STR) && arg->value.cnst.type == CT_STRING;
+      return (accepts & (unsigned)A_STR) && arg->value.cnst.type == CT_STRING;
     case OK_LABEL:
-      return accepts & A_LABEL;
+      return accepts & (unsigned)A_LABEL;
     case OK_TYPE:
-      return (accepts & A_TYPE) && arg->value.type != CT_NIL;
+      return (accepts & (unsigned)A_TYPE) && arg->value.type != CT_NIL;
     default:
       return false;
   }
@@ -408,8 +409,8 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
 
 /// Lowers a function call, preferredDst specifies the preferred destination operand, note that this
 /// operand does not have to be used, consult the returned info for the actual value location
-ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
-                            const Operand *preferredDst) {
+ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Operand *preferredDst,
+                            SymTable *table) {
   if (strcmp(call->functionName, "print") == 0) {
     ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
     switch (arg.ty) {
@@ -648,45 +649,52 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
     EMIT(code, CALL, labelOp(call->functionName));  // Call function
     EMIT0(code, POPFRAME);                          // Pop frame so that we can access old LF
     EMIT(code, MOVE, dst, varOp(FT_TF, "$ret"));    // Move return value from TF to LF
-    return (ValueInfo){.ty = UNKNOWN, .val = dst};  // BUG: Needs symbol table to resolve data type
+    StSymbol *sym = symtableLookup(table, call->functionName);
+    if (sym == NULL)
+      die(ERR_INTERNAL, 0, "Could not find function %s in symbol table", call->functionName);
+    if (sym->type != ST_FUNCTION)
+      die(ERR_INTERNAL, 0, "Cannot call a variable");
+    return (ValueInfo){.ty = sym->data.function.returnType,
+                       .val = dst};  // BUG: Needs symbol table to resolve data type
   }
 }
 
 /// Lowers a value (either expression or function call)
-ValueInfo lowerValue(StringBuilder *code, AstValue *val, const Operand *preferredDst) {
+ValueInfo lowerValue(StringBuilder *code, AstValue *val, const Operand *preferredDst,
+                     SymTable *table) {
   if (val->type == VALUE_EXPRESSION) {
     return lowerExpression(code, val->data.expression, preferredDst);
   }
-  return lowerFunctionCall(code, val->data.functionCall, preferredDst);
+  return lowerFunctionCall(code, val->data.functionCall, preferredDst, table);
 }
 
 void lowerCodeBlock(StringBuilder *code, AstCodeBlock *block);
 
 /// Lowers a command
-void lowerCommand(StringBuilder *code, AstCommand *cmd) {
+void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
   switch (cmd->type) {
     case VARIABLE_DECLARATION: {
       // Declare and register variable operand for this variable, creates on LF
       Operand var = varOp(FT_LF, cmd->data.variableDeclaration.variableName);
       registerVariable(var);
-      ValueInfo value = lowerValue(code, cmd->data.variableDeclaration.value, &var);
+      ValueInfo value = lowerValue(code, cmd->data.variableDeclaration.value, &var, table);
       storeValue(code, var, value);
       break;
     }
     case ASSIGNMENT: {
       Operand dst = varOp(FT_LF, cmd->data.assignment.variableName);
-      ValueInfo value = lowerValue(code, cmd->data.assignment.value, &dst);
+      ValueInfo value = lowerValue(code, cmd->data.assignment.value, &dst, table);
       storeValue(code, dst, value);
       break;
     }
     case FUNCTION_CALL:
       // Could return value, but this value is ignored
-      lowerFunctionCall(code, cmd->data.call.functionCall, NULL);
+      lowerFunctionCall(code, cmd->data.call.functionCall, NULL, table);
       break;
     case RETURN: {
       // Lower value and store or copy it to the return variable
       Operand ret = varOp(FT_LF, "$ret");
-      ValueInfo value = lowerValue(code, cmd->data.returnAst.value, &ret);
+      ValueInfo value = lowerValue(code, cmd->data.returnAst.value, &ret, table);
       storeValue(code, ret, value);
       EMIT0(code, RETURN);
       break;
@@ -722,7 +730,7 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd) {
 void lowerCodeBlock(StringBuilder *code, AstCodeBlock *block) {
   AstCommand *cmd = block->firstCommand;
   while (cmd != NULL) {
-    lowerCommand(code, cmd);
+    lowerCommand(code, cmd, block->symTable);
     cmd = cmd->nextCommand;
   }
 }
@@ -752,7 +760,7 @@ void lowerFunction(StringBuilder *code, AstFunction *func) {
   registry.count = 0;
   if (func->bodyType == VALUE) {
     Operand ret = varOp(FT_LF, "$ret");
-    ValueInfo value = lowerValue(&internal, func->body.value, &ret);
+    ValueInfo value = lowerValue(&internal, func->body.value, &ret, func->symTable);
     storeValue(&internal, ret, value);
     EMIT0(&internal, RETURN);
     for (size_t i = 0; i < registry.count; i++) {

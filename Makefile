@@ -5,7 +5,7 @@ OBJ_DIR := obj
 CC := gcc
 STD := -std=c11
 CFLAGS := $(STD) -Wall -Wextra -pedantic -O2 -I$(SRC_DIR)
-LDFLAGS :=
+LDFLAGS := -lm
 TARGET := ifj26
 
 SRCS := $(wildcard $(SRC_DIR)/*.c)

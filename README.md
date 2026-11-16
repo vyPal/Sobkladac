@@ -61,7 +61,7 @@ Reallocates `ptr` from `old_size` bytes to `new_size` bytes, if `ptr` is `NULL`
 `new_size` is allocated using `arena_alloc()`
 
 > [!NOTE]
-> `ptr` should not be used after the reallocation
+> `ptr` must not be used after the reallocation
 
 > [!WARNING]
 > `old_size` must be specified and **must** be equal to the current size of

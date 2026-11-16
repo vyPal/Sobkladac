@@ -78,7 +78,7 @@ void *arenaZalloc(size_t n);
  * @return Pointer to newly allocated memory or original pointer `p`
  * @note Function will never return `NULL`, if the allocation fails, the program will exit
  * @note If you plan to reallocate later, keep current size saved somewhere
- * @note Keeps `min(o,n)` bytes, old pointer shouldn't be used afterwards
+ * @note Keeps `min(o,n)` bytes, old pointer must not be used afterwards
  * @warning Passing an inaccurate value of `o` may result in undefined behavior
  */
 void *arenaRealloc(void *p, size_t o, size_t n);
