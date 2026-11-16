@@ -6,6 +6,8 @@
 #include "syn-analyzator-top-down.h"
 
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "common.h"
 
@@ -26,17 +28,35 @@ bool codeBlock(LinkedTlist *tokenList);
 bool LinesTail(LinkedTlist *tokenList);
 bool Line(LinkedTlist *tokenList);
 
+bool simpleTail(LinkedTlist *tokenList);
+bool simpleStatement(LinkedTlist *tokenList);
+bool assignment(LinkedTlist *tokenList);
+bool functionCall(LinkedTlist *tokenList);
+bool variableDeclaration(LinkedTlist *tokenList);
+bool returnStatement(LinkedTlist *tokenList);
+bool RValue(LinkedTlist *tokenList);
+bool args(LinkedTlist *tokenList);
+bool ifStatement(LinkedTlist *tokenList);
+bool whileStatement(LinkedTlist *tokenList);
+
+/// function will be implemented in different file, because it is more complex and will be
+/// implemented as a precedence parser
+bool expression(LinkedTlist *tokenList) {
+  return true;  // Only temporary
+}
+
 bool prolog(LinkedTlist *tokenList) {
   Token *importT = popToken(tokenList);
   Token *identT = popToken(tokenList);
   Token *dotT = popToken(tokenList);
   Token *multiplyT = popToken(tokenList);
   Token *newlineT = popToken(tokenList);
-  if (getTkType(importT) == TK_KW_IMPORT &&                                       // import
-      getTkType(identT) == TK_IDENT && strcmp(getValue(identT), "ifj26") == 0 &&  // ifj26
-      getTkType(dotT) == TK_DOT &&                                                //.
-      getTkType(multiplyT) == TK_MULTIPLY &&                                      //*
-      getTkType(newlineT) == TK_NEWLINE                                           // newline
+  if (getTkType(importT) == TK_KW_IMPORT &&  // import
+      getTkType(identT) == TK_IDENT &&
+      strcmp(getValue(identT)->s->string, "ifj26") == 0 &&  // ifj26
+      getTkType(dotT) == TK_DOT &&                          //.
+      getTkType(multiplyT) == TK_MULTIPLY &&                //*
+      getTkType(newlineT) == TK_NEWLINE                     // newline
   ) {
     return true;  // together it matches line: import ifj26.*
   } else
@@ -57,7 +77,7 @@ bool funDefsTail(LinkedTlist *tokenList, AstProgram *asTree) {
     return true;  // epsilon
 }
 
-bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {  // TODO
+bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {
   bool isMain = mainAnnot(tokenList);
   Token *defTK = popToken(tokenList);
   Token *idTK = popToken(tokenList);
@@ -142,6 +162,7 @@ bool funBody(LinkedTlist *tokenList) {
     pushToken(token, tokenList);
     return RValue(tokenList);
   }
+  return false;
 }
 
 bool params(LinkedTlist *tokenList) {
@@ -246,10 +267,117 @@ bool LinesTail(LinkedTlist *tokenList) {
 }
 
 bool Line(LinkedTlist *tokenList) {
+  Token *token = lookAheadToken(tokenList, 0);
+  if (token == NULL) {
+    fprintf(stderr, "Unexpected end of file");
+    return false;
+  }
+  if (getTkType(token) == TK_KW_IF) {
+    return ifStatement(tokenList);
+  } else if (getTkType(token) == TK_KW_WHILE) {
+    return whileStatement(tokenList);
+  } else if (simpleStatement(tokenList)) {
+    if (simpleTail(tokenList)) {
+      token = popToken(tokenList);
+      if (getTkType(token) == TK_NEWLINE) {
+        return true;
+      }
+    }
+  }
+  fprintf(stderr, "Invalid statement");
+  return false;
+}
+
+bool simpleTail(LinkedTlist *tokenList) {
+  Token *token = popToken(tokenList);
+  if (getTkType(token) == TK_SEMICOLON) {
+    if (simpleStatement(tokenList)) {
+      return simpleTail(tokenList);
+    }
+  } else {
+    pushToken(token, tokenList);
+    return true;  // epsilon
+  }
+  return false;  // No statement after semicolon
+}
+
+bool simpleStatement(LinkedTlist *tokenList) {
+  Token *token = lookAheadToken(tokenList, 0);
+  if (token == NULL) {
+    fprintf(stderr, "Unexpected end of file");
+    return false;
+  }
+  int tokenType = getTkType(token);
+  if (tokenType == TK_IDENT) {
+    return assignment(tokenList) || functionCall(tokenList) ||
+           expression(tokenList);  // SAFE - if one fails, the other will be tried (mostly they will
+                                   // fail, if it was supposed to be e.g. function call)
+  } else if (tokenType == TK_KW_RETURN) {
+    return returnStatement(tokenList);
+  } else if (tokenType == TK_KW_VAL || tokenType == TK_KW_VAR) {
+    return variableDeclaration(tokenList);
+  } else {
+    return expression(tokenList);
+  }
+}
+
+bool assignment(LinkedTlist *tokenList) {
+  Token *token = popToken(tokenList);
+  if (getTkType(token) == TK_IDENT) {
+    token = popToken(tokenList);
+    if (getTkType(token) == TK_ASSIGN) {
+      return RValue(tokenList);
+    } else {
+      fprintf(stderr, "Missing '=' in assignment");
+      return false;
+    }
+  }
+  return false;
+}
+
+bool functionCall(LinkedTlist *tokenList) {
+  Token *token = popToken(tokenList);
+  if (getTkType(token) == TK_IDENT) {
+    token = popToken(tokenList);
+    if (getTkType(token) == TK_LPAREN) {
+      if (args(tokenList)) {
+        token = popToken(tokenList);
+        if (getTkType(token) == TK_RPAREN) {
+          return true;
+        } else {
+          fprintf(stderr, "Missing ')' in function call");
+          return false;
+        }
+      }
+    } else {
+      fprintf(stderr, "Missing '(' in function call");
+      return false;
+    }
+  }
+  return false;
+}
+
+bool variableDeclaration(LinkedTlist *tokenList) {
+  return true;  // TODO
+}
+
+bool returnStatement(LinkedTlist *tokenList) {
   return true;  // TODO
 }
 
 bool RValue(LinkedTlist *tokenList) {
+  return true;  // TODO
+}
+
+bool args(LinkedTlist *tokenList) {
+  return true;  // TODO
+}
+
+bool ifStatement(LinkedTlist *tokenList) {
+  return true;  // TODO
+}
+
+bool whileStatement(LinkedTlist *tokenList) {
   return true;  // TODO
 }
 
