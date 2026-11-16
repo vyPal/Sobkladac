@@ -638,7 +638,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
     EMIT(code, CALL, labelOp(call->functionName));  // Call function
     EMIT0(code, POPFRAME);                          // Pop frame so that we can access old LF
     EMIT(code, MOVE, dst, varOp(FT_TF, "$ret"));    // Move return value from TF to LF
-    StSymbol *sym = symtableLookup(table, call->functionName);
+    const StSymbol *sym = symtableLookup(table, call->functionName);
     if (sym == NULL)
       die(ERR_INTERNAL, 0, "Could not find function %s in symbol table", call->functionName);
     if (sym->type != ST_FUNCTION)
