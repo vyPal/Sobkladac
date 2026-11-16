@@ -88,9 +88,7 @@ void initializeFunctions(const AstProgram *ast, SymTable *globalSymTable) {
 
   insertFunctionSymTable(globalSymTable, "readDouble", 0, 0, DOUBLE, NULL, 0, true, false);
 
-  AstDataType *toStrParams = arenaAlloc(sizeof(AstDataType));
-  toStrParams[0] = ANY;
-  insertFunctionSymTable(globalSymTable, "toStr", 0, 0, STRING, toStrParams, 1, true, false);
+  insertFunctionSymTable(globalSymTable, "toStr", 0, 0, STRING, printParams, 1, true, false);
 
   AstDataType *toIntParams = arenaAlloc(sizeof(AstDataType));
   toIntParams[0] = DOUBLE;
