@@ -9,8 +9,67 @@
  *  a new list of tokens with proper indentation and dedentation.
  */
 
+#include <string.h>
+
 #include "common.h"
 #include "syn-analyzator-top-down.h"
+#include "token.h"
+
+/// @brief Checks if a comma is trailing
+/// @param in
+/// @return true if the comma is trailing, false otherwise
+bool isTrailingComma(const LinkedTlist *in) {
+  bool sawNewline = false;
+  Token *token;
+  for (int i = 0; (token = lookAheadToken(in, i)) != NULL; i++) {
+    enum TkType type = getTkType(token);
+    if (type == TK_NEWLINE) {
+      sawNewline = true;
+      continue;
+    }
+    if (type == TK_INDENT)
+      continue;
+    return type == TK_RPAREN && sawNewline;
+  }
+  return false;
+}
+
+/// @brief Converts an id token to a keyword token if it matches a known keyword
+/// @param tk The token to convert
+/// @return The converted token
+Token *toKeyword(Token *tk) {
+  char *value = getValue(tk)->s->string;
+  int line = getLine(tk);
+  if (strcmp(value, "import") == 0)
+    tk = newToken(TK_KW_IMPORT, line);
+  else if (strcmp(value, "Int") == 0)
+    tk = newToken(TK_KW_INT, line);
+  else if (strcmp(value, "Double") == 0)
+    tk = newToken(TK_KW_DOUBLE, line);
+  else if (strcmp(value, "String") == 0)
+    tk = newToken(TK_KW_STRING, line);
+  else if (strcmp(value, "Unit") == 0)
+    tk = newToken(TK_KW_UNIT, line);
+  else if (strcmp(value, "def") == 0)
+    tk = newToken(TK_KW_DEF, line);
+  else if (strcmp(value, "return") == 0)
+    tk = newToken(TK_KW_RETURN, line);
+  else if (strcmp(value, "if") == 0)
+    tk = newToken(TK_KW_IF, line);
+  else if (strcmp(value, "then") == 0)
+    tk = newToken(TK_KW_THEN, line);
+  else if (strcmp(value, "else") == 0)
+    tk = newToken(TK_KW_ELSE, line);
+  else if (strcmp(value, "while") == 0)
+    tk = newToken(TK_KW_WHILE, line);
+  else if (strcmp(value, "do") == 0)
+    tk = newToken(TK_KW_DO, line);
+  else if (strcmp(value, "val") == 0)
+    tk = newToken(TK_KW_VAL, line);
+  else if (strcmp(value, "var") == 0)
+    tk = newToken(TK_KW_VAR, line);
+  return tk;
+}
 
 LinkedTlist *layoutFilter(LinkedTlist *in) {
   LinkedTlist *out = newTlist();
