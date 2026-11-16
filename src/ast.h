@@ -283,19 +283,19 @@ AstValue *astValueFromExpr(AstExpression *expression);
 AstValue *astValueFromFunctionCall(AstFunctionCall *functionCall);
 
 /// Appends function to program's list of functions
-/// @note Supplying a NULL program kills the compiler
+/// @note Supplying a NULL program or function kills the compiler
 void astProgramAppendFunction(AstProgram *program, AstFunction *function);
 
 //// Appends parameter to function's paramter list
-/// @note Supplying a NULL function kills the compiler
+/// @note Supplying a NULL function or parameter kills the compiler
 void astFunctionAppendParameter(AstFunction *function, AstFunctionParameter *parameter);
 
 /// Appends commands to code block's command list
-/// @note Supplying a NULL block kills the compiler
+/// @note Supplying a NULL block or command kills the compiler
 void astBlockAppendCommand(AstCodeBlock *block, AstCommand *command);
 
 /// Appends argument to function call's list of arguments
-/// @note Supplying a NULL call kills the compiler
+/// @note Supplying a NULL call or argument kills the compiler
 void astCallAppendArgument(AstFunctionCall *call, AstFunctionCallArgument *argument);
 
 #endif  // AST_H

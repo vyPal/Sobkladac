@@ -80,6 +80,8 @@ AstValue *astValueFromFunctionCall(AstFunctionCall *functionCall) {
 void astProgramAppendFunction(AstProgram *program, AstFunction *function) {
   if (program == NULL)
     die(ERR_INTERNAL, 0, "Unable to append function to NULL program");
+  if (function == NULL)
+    die(ERR_INTERNAL, 0, "Unable to append NULL function to program");
 
   if (program->firstFunction == NULL) {
     program->lastFunction = function;
@@ -93,6 +95,8 @@ void astProgramAppendFunction(AstProgram *program, AstFunction *function) {
 void astFunctionAppendParameter(AstFunction *function, AstFunctionParameter *parameter) {
   if (function == NULL)
     die(ERR_INTERNAL, 0, "Unable to append parameter to NULL function");
+  if (parameter == NULL)
+    die(ERR_INTERNAL, 0, "Unable to append NULL parameter to function");
 
   if (function->firstParameter == NULL) {
     function->firstParameter = parameter;
@@ -106,6 +110,8 @@ void astFunctionAppendParameter(AstFunction *function, AstFunctionParameter *par
 void astBlockAppendCommand(AstCodeBlock *block, AstCommand *command) {
   if (block == NULL)
     die(ERR_INTERNAL, 0, "Unable to append command to NULL block");
+  if (command == NULL)
+    die(ERR_INTERNAL, 0, "Unable to append NULL command to block");
 
   if (block->firstCommand == NULL) {
     block->firstCommand = command;
@@ -119,6 +125,8 @@ void astBlockAppendCommand(AstCodeBlock *block, AstCommand *command) {
 void astCallAppendArgument(AstFunctionCall *call, AstFunctionCallArgument *argument) {
   if (call == NULL)
     die(ERR_INTERNAL, 0, "Unable to append argument to NULL call");
+  if (argument == NULL)
+    die(ERR_INTERNAL, 0, "Unable to append NULL argument to call");
 
   if (call->firstArgument == NULL) {
     call->firstArgument = argument;
