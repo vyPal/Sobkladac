@@ -14,7 +14,7 @@
 #include "common.h"
 #include "symtable.h"
 
-// insert function into symTable and assign uniqueID
+// insert function into symTable
 // return FALSE if function already exists
 bool insertFunctionSymTable(SymTable *symTable, const char *name, unsigned line, unsigned column,
                             AstDataType returnType, AstDataType *paramTypes, size_t paramCount,
@@ -23,7 +23,6 @@ bool insertFunctionSymTable(SymTable *symTable, const char *name, unsigned line,
   symbol->type = ST_FUNCTION;
   symbol->declarationLocation.line = line;
   symbol->declarationLocation.column = column;
-  symbol->uniqueID = newVar(name);  // guarantees unique output from a string
   symbol->data.function.returnType = returnType;
   symbol->data.function.parameterTypes = paramTypes;
   symbol->data.function.parameterCount = paramCount;
@@ -859,10 +858,6 @@ void expressionUniqueNameResolution(AstExpression *expression, SymTable *symTabl
 // uniqueNameResolution() helper function
 void functionCallUniqueNameResolution(SymTable *globalSymTable, AstFunctionCall *call,
                                       SymTable *symTable) {
-  // rename call
-  StSymbol *symbol = symtableLookup(globalSymTable, call->functionName);
-  call->functionName = symbol->uniqueID;
-
   // rename all arguments
   AstFunctionCallArgument *argument = call->firstArgument;
   while (argument != NULL) {
@@ -951,10 +946,6 @@ void uniqueNameResolution(AstProgram *ast, SymTable *globalSymTable) {
   AstFunction *function = ast->firstFunction;
   StSymbol *symbol;
   while (function != NULL) {
-    // rename function
-    symbol = symtableLookup(globalSymTable, function->functionName);
-    function->functionName = symbol->uniqueID;
-
     // rename all function params
     AstFunctionParameter *param = function->firstParameter;
     while (param != NULL) {
