@@ -529,9 +529,34 @@ bool ifStatement(LinkedTlist *tokenList) {
 }
 
 bool whileStatement(LinkedTlist *tokenList) {
-  Token *token = popToken(tokenList);
-  pushToken(token, tokenList);
-  return true;  // TODO
+  Token *token = lookAheadToken(tokenList, 0);
+  int tkType = getTkType(token);
+  if (tkType != TK_KW_WHILE) {
+    die(ERR_SYNTAX, getLine(token), "Missing 'while' in while statement");
+  }
+  if (expression(tokenList)) {
+    token = popToken(tokenList);
+    if (getTkType(token) != TK_KW_DO) {
+      die(ERR_SYNTAX, getLine(token), "Missing 'do' in while statement");
+    }
+    token = popToken(tokenList);
+    if (getTkType(token) != TK_NEWLINE) {
+      die(ERR_SYNTAX, getLine(token), "Missing '\\n' in while statement");
+    }
+    token = popToken(tokenList);
+    if (getTkType(token) != TK_INDENT) {
+      die(ERR_SYNTAX, getLine(token), "Missing indentation in while statement");
+    }
+    if (codeBlock(tokenList)) {
+      token = popToken(tokenList);
+      if (getTkType(token) != TK_DEDENT) {
+        die(ERR_SYNTAX, getLine(token),
+            "Missing dedentation (inversion of indentation) in while statement");
+      }
+      return true;
+    }
+  }
+  return false;
 }
 
 AstExpressionType lit(int tkType) {
