@@ -33,15 +33,23 @@ bool simpleStatement(LinkedTlist *tokenList);
 bool assignment(LinkedTlist *tokenList);
 bool functionCall(LinkedTlist *tokenList);
 bool variableDeclaration(LinkedTlist *tokenList);
+bool varKW(LinkedTlist *tokenList, bool *isMutable);
 bool returnStatement(LinkedTlist *tokenList);
+bool returnTail(LinkedTlist *tokenList);
 bool RValue(LinkedTlist *tokenList);
 bool args(LinkedTlist *tokenList);
+bool argsTail(LinkedTlist *tokenList);
+bool term(LinkedTlist *tokenList);
 bool ifStatement(LinkedTlist *tokenList);
 bool whileStatement(LinkedTlist *tokenList);
+
+AstExpressionType lit(int tkType);
 
 /// function will be implemented in different file, because it is more complex and will be
 /// implemented as a precedence parser
 bool expression(LinkedTlist *tokenList) {
+  Token *token = popToken(tokenList);
+  pushToken(token, tokenList);
   return true;  // Only temporary
 }
 
@@ -117,7 +125,6 @@ bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {
       }
     }
   }
-  astFreeProgram(asTree);
   return false;
 }
 
@@ -309,9 +316,14 @@ bool simpleStatement(LinkedTlist *tokenList) {
   }
   int tokenType = getTkType(token);
   if (tokenType == TK_IDENT) {
-    return assignment(tokenList) || functionCall(tokenList) ||
-           expression(tokenList);  // SAFE - if one fails, the other will be tried (mostly they will
-                                   // fail, if it was supposed to be e.g. function call)
+    Token *nextToken = lookAheadToken(tokenList, 1);
+    if (nextToken != NULL && getTkType(nextToken) == TK_ASSIGN) {
+      return assignment(tokenList);
+    }
+    if (nextToken != NULL && getTkType(nextToken) == TK_LPAREN) {
+      return functionCall(tokenList);
+    }
+    return expression(tokenList);
   } else if (tokenType == TK_KW_RETURN) {
     return returnStatement(tokenList);
   } else if (tokenType == TK_KW_VAL || tokenType == TK_KW_VAR) {
@@ -358,27 +370,181 @@ bool functionCall(LinkedTlist *tokenList) {
 }
 
 bool variableDeclaration(LinkedTlist *tokenList) {
-  return true;  // TODO
+  bool isMutable = false;
+  if (varKW(tokenList, &isMutable)) {
+    popToken(tokenList);  // pop the found var/val
+    Token *token = popToken(tokenList);
+    if (getTkType(token) == TK_IDENT) {
+      AstDataType dtype = optType(tokenList);
+      if (dtype == UNKNOWN) {
+        fprintf(stderr, "Incorrect variable type");
+        return false;
+      }
+      token = popToken(tokenList);
+      if (getTkType(token) == TK_ASSIGN) {
+        return RValue(tokenList);
+      } else {
+        die(ERR_SYNTAX, getLine(token), "Missing '=' in function call");
+      }
+    } else {
+      die(ERR_SYNTAX, getLine(token), "Missing identifier in function call");
+    }
+  }
+  return false;  // it didn't start with var/val
+}
+
+bool varKW(LinkedTlist *tokenList, bool *isMutable) {
+  Token *token = lookAheadToken(tokenList, 0);
+  int tkType = getTkType(token);
+  if (tkType == TK_KW_VAR)
+    *isMutable = true;
+  else if (tkType == TK_KW_VAL)
+    *isMutable = false;
+  else
+    return false;
+  return true;
 }
 
 bool returnStatement(LinkedTlist *tokenList) {
-  return true;  // TODO
+  Token *token = popToken(tokenList);
+  if (getTkType(token) == TK_KW_RETURN) {
+    return returnTail(tokenList);
+  }
+  return false;
+}
+
+bool returnTail(LinkedTlist *tokenList) {
+  return RValue(tokenList) || true;  // epsilon
 }
 
 bool RValue(LinkedTlist *tokenList) {
-  return true;  // TODO
+  Token *token = lookAheadToken(tokenList, 0);
+  if (token == NULL) {
+    fprintf(stderr, "Unexpected end of file");
+    return false;
+  }
+  int tokenType = getTkType(token);
+  if (tokenType == TK_IDENT) {
+    Token *nextToken = lookAheadToken(tokenList, 1);
+    if (nextToken != NULL && getTkType(nextToken) == TK_LPAREN) {
+      return functionCall(tokenList);
+    }
+  }
+  return expression(tokenList);
 }
 
 bool args(LinkedTlist *tokenList) {
-  return true;  // TODO
+  if (term(tokenList)) {
+    return argsTail(tokenList);
+  } else {
+    return true;  // epsilon
+  }
+}
+
+bool argsTail(LinkedTlist *tokenList) {
+  Token *token = lookAheadToken(tokenList, 0);
+  if (getTkType(token) == TK_COMMA) {
+    popToken(tokenList);
+    if (term(tokenList)) {
+      return argsTail(tokenList);
+    }
+  } else {
+    return true;  // epsilon
+  }
+  return false;  // term failed after comma
+}
+
+bool term(LinkedTlist *tokenList) {
+  AstExpressionType literal = BINARY;  // default wrong option, because can't use macro
+  Token *token = lookAheadToken(tokenList, 0);
+  int tkType = getTkType(token);
+  if (tkType == TK_IDENT) {
+    popToken(tokenList);
+    return true;
+  } else if ((literal = lit(tkType)) != BINARY) {
+    popToken(tokenList);
+    return true;
+  } else if (tkType == TK_LPAREN) {
+    popToken(tokenList);
+    token = popToken(tokenList);
+    if (getTkType(token) == TK_RPAREN) {  // Confirmed: UNIT_LITERAL
+      literal = UNIT_LITERAL;
+      return true;
+    } else {
+      die(ERR_SYNTAX, getLine(token), "Missing ')' for UNIT_LITERAL");
+      return false;
+    }
+  }
+  return false;
 }
 
 bool ifStatement(LinkedTlist *tokenList) {
-  return true;  // TODO
+  Token *token = lookAheadToken(tokenList, 0);
+  int tkType = getTkType(token);
+  if (tkType != TK_KW_IF) {
+    die(ERR_SYNTAX, getLine(token), "Missing 'if' in if statement");
+  }
+  popToken(tokenList);
+  if (expression(tokenList)) {
+    token = popToken(tokenList);
+    if (getTkType(token) != TK_KW_THEN) {
+      die(ERR_SYNTAX, getLine(token), "Missing 'then' in if statement");
+    }
+    token = popToken(tokenList);
+    if (getTkType(token) != TK_NEWLINE) {
+      die(ERR_SYNTAX, getLine(token), "Missing '\\n' in if statement");
+    }
+    token = popToken(tokenList);
+    if (getTkType(token) != TK_INDENT) {
+      die(ERR_SYNTAX, getLine(token), "Missing indentation in if statement");
+    }
+    if (codeBlock(tokenList)) {
+      token = popToken(tokenList);
+      if (getTkType(token) != TK_DEDENT) {
+        die(ERR_SYNTAX, getLine(token),
+            "Missing dedentation (inversion of indentation) in if statement");
+      }
+      token = popToken(tokenList);
+      if (getTkType(token) != TK_KW_ELSE) {
+        die(ERR_SYNTAX, getLine(token), "Missing 'else' in if statement");
+      }
+      token = popToken(tokenList);
+      if (getTkType(token) != TK_NEWLINE) {
+        die(ERR_SYNTAX, getLine(token), "Missing '\\n' in else branch");
+      }
+      token = popToken(tokenList);
+      if (getTkType(token) != TK_INDENT) {
+        die(ERR_SYNTAX, getLine(token), "Missing indentation in else branch");
+      }
+      if (codeBlock(tokenList)) {
+        token = popToken(tokenList);
+        if (getTkType(token) != TK_DEDENT) {
+          die(ERR_SYNTAX, getLine(token), "Missing dedentation in else branch");
+        }
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 bool whileStatement(LinkedTlist *tokenList) {
+  Token *token = popToken(tokenList);
+  pushToken(token, tokenList);
   return true;  // TODO
+}
+
+AstExpressionType lit(int tkType) {
+  switch (tkType) {
+    case TK_DECIMAL:
+      return DOUBLE_LITERAL;
+    case TK_NUMBER:
+      return INT_LITERAL;
+    case TK_STRING:
+      return STRING_LITERAL;
+    default:
+      return BINARY;  // default wrong option
+  }
 }
 
 AstProgram *topDown(struct LinkedTlist *tokenList) {
