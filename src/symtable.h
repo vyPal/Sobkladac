@@ -11,6 +11,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 
 #include "ast.h"
 #include "hashtable.h"
@@ -37,6 +38,7 @@ typedef struct {
 typedef struct {
   StSymbolType type;  // variable or function
   AstLocation declarationLocation;
+  char *uniqueID;
 
   union {
     StVariableSymbol variable;
@@ -54,12 +56,15 @@ typedef struct SymTable {
 SymTable *symtableCreate(SymTable *parent);
 
 /// @brief Look up a symbol in the current scope and its parent scopes.
+/// returns NULL if symbol doesnt exist
 StSymbol *symtableLookup(SymTable *table, const char *symbolName);
 
 /// @brief Look up a symbol in the current scope.
+/// returns NULL if symbol doesnt exist
 StSymbol *symtableLookupLocal(SymTable *table, const char *symbolName);
 
 /// @brief Insert a new symbol inside a Symbol table.
+/// returns FALSE if symbol already exists
 bool symtableInsertSymbol(SymTable *table, const char *symbolName, StSymbol *symbol);
 
 #endif  // SYMTABLE_H

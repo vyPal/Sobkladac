@@ -27,6 +27,7 @@
 #include "ast.h"
 #include "codegen.h"
 #include "common.h"
+#include "symtable.h"
 #include "tst.h"
 
 // AI-BEGIN [claude-opus-5-5, Claude Code]
@@ -73,6 +74,56 @@ static char *readWholeFile(FILE *file) {
   return content;
 }
 
+// ============================================================
+// Symbol tables
+// ============================================================
+
+static void attachToBlock(AstCodeBlock *block, SymTable *table);
+
+static void attachToCommands(AstCommand *cmd, SymTable *table) {
+  for (; cmd != NULL; cmd = cmd->nextCommand) {
+    if (cmd->type == IF) {
+      attachToBlock(cmd->data.ifAst.thenBlock, table);
+      attachToBlock(cmd->data.ifAst.elseBlock, table);
+    } else if (cmd->type == WHILE) {
+      attachToBlock(cmd->data.whileAst.codeBlock, table);
+    }
+  }
+}
+
+static void attachToBlock(AstCodeBlock *block, SymTable *table) {
+  if (block == NULL)
+    return;
+
+  block->symTable = table;
+  attachToCommands(block->firstCommand, table);
+}
+
+/// The tests build their ASTs by hand and skip semantic analysis, so this
+/// stands in for it: every user function is registered with its return type in
+/// one global table, which is then attached to every function and code block.
+/// Codegen only looks functions up, so a single scope is enough
+static void attachSymbolTables(AstProgram *program) {
+  SymTable *global = symtableCreate(NULL);
+
+  for (AstFunction *func = program->firstFunction; func != NULL; func = func->nextFunction) {
+    StSymbol *symbol = arenaZalloc(sizeof(*symbol));
+    symbol->type = ST_FUNCTION;
+    symbol->declarationLocation = func->location;
+    symbol->data.function.returnType = func->resolvedReturnType;
+    symbol->data.function.isMain = func->isMain;
+
+    if (!symtableInsertSymbol(global, func->functionName, symbol))
+      die(ERR_INTERNAL, 0, "test defines function %s twice", func->functionName);
+  }
+
+  for (AstFunction *func = program->firstFunction; func != NULL; func = func->nextFunction) {
+    func->symTable = global;
+    if (func->bodyType == CODE_BLOCK)
+      attachToBlock(func->body.codeBlock, global);
+  }
+}
+
 /// Generates code in a child process, because generateCode() can die() or
 /// crash, and because its global state would otherwise keep pointing into the
 /// arena after arenaCleanup()
@@ -81,6 +132,7 @@ static bool generateInto(AstProgram program, FILE *file) {
 
   if (pid == 0) {
     alarm(TIMEOUT_SECONDS);
+    attachSymbolTables(&program);
 
     bool written = fputs(generateCode(program), file) >= 0 && fflush(file) == 0;
     _exit(written ? EXIT_SUCCESS : EXIT_FAILURE);
