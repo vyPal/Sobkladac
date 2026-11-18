@@ -12,6 +12,7 @@
 #define TOP_DOWN_H
 
 #include "ast.h"
+#include "syn-analyzator-bottom-up.h"
 #include "token.h"
 
 AstProgram *topDown(struct LinkedTlist *tokenList);

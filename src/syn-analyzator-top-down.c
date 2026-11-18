@@ -6,6 +6,7 @@
 #include "syn-analyzator-top-down.h"
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,8 +26,8 @@ AstDataType optType(LinkedTlist *tokenList);
 AstDataType dType(LinkedTlist *tokenList);
 
 bool codeBlock(LinkedTlist *tokenList);
-bool LinesTail(LinkedTlist *tokenList);
-bool Line(LinkedTlist *tokenList);
+bool linesTail(LinkedTlist *tokenList);
+bool line(LinkedTlist *tokenList);
 
 bool simpleTail(LinkedTlist *tokenList);
 bool simpleStatement(LinkedTlist *tokenList);
@@ -36,7 +37,7 @@ bool variableDeclaration(LinkedTlist *tokenList);
 bool varKW(LinkedTlist *tokenList, bool *isMutable);
 bool returnStatement(LinkedTlist *tokenList);
 bool returnTail(LinkedTlist *tokenList);
-bool RValue(LinkedTlist *tokenList);
+bool rValue(LinkedTlist *tokenList);
 bool args(LinkedTlist *tokenList);
 bool argsTail(LinkedTlist *tokenList);
 bool term(LinkedTlist *tokenList);
@@ -44,14 +45,6 @@ bool ifStatement(LinkedTlist *tokenList);
 bool whileStatement(LinkedTlist *tokenList);
 
 AstExpressionType lit(int tkType);
-
-/// function will be implemented in different file, because it is more complex and will be
-/// implemented as a precedence parser
-bool expression(LinkedTlist *tokenList) {
-  Token *token = popToken(tokenList);
-  pushToken(token, tokenList);
-  return true;  // Only temporary
-}
 
 bool prolog(LinkedTlist *tokenList) {
   Token *importT = popToken(tokenList);
@@ -167,7 +160,7 @@ bool funBody(LinkedTlist *tokenList) {
     }
   } else {
     pushToken(token, tokenList);
-    return RValue(tokenList);
+    return rValue(tokenList);
   }
   return false;
 }
@@ -258,25 +251,25 @@ AstDataType dType(LinkedTlist *tokenList) {
 // ---- Statements ----
 
 bool codeBlock(LinkedTlist *tokenList) {
-  if (Line(tokenList)) {
-    return LinesTail(tokenList);
+  if (line(tokenList)) {
+    return linesTail(tokenList);
   } else {
     return false;  // no lines in code block
   }
 }
 
-bool LinesTail(LinkedTlist *tokenList) {
-  if (Line(tokenList)) {
-    return LinesTail(tokenList);
+bool linesTail(LinkedTlist *tokenList) {
+  if (line(tokenList)) {
+    return linesTail(tokenList);
   } else {
     return true;  // epsilon
   }
 }
 
-bool Line(LinkedTlist *tokenList) {
+bool line(LinkedTlist *tokenList) {
   Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL) {
-    fprintf(stderr, "Unexpected end of file");
+    die(ERR_SYNTAX, 999, "Unexpected end of file");
     return false;
   }
   if (getTkType(token) == TK_KW_IF) {
@@ -338,7 +331,7 @@ bool assignment(LinkedTlist *tokenList) {
   if (getTkType(token) == TK_IDENT) {
     token = popToken(tokenList);
     if (getTkType(token) == TK_ASSIGN) {
-      return RValue(tokenList);
+      return rValue(tokenList);
     } else {
       fprintf(stderr, "Missing '=' in assignment");
       return false;
@@ -382,7 +375,7 @@ bool variableDeclaration(LinkedTlist *tokenList) {
       }
       token = popToken(tokenList);
       if (getTkType(token) == TK_ASSIGN) {
-        return RValue(tokenList);
+        return rValue(tokenList);
       } else {
         die(ERR_SYNTAX, getLine(token), "Missing '=' in function call");
       }
@@ -414,13 +407,13 @@ bool returnStatement(LinkedTlist *tokenList) {
 }
 
 bool returnTail(LinkedTlist *tokenList) {
-  return RValue(tokenList) || true;  // epsilon
+  return rValue(tokenList) || true;  // epsilon
 }
 
-bool RValue(LinkedTlist *tokenList) {
+bool rValue(LinkedTlist *tokenList) {
   Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL) {
-    fprintf(stderr, "Unexpected end of file");
+    die(ERR_SYNTAX, 999, "Unexpected end of file");
     return false;
   }
   int tokenType = getTkType(token);
@@ -458,10 +451,11 @@ bool term(LinkedTlist *tokenList) {
   AstExpressionType literal = BINARY;  // default wrong option, because can't use macro
   Token *token = lookAheadToken(tokenList, 0);
   int tkType = getTkType(token);
+  literal = lit(tkType);
   if (tkType == TK_IDENT) {
     popToken(tokenList);
     return true;
-  } else if ((literal = lit(tkType)) != BINARY) {
+  } else if (literal != BINARY) {
     popToken(tokenList);
     return true;
   } else if (tkType == TK_LPAREN) {
@@ -583,7 +577,7 @@ AstProgram *topDown(struct LinkedTlist *tokenList) {
   Token *lastToken = popToken(tokenList);
   result = result && (getTkType(lastToken) == TK_EOF);
   if (!result) {
-    astFreeProgram(asTree);
+    free(asTree);
     return NULL;
   }
   return asTree;

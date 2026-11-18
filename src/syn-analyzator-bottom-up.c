@@ -10,6 +10,10 @@
 
 #include "syn-analyzator-bottom-up.h"
 
+#include <limits.h>
+
+#include "common.h"
+
 #define PREC_TYPES 9
 
 bool isUnaryContext(Token *prevToken) {
@@ -71,9 +75,63 @@ PrecSymbol tokenToPrecSymbol(struct Token *token, struct Token *prevToken) {
   }
 }
 
+void stackInit(PrecStack *s, int capacity) {
+  if (s == NULL || capacity <= 0)
+    die(ERR_INTERNAL, 0, "Invalid precedence stack initialization");
+
+  s->capacity = capacity;
+  s->items = arenaAlloc((size_t)capacity * sizeof *s->items);
+  s->top = -1;
+}
+
+void pushItem(PrecStackItem item, PrecStack *stack) {
+  if (stack == NULL || stack->items == NULL || stack->capacity <= 0)
+    die(ERR_INTERNAL, 0, "Invalid precedence stack");
+
+  if (stack->top >= stack->capacity - 1) {
+    size_t oldCapacity = (size_t)stack->capacity;
+    size_t newCapacity = oldCapacity * 2;
+    stack->items = arenaRealloc(stack->items, oldCapacity * sizeof(PrecStackItem),
+                                newCapacity * sizeof(PrecStackItem));
+    stack->capacity = (int)newCapacity;
+  }
+  stack->top++;
+  stack->items[stack->top] = item;
+}
+
+PrecStackItem popItem(PrecStack *stack) {
+  if (stack == NULL || stack->top < 0)
+    die(ERR_SYNTAX, 999, "Missing item on stack to pop");
+
+  return stack->items[stack->top--];
+}
+
+PrecStackItem *getTopItem(PrecStack *stack) {
+  if (stack == NULL)
+    return NULL;
+
+  for (int i = stack->top; i >= 0; i--) {
+    if (stack->items[i].type == TERMINAL)
+      return &stack->items[i];
+  }
+  return NULL;
+}
+
+PrecStackItem makeTerminalItem(PrecSymbol sym, Token *token, bool isBreakpoint) {
+  PrecStackItem item;
+  item.symbol = sym;
+  item.token = token;
+  item.type = TERMINAL;
+  item.startBrkP = isBreakpoint;
+  item.astNode = NULL;
+  return item;
+}
+
 /// function will be implemented in different file, because it is more complex and will be
 /// implemented as a precedence parser
-bool expression(LinkedTlist *tokenList) {
+bool expression(LinkedTlist *tokenList) {  // TODO: Add parametr: specific ending token
+  if (tokenList == NULL)
+    die(ERR_SYNTAX, 999, "Missing tokens for expression");
   static const char precTable[PREC_TYPES][PREC_TYPES] = {
       /*                     0     1      2       3    4    5     6    7   8*/
       /* stack \     in  | plus | mul | U(-x) | REL | EQ | '(' | ')' | i | $ */
@@ -88,7 +146,5 @@ bool expression(LinkedTlist *tokenList) {
       /* $               */ {'<', '<', '<', '<', '<', '<', 'E', '<', 'E'}   // ok
 
   };
-  Token *token = popToken(tokenList);
-  pushToken(token, tokenList);
   return true;  // Only temporary
 }
