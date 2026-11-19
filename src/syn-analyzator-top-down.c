@@ -10,8 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ast.h"
 #include "common.h"
 #include "layout.h"
+#include "syn-analyzator-bottom-up.h"
 
 bool prolog(LinkedTlist *tokenList);
 bool funDefs(LinkedTlist *tokenList, AstProgram *asTree);
@@ -41,13 +43,15 @@ bool returnTail(LinkedTlist *tokenList);
 bool rValue(LinkedTlist *tokenList);
 bool args(LinkedTlist *tokenList);
 bool argsTail(LinkedTlist *tokenList);
-bool term(LinkedTlist *tokenList);
+AstExpression *term(LinkedTlist *tokenList);
 bool ifStatement(LinkedTlist *tokenList);
 bool whileStatement(LinkedTlist *tokenList);
 
-AstExpressionType lit(int tkType);
-
 bool prolog(LinkedTlist *tokenList) {
+  Token *token = lookAheadToken(tokenList, 4);
+  if (token == NULL) {
+    die(ERR_SYNTAX, 0, "Missing prolog");
+  }
   Token *importT = popToken(tokenList);
   Token *identT = popToken(tokenList);
   Token *dotT = popToken(tokenList);
@@ -448,29 +452,55 @@ bool argsTail(LinkedTlist *tokenList) {
   return false;  // term failed after comma
 }
 
-bool term(LinkedTlist *tokenList) {
-  AstExpressionType literal = BINARY;  // default wrong option, because can't use macro
+AstExpression *term(LinkedTlist *tokenList) {
+  AstExpression *term;
   Token *token = lookAheadToken(tokenList, 0);
+  if (token == NULL || getTkType(token) == TK_EOF) {
+    die(ERR_SYNTAX, 999, "Unexpected end of file");
+  }
   int tkType = getTkType(token);
-  literal = lit(tkType);
-  if (tkType == TK_IDENT) {
+  if (tkType == TK_IDENT) {  // it is variable
     popToken(tokenList);
-    return true;
-  } else if (literal != BINARY) {
+    term = astExpressionNew(VARIABLE, getLocation(token));
+    term->data.variable = getString(getValue(token)->s);
+    return term;
+
+    // it is INT_LITERAL
+  } else if (tkType == TK_NUMBER) {
     popToken(tokenList);
-    return true;
+    term = astExpressionNew(INT_LITERAL, getLocation(token));
+    term->data.intValue = getValue(token)->i;
+    return term;
+
+    // it is DOUBLE_LITERAL
+  } else if (tkType == TK_DECIMAL) {
+    popToken(tokenList);
+    term = astExpressionNew(DOUBLE_LITERAL, getLocation(token));
+    term->data.doubleValue = getValue(token)->d;
+    return term;
+
+    // it is STRING_LITERAL
+  } else if (tkType == TK_STRING) {
+    popToken(tokenList);
+    term = astExpressionNew(STRING_LITERAL, getLocation(token));
+    term->data.stringValue = getString(getValue(token)->s);
+    return term;
+
   } else if (tkType == TK_LPAREN) {
     popToken(tokenList);
     token = popToken(tokenList);
     if (getTkType(token) == TK_RPAREN) {  // Confirmed: UNIT_LITERAL
-      literal = UNIT_LITERAL;
-      return true;
-    } else {
+      term = astExpressionNew(UNIT_LITERAL, getLocation(token));
+      return term;
+    } else {  // missing )
       die(ERR_SYNTAX, getLine(token), "Missing ')' for UNIT_LITERAL");
-      return false;
     }
   }
-  return false;
+  // it is not variable nor term -> Error
+  else {
+    die(ERR_SYNTAX, getLine(token), "Incorrect input");
+  }
+  return NULL;
 }
 
 bool ifStatement(LinkedTlist *tokenList) {
@@ -552,19 +582,6 @@ bool whileStatement(LinkedTlist *tokenList) {
     }
   }
   return false;
-}
-
-AstExpressionType lit(int tkType) {
-  switch (tkType) {
-    case TK_DECIMAL:
-      return DOUBLE_LITERAL;
-    case TK_NUMBER:
-      return INT_LITERAL;
-    case TK_STRING:
-      return STRING_LITERAL;
-    default:
-      return BINARY;  // default wrong option
-  }
 }
 
 AstProgram *topDown(struct LinkedTlist *tokenList) {
