@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "layout.h"
 
 bool prolog(LinkedTlist *tokenList);
 bool funDefs(LinkedTlist *tokenList, AstProgram *asTree);
