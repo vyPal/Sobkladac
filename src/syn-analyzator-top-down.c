@@ -21,7 +21,7 @@ bool funDefsTail(LinkedTlist *tokenList, AstProgram *asTree);  // DONE
 bool funDef(LinkedTlist *tokenList, AstProgram *asTree);       // DONE
 bool mainAnnot(LinkedTlist *tokenList);                        // DONE
 void mainNL(LinkedTlist *tokenList);                           // DONE
-bool funBody(LinkedTlist *tokenList);
+bool funBody(AstFunction function, LinkedTlist *tokenList);    // DONE
 bool params(LinkedTlist *tokenList);
 bool paramsTail(LinkedTlist *tokenList);
 bool param(LinkedTlist *tokenList);
@@ -44,8 +44,8 @@ AstValue *rValue(LinkedTlist *tokenList);                           // DONE
 bool args(AstFunctionCall *funCall, LinkedTlist *tokenList);        // DONE
 bool argsTail(AstFunctionCall *funCall, LinkedTlist *tokenList);    // DONE
 AstExpression *term(LinkedTlist *tokenList);                        // DONE
-bool ifStatement(AstCodeBlock *block, LinkedTlist *tokenList);
-bool whileStatement(AstCodeBlock *block, LinkedTlist *tokenList);
+bool ifStatement(AstCodeBlock *block, LinkedTlist *tokenList);      // DONE
+bool whileStatement(AstCodeBlock *block, LinkedTlist *tokenList);   // DONE
 
 bool prolog(LinkedTlist *tokenList) {
   Token *token = lookAheadToken(tokenList, 4);
@@ -157,15 +157,19 @@ void mainNL(LinkedTlist *tokenList) {
   }
 }
 
-bool funBody(LinkedTlist *tokenList) {
-  Token *token = popToken(tokenList);
+bool funBody(AstFunction *function, LinkedTlist *tokenList) {
+  Token *token = lookAheadToken(tokenList, 0);
   if (token != NULL && getTkType(token) == TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token !=
                                                           // NULL && to all getTkType(token) in ifs"
-    token = popToken(tokenList);
+    popToken(tokenList);                                  // pop newline
+    token = popToken(tokenList);                          // pop new token
     if (token != NULL &&
         getTkType(token) == TK_INDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
                                           // getTkType(token) in ifs"
-      if (codeBlock(tokenList)) {
+
+      function->bodyType = CODE_BLOCK;
+      function->body.codeBlock = astCodeBlockNew();
+      if (codeBlock(function->body.codeBlock, tokenList)) {
         token = popToken(tokenList);
         if (token != NULL &&
             getTkType(token) == TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
@@ -175,8 +179,9 @@ bool funBody(LinkedTlist *tokenList) {
       }
     }
   } else {
-    pushToken(token, tokenList);
-    return rValue(tokenList);
+    function->bodyType = VALUE;
+    function->body.value = rValue(tokenList);
+    return true;
   }
   return false;
 }
@@ -615,14 +620,22 @@ AstExpression *term(LinkedTlist *tokenList) {
   return NULL;
 }
 
-bool ifStatement(AstCommand *cmd, LinkedTlist *tokenList) {
+bool ifStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
   Token *token = lookAheadToken(tokenList, 0);
+  if (token == NULL || getTkType(token) == TK_EOF) {
+    die(ERR_SYNTAX, 999, "Unexpected end of file");
+    return NULL;
+  }
+
   int tkType = getTkType(token);
   if (tkType != TK_KW_IF) {
     die(ERR_SYNTAX, getLine(token), "Missing 'if' in if statement");
   }
+  AstCommand *cmd = astCodeCommandNew(IF, getLocation(token));
   popToken(tokenList);
-  if (expression(tokenList)) {
+  AstExpression *condition = expression(tokenList);
+  if (condition != NULL) {
+    cmd->data.ifAst.condition = condition;
     token = popToken(tokenList);
     if (token == NULL ||
         getTkType(token) != TK_KW_THEN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
@@ -641,7 +654,8 @@ bool ifStatement(AstCommand *cmd, LinkedTlist *tokenList) {
                                           // getTkType(token) in ifs"
       die(ERR_SYNTAX, getLine(token), "Missing indentation in if statement");
     }
-    if (codeBlock(tokenList)) {
+    cmd->data.ifAst.thenBlock = astCodeBlockNew();
+    if (codeBlock(cmd->data.ifAst.thenBlock, tokenList)) {
       token = popToken(tokenList);
       if (token == NULL ||
           getTkType(token) != TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
@@ -667,13 +681,15 @@ bool ifStatement(AstCommand *cmd, LinkedTlist *tokenList) {
                                             // getTkType(token) in ifs"
         die(ERR_SYNTAX, getLine(token), "Missing indentation in else branch");
       }
-      if (codeBlock(tokenList)) {
+      cmd->data.ifAst.elseBlock = astCodeBlockNew();
+      if (codeBlock(cmd->data.ifAst.elseBlock, tokenList)) {
         token = popToken(tokenList);
         if (token == NULL ||
             getTkType(token) != TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
                                               // all getTkType(token) in ifs"
           die(ERR_SYNTAX, getLine(token), "Missing dedentation in else branch");
         }
+        astBlockAppendCommand(block, cmd);
         return true;
       }
     }
@@ -681,13 +697,21 @@ bool ifStatement(AstCommand *cmd, LinkedTlist *tokenList) {
   return false;
 }
 
-bool whileStatement(AstCommand *cmd, LinkedTlist *tokenList) {
+bool whileStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
   Token *token = lookAheadToken(tokenList, 0);
+  if (token == NULL || getTkType(token) == TK_EOF) {
+    die(ERR_SYNTAX, 999, "Unexpected end of file");
+    return NULL;
+  }
+
   int tkType = getTkType(token);
   if (tkType != TK_KW_WHILE) {
     die(ERR_SYNTAX, getLine(token), "Missing 'while' in while statement");
   }
-  if (expression(tokenList)) {
+  AstCommand *cmd = astCodeCommandNew(WHILE, getLocation(token));
+  AstExpression *condition = expression(tokenList);
+  if (condition != NULL) {
+    cmd->data.whileAst.condition = condition;
     token = popToken(tokenList);
     if (token == NULL || getTkType(token) != TK_KW_DO) {  // AI [gpt-6-luna]: "Can you add token !=
                                                           // NULL && to all getTkType(token) in ifs"
@@ -705,7 +729,8 @@ bool whileStatement(AstCommand *cmd, LinkedTlist *tokenList) {
                                           // getTkType(token) in ifs"
       die(ERR_SYNTAX, getLine(token), "Missing indentation in while statement");
     }
-    if (codeBlock(tokenList)) {
+    cmd->data.whileAst.codeBlock = astCodeBlockNew();
+    if (codeBlock(cmd->data.whileAst.codeBlock, tokenList)) {
       token = popToken(tokenList);
       if (token == NULL ||
           getTkType(token) != TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
@@ -713,6 +738,8 @@ bool whileStatement(AstCommand *cmd, LinkedTlist *tokenList) {
         die(ERR_SYNTAX, getLine(token),
             "Missing dedentation (inversion of indentation) in while statement");
       }
+
+      astBlockAppendCommand(block, cmd);
       return true;
     }
   }
