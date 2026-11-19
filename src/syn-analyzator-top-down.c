@@ -15,12 +15,12 @@
 #include "layout.h"
 #include "syn-analyzator-bottom-up.h"
 
-bool prolog(LinkedTlist *tokenList);
-bool funDefs(LinkedTlist *tokenList, AstProgram *asTree);
-bool funDefsTail(LinkedTlist *tokenList, AstProgram *asTree);
-bool funDef(LinkedTlist *tokenList, AstProgram *asTree);
-bool mainAnnot(LinkedTlist *tokenList);
-void mainNL(LinkedTlist *tokenList);
+bool prolog(LinkedTlist *tokenList);                           // DONE
+bool funDefs(LinkedTlist *tokenList, AstProgram *asTree);      // DONE
+bool funDefsTail(LinkedTlist *tokenList, AstProgram *asTree);  // DONE
+bool funDef(LinkedTlist *tokenList, AstProgram *asTree);       // DONE
+bool mainAnnot(LinkedTlist *tokenList);                        // DONE
+void mainNL(LinkedTlist *tokenList);                           // DONE
 bool funBody(LinkedTlist *tokenList);
 bool params(LinkedTlist *tokenList);
 bool paramsTail(LinkedTlist *tokenList);
@@ -85,50 +85,48 @@ bool funDefsTail(LinkedTlist *tokenList, AstProgram *asTree) {
 
 bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {
   bool isMain = mainAnnot(tokenList);
+  if (lookAheadToken(tokenList, 1) == NULL) {
+    return false;
+  }
   Token *defTK = popToken(tokenList);
   Token *idTK = popToken(tokenList);
-  if (getTkType(defTK) == TK_KW_DEF && getTkType(idTK) == TK_IDENT) {
-    // AstLocation location = {.line = getLine(idTK), .column = 1}; // I don't know percise location
-    AstFunction *fun = malloc(sizeof(AstFunction));
-    if (fun == NULL) {
-      die(ERR_INTERNAL, 0, "Memory allocation failed");
-    }
-    if (asTree->firstFunction == NULL) {
-      asTree->firstFunction = fun;
-    } else {
-      asTree->lastFunction = fun;
-    }
+  if (getTkType(defTK) == TK_KW_DEF) {
+    if (getTkType(idTK) == TK_IDENT) {
+      // AstLocation location <- use getLocation(token);
+      AstFunction *fun = astFunctionNew(getString(getValue(idTK)->s), getLocation(idTK));
 
-    fun->isMain = isMain;
+      fun->isMain = isMain;
 
-    Token *token = popToken(tokenList);
-    if (token != NULL &&
-        getTkType(token) == TK_LPAREN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                          // getTkType(token) in ifs"
-      if (params(tokenList)) {
-        token = popToken(tokenList);
-        if (token != NULL &&
-            getTkType(token) ==
-                TK_RPAREN) {  // Confirmed: (Params) // AI [gpt-6-luna]: "Can you add token != NULL
-                              // && to all getTkType(token) in ifs"
-          AstDataType returnType = optType(tokenList);
-          if (returnType == UNKNOWN) {
-            return false;  // incorrect return type
-          }
-          fun->declaredReturnType = returnType;
+      Token *token = popToken(tokenList);
+      if (token != NULL &&
+          getTkType(token) == TK_LPAREN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                            // getTkType(token) in ifs"
+        if (params(tokenList)) {
           token = popToken(tokenList);
           if (token != NULL &&
-              getTkType(token) == TK_ASSIGN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
-                                                // all getTkType(token) in ifs"
-            return funBody(tokenList);
+              getTkType(token) == TK_RPAREN) {  // Confirmed: (Params) // AI [gpt-6-luna]: "Can you
+                                                // add token != NULL
+                                                // && to all getTkType(token) in ifs"
+            AstDataType returnType = optType(tokenList);
+            if (returnType == UNKNOWN) {
+              return false;  // incorrect return type
+            }
+            fun->declaredReturnType = returnType;
+            token = popToken(tokenList);
+            if (token != NULL &&
+                getTkType(token) == TK_ASSIGN) {  // AI [gpt-6-luna]: "Can you add token != NULL &&
+                                                  // to all getTkType(token) in ifs"
+              return funBody(tokenList);
+            } else {
+              fprintf(stderr, "Missing '=' in function definition");
+            }
           } else {
-            fprintf(stderr, "Missing '=' in function definition");
+            fprintf(stderr, "Missing ')' in function definition");
           }
-        } else {
-          fprintf(stderr, "Missing ')' in function definition");
         }
       }
     }
+    die(ERR_SYNTAX, getLine(defTK), "Ivalid function definition");
   }
   return false;
 }
@@ -137,13 +135,13 @@ bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {
 /// @param tokenList
 /// @return result of search
 bool mainAnnot(LinkedTlist *tokenList) {
-  Token *token = popToken(tokenList);
+  Token *token = lookAheadToken(tokenList, 0);
   if (token != NULL && getTkType(token) == TK_ATMAIN) {  // AI [gpt-6-luna]: "Can you add token !=
                                                          // NULL && to all getTkType(token) in ifs"
+    popToken(tokenList);
     mainNL(tokenList);
     return true;
   } else {
-    pushToken(token, tokenList);
     return false;
   }
 }
@@ -151,12 +149,11 @@ bool mainAnnot(LinkedTlist *tokenList) {
 /// @brief If anotation @main is on another line, it takes newline, otherwise does nothing
 /// @param tokenList
 void mainNL(LinkedTlist *tokenList) {
-  Token *token = popToken(tokenList);
-  if (token != NULL && getTkType(token) == TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token !=
-                                                          // NULL && to all getTkType(token) in ifs"
+  Token *token = lookAheadToken(tokenList, 0);
+  if (token != NULL &&
+      getTkType(token) == TK_NEWLINE) {  // AI [gpt-6-luna]: NULL && to all getTkType(token) in ifs"
+    popToken(tokenList);
     return;
-  } else {
-    pushToken(token, tokenList);
   }
 }
 
@@ -330,7 +327,7 @@ bool simpleTail(LinkedTlist *tokenList) {
 
 bool simpleStatement(LinkedTlist *tokenList) {
   Token *token = lookAheadToken(tokenList, 0);
-  if (token == NULL) {
+  if (token == NULL && getTkType(token) == TK_EOF) {
     fprintf(stderr, "Unexpected end of file");
     return false;
   }
@@ -669,15 +666,12 @@ bool whileStatement(LinkedTlist *tokenList) {
 AstProgram *topDown(struct LinkedTlist *tokenList) {
   tokenList = layoutFilter(tokenList);
 
-  AstProgram *asTree = malloc(sizeof(AstProgram));
-  if (asTree == NULL) {
-    die(ERR_INTERNAL, 0, "Memory allocation failed");
-  }
+  AstProgram *asTree = astProgramNew();
   bool result = prolog(tokenList) && funDefs(tokenList, asTree);
   Token *lastToken = popToken(tokenList);
-  result = result && (getTkType(lastToken) == TK_EOF);
+  result = result && (lastToken != NULL && getTkType(lastToken) == TK_EOF);
   if (!result) {
-    free(asTree);
+    die(ERR_SYNTAX, 0, "Invalid code");
     return NULL;
   }
   return asTree;
