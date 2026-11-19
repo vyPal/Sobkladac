@@ -15,18 +15,18 @@
 #include "layout.h"
 #include "syn-analyzator-bottom-up.h"
 
-bool prolog(LinkedTlist *tokenList);                           // DONE
-bool funDefs(LinkedTlist *tokenList, AstProgram *asTree);      // DONE
-bool funDefsTail(LinkedTlist *tokenList, AstProgram *asTree);  // DONE
-bool funDef(LinkedTlist *tokenList, AstProgram *asTree);       // DONE
-bool mainAnnot(LinkedTlist *tokenList);                        // DONE
-void mainNL(LinkedTlist *tokenList);                           // DONE
-bool funBody(AstFunction function, LinkedTlist *tokenList);    // DONE
-bool params(LinkedTlist *tokenList);
-bool paramsTail(LinkedTlist *tokenList);
-bool param(LinkedTlist *tokenList);
-AstDataType optType(LinkedTlist *tokenList);  // DONE
-AstDataType dType(LinkedTlist *tokenList);    // DONE
+bool prolog(LinkedTlist *tokenList);                             // DONE
+bool funDefs(LinkedTlist *tokenList, AstProgram *asTree);        // DONE
+bool funDefsTail(LinkedTlist *tokenList, AstProgram *asTree);    // DONE
+bool funDef(LinkedTlist *tokenList, AstProgram *asTree);         // DONE
+bool mainAnnot(LinkedTlist *tokenList);                          // DONE
+void mainNL(LinkedTlist *tokenList);                             // DONE
+bool funBody(AstFunction *function, LinkedTlist *tokenList);     // DONE
+bool params(AstFunction *function, LinkedTlist *tokenList);      // DONE
+bool paramsTail(AstFunction *function, LinkedTlist *tokenList);  // DONE
+bool param(AstFunction *function, LinkedTlist *tokenList);       // DONE
+AstDataType optType(LinkedTlist *tokenList);                     // DONE
+AstDataType dType(LinkedTlist *tokenList);                       // DONE
 
 bool codeBlock(AstCodeBlock *block, LinkedTlist *tokenList);  // DONE
 bool linesTail(AstCodeBlock *block, LinkedTlist *tokenList);  // DONE
@@ -101,7 +101,7 @@ bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {
       if (token != NULL &&
           getTkType(token) == TK_LPAREN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
                                             // getTkType(token) in ifs"
-        if (params(tokenList)) {
+        if (params(fun, tokenList)) {
           token = popToken(tokenList);
           if (token != NULL &&
               getTkType(token) == TK_RPAREN) {  // Confirmed: (Params) // AI [gpt-6-luna]: "Can you
@@ -116,7 +116,7 @@ bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {
             if (token != NULL &&
                 getTkType(token) == TK_ASSIGN) {  // AI [gpt-6-luna]: "Can you add token != NULL &&
                                                   // to all getTkType(token) in ifs"
-              return funBody(tokenList);
+              return funBody(fun, tokenList);
             } else {
               fprintf(stderr, "Missing '=' in function definition");
             }
@@ -186,11 +186,11 @@ bool funBody(AstFunction *function, LinkedTlist *tokenList) {
   return false;
 }
 
-bool params(LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 1);
-  if (getTkType(token) == TK_IDENT) {
-    if (param(tokenList)) {
-      return paramsTail(tokenList);
+bool params(AstFunction *function, LinkedTlist *tokenList) {
+  Token *token = lookAheadToken(tokenList, 0);
+  if (token != NULL && getTkType(token) == TK_IDENT) {
+    if (param(function, tokenList)) {
+      return paramsTail(function, tokenList);
     } else {
       fprintf(stderr, "Incorrect function parameter");
       return false;
@@ -200,26 +200,33 @@ bool params(LinkedTlist *tokenList) {
   }
 }
 
-bool paramsTail(LinkedTlist *tokenList) {
-  Token *token = popToken(tokenList);
+bool paramsTail(AstFunction *function, LinkedTlist *tokenList) {
+  Token *token = lookAheadToken(tokenList, 0);
+  if (token == NULL || getTkType(token) == TK_EOF) {
+    die(ERR_SYNTAX, 999, "Unexpected EOF");
+  }
   if (token != NULL && getTkType(token) == TK_COMMA) {  // AI [gpt-6-luna]: "Can you add token !=
                                                         // NULL && to all getTkType(token) in ifs"
-    if (param(tokenList)) {
-      return paramsTail(tokenList);
+    popToken((tokenList));                              // pop comma
+    if (param(function, tokenList)) {
+      return paramsTail(function, tokenList);
     } else {
       fprintf(stderr, "Incorrect function parameter");
       return false;
     }
   } else {
-    pushToken(token, tokenList);
     return true;  // epsilon
   }
 }
 
-bool param(LinkedTlist *tokenList) {
+bool param(AstFunction *function, LinkedTlist *tokenList) {
   Token *token = popToken(tokenList);
+  if (token == NULL || getTkType(token) == TK_EOF) {
+    die(ERR_SYNTAX, 999, "Unexpected EOF");
+  }
   if (token != NULL && getTkType(token) == TK_IDENT) {  // AI [gpt-6-luna]: "Can you add token !=
                                                         // NULL && to all getTkType(token) in ifs"
+    char *name = getString(getValue(token)->s);
     token = popToken(tokenList);
     if (token != NULL && getTkType(token) == TK_COLON) {  // AI [gpt-6-luna]: "Can you add token !=
                                                           // NULL && to all getTkType(token) in ifs"
@@ -228,6 +235,11 @@ bool param(LinkedTlist *tokenList) {
         fprintf(stderr, "Incorrect function parameter type");
         return false;
       } else {
+        AstFunctionParameter *par = astFunctionParameterNew(name, type);
+        if (par == NULL)
+          return false;
+
+        astFunctionAppendParameter(function, par);
         return true;
       }
     } else {
@@ -402,9 +414,9 @@ bool assignment(AstCommand *cmd, LinkedTlist *tokenList) {
     if (token != NULL &&
         getTkType(token) == TK_ASSIGN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
                                           // getTkType(token) in ifs"
-      cmd->data.assignment.variableName = getString(getValue(token)->s),
+      cmd->data.assignment.variableName = getString(getValue(prevToken)->s);
+      popToken(tokenList);
       cmd->data.assignment.value = rValue(tokenList);
-      prevToken = popToken(tokenList);
       return true;
     } else {
       die(ERR_SYNTAX, getLine(prevToken), "Missing '=' in assignment");
