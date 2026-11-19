@@ -35,14 +35,14 @@ bool line(LinkedTlist *tokenList);
 bool simpleTail(LinkedTlist *tokenList);
 bool simpleStatement(LinkedTlist *tokenList);
 bool assignment(LinkedTlist *tokenList);
-bool functionCall(LinkedTlist *tokenList);
+AstFunctionCall *functionCall(LinkedTlist *tokenList);
 bool variableDeclaration(LinkedTlist *tokenList);
 bool varKW(LinkedTlist *tokenList, bool *isMutable);
 bool returnStatement(LinkedTlist *tokenList);
 bool returnTail(LinkedTlist *tokenList);
 bool rValue(LinkedTlist *tokenList);
-bool args(LinkedTlist *tokenList);
-bool argsTail(LinkedTlist *tokenList);
+bool args(AstFunctionCall *funCall, LinkedTlist *tokenList);
+bool argsTail(AstFunctionCall *funCall, LinkedTlist *tokenList);
 AstExpression *term(LinkedTlist *tokenList);
 bool ifStatement(LinkedTlist *tokenList);
 bool whileStatement(LinkedTlist *tokenList);
@@ -102,17 +102,24 @@ bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {
     fun->isMain = isMain;
 
     Token *token = popToken(tokenList);
-    if (getTkType(token) == TK_LPAREN) {
+    if (token != NULL &&
+        getTkType(token) == TK_LPAREN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                          // getTkType(token) in ifs"
       if (params(tokenList)) {
         token = popToken(tokenList);
-        if (getTkType(token) == TK_RPAREN) {  // Confirmed: (Params)
+        if (token != NULL &&
+            getTkType(token) ==
+                TK_RPAREN) {  // Confirmed: (Params) // AI [gpt-6-luna]: "Can you add token != NULL
+                              // && to all getTkType(token) in ifs"
           AstDataType returnType = optType(tokenList);
           if (returnType == UNKNOWN) {
             return false;  // incorrect return type
           }
           fun->declaredReturnType = returnType;
           token = popToken(tokenList);
-          if (getTkType(token) == TK_ASSIGN) {
+          if (token != NULL &&
+              getTkType(token) == TK_ASSIGN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
+                                                // all getTkType(token) in ifs"
             return funBody(tokenList);
           } else {
             fprintf(stderr, "Missing '=' in function definition");
@@ -131,7 +138,8 @@ bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {
 /// @return result of search
 bool mainAnnot(LinkedTlist *tokenList) {
   Token *token = popToken(tokenList);
-  if (getTkType(token) == TK_ATMAIN) {
+  if (token != NULL && getTkType(token) == TK_ATMAIN) {  // AI [gpt-6-luna]: "Can you add token !=
+                                                         // NULL && to all getTkType(token) in ifs"
     mainNL(tokenList);
     return true;
   } else {
@@ -144,7 +152,8 @@ bool mainAnnot(LinkedTlist *tokenList) {
 /// @param tokenList
 void mainNL(LinkedTlist *tokenList) {
   Token *token = popToken(tokenList);
-  if (getTkType(token) == TK_NEWLINE) {
+  if (token != NULL && getTkType(token) == TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token !=
+                                                          // NULL && to all getTkType(token) in ifs"
     return;
   } else {
     pushToken(token, tokenList);
@@ -153,12 +162,17 @@ void mainNL(LinkedTlist *tokenList) {
 
 bool funBody(LinkedTlist *tokenList) {
   Token *token = popToken(tokenList);
-  if (getTkType(token) == TK_NEWLINE) {
+  if (token != NULL && getTkType(token) == TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token !=
+                                                          // NULL && to all getTkType(token) in ifs"
     token = popToken(tokenList);
-    if (getTkType(token) == TK_INDENT) {
+    if (token != NULL &&
+        getTkType(token) == TK_INDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                          // getTkType(token) in ifs"
       if (codeBlock(tokenList)) {
         token = popToken(tokenList);
-        if (getTkType(token) == TK_DEDENT) {
+        if (token != NULL &&
+            getTkType(token) == TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
+                                              // all getTkType(token) in ifs"
           return true;
         }
       }
@@ -185,7 +199,8 @@ bool params(LinkedTlist *tokenList) {
 
 bool paramsTail(LinkedTlist *tokenList) {
   Token *token = popToken(tokenList);
-  if (getTkType(token) == TK_COMMA) {
+  if (token != NULL && getTkType(token) == TK_COMMA) {  // AI [gpt-6-luna]: "Can you add token !=
+                                                        // NULL && to all getTkType(token) in ifs"
     if (param(tokenList)) {
       return paramsTail(tokenList);
     } else {
@@ -200,9 +215,11 @@ bool paramsTail(LinkedTlist *tokenList) {
 
 bool param(LinkedTlist *tokenList) {
   Token *token = popToken(tokenList);
-  if (getTkType(token) == TK_IDENT) {
+  if (token != NULL && getTkType(token) == TK_IDENT) {  // AI [gpt-6-luna]: "Can you add token !=
+                                                        // NULL && to all getTkType(token) in ifs"
     token = popToken(tokenList);
-    if (getTkType(token) == TK_COLON) {
+    if (token != NULL && getTkType(token) == TK_COLON) {  // AI [gpt-6-luna]: "Can you add token !=
+                                                          // NULL && to all getTkType(token) in ifs"
       AstDataType type = dType(tokenList);
       if (type == UNKNOWN) {
         fprintf(stderr, "Incorrect function parameter type");
@@ -222,7 +239,8 @@ bool param(LinkedTlist *tokenList) {
 
 AstDataType optType(LinkedTlist *tokenList) {
   Token *token = popToken(tokenList);
-  if (getTkType(token) == TK_COLON) {
+  if (token != NULL && getTkType(token) == TK_COLON) {  // AI [gpt-6-luna]: "Can you add token !=
+                                                        // NULL && to all getTkType(token) in ifs"
     if (dType(tokenList) == UNKNOWN) {
       fprintf(stderr, "Incorrect Function type");
     }
@@ -284,7 +302,9 @@ bool line(LinkedTlist *tokenList) {
   } else if (simpleStatement(tokenList)) {
     if (simpleTail(tokenList)) {
       token = popToken(tokenList);
-      if (getTkType(token) == TK_NEWLINE) {
+      if (token != NULL &&
+          getTkType(token) == TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
+                                             // all getTkType(token) in ifs"
         return true;
       }
     }
@@ -295,7 +315,9 @@ bool line(LinkedTlist *tokenList) {
 
 bool simpleTail(LinkedTlist *tokenList) {
   Token *token = popToken(tokenList);
-  if (getTkType(token) == TK_SEMICOLON) {
+  if (token != NULL &&
+      getTkType(token) == TK_SEMICOLON) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                           // getTkType(token) in ifs"
     if (simpleStatement(tokenList)) {
       return simpleTail(tokenList);
     }
@@ -333,9 +355,12 @@ bool simpleStatement(LinkedTlist *tokenList) {
 
 bool assignment(LinkedTlist *tokenList) {
   Token *token = popToken(tokenList);
-  if (getTkType(token) == TK_IDENT) {
+  if (token != NULL && getTkType(token) == TK_IDENT) {  // AI [gpt-6-luna]: "Can you add token !=
+                                                        // NULL && to all getTkType(token) in ifs"
     token = popToken(tokenList);
-    if (getTkType(token) == TK_ASSIGN) {
+    if (token != NULL &&
+        getTkType(token) == TK_ASSIGN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                          // getTkType(token) in ifs"
       return rValue(tokenList);
     } else {
       fprintf(stderr, "Missing '=' in assignment");
@@ -345,26 +370,37 @@ bool assignment(LinkedTlist *tokenList) {
   return false;
 }
 
-bool functionCall(LinkedTlist *tokenList) {
-  Token *token = popToken(tokenList);
-  if (getTkType(token) == TK_IDENT) {
-    token = popToken(tokenList);
-    if (getTkType(token) == TK_LPAREN) {
-      if (args(tokenList)) {
-        token = popToken(tokenList);
-        if (getTkType(token) == TK_RPAREN) {
-          return true;
+AstFunctionCall *functionCall(LinkedTlist *tokenList) {
+  AstFunctionCall *funCall;
+  Token *prevToken, *token = lookAheadToken(tokenList, 0);  // ident
+  if (token != NULL && getTkType(token) == TK_IDENT) {  // AI [gpt-6-luna]: "Can you add token !=
+                                                        // NULL && to all getTkType(token) in ifs"
+    prevToken = popToken(tokenList);
+    token = lookAheadToken(tokenList, 0);  // lparen
+    if (token != NULL &&
+        getTkType(token) == TK_LPAREN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                          // getTkType(token) in ifs"
+      funCall = astFunctionCallNew(getString(getValue(prevToken)->s), getLocation(prevToken));
+      Token *nextToken = lookAheadToken(tokenList, 1);
+      if ((nextToken != NULL && getTkType(nextToken) == TK_RPAREN) ||
+          args(funCall, tokenList)) {  // It skips args if there are none
+        token = popToken(tokenList);   // rparen
+        if (token != NULL &&
+            getTkType(token) == TK_RPAREN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
+                                              // all getTkType(token) in ifs"
+          return funCall;
         } else {
-          fprintf(stderr, "Missing ')' in function call");
-          return false;
+          die(ERR_SYNTAX, getLine(prevToken), "Missing ')' in function call");
+          return NULL;
         }
       }
     } else {
-      fprintf(stderr, "Missing '(' in function call");
-      return false;
+      die(ERR_SYNTAX, getLine(prevToken), "Missing '(' in function call");
+      return NULL;
     }
   }
-  return false;
+  die(ERR_SYNTAX, 999, "Unexpected EOF");
+  return NULL;
 }
 
 bool variableDeclaration(LinkedTlist *tokenList) {
@@ -372,14 +408,17 @@ bool variableDeclaration(LinkedTlist *tokenList) {
   if (varKW(tokenList, &isMutable)) {
     popToken(tokenList);  // pop the found var/val
     Token *token = popToken(tokenList);
-    if (getTkType(token) == TK_IDENT) {
+    if (token != NULL && getTkType(token) == TK_IDENT) {  // AI [gpt-6-luna]: "Can you add token !=
+                                                          // NULL && to all getTkType(token) in ifs"
       AstDataType dtype = optType(tokenList);
       if (dtype == UNKNOWN) {
         fprintf(stderr, "Incorrect variable type");
         return false;
       }
       token = popToken(tokenList);
-      if (getTkType(token) == TK_ASSIGN) {
+      if (token != NULL &&
+          getTkType(token) == TK_ASSIGN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                            // getTkType(token) in ifs"
         return rValue(tokenList);
       } else {
         die(ERR_SYNTAX, getLine(token), "Missing '=' in function call");
@@ -405,7 +444,9 @@ bool varKW(LinkedTlist *tokenList, bool *isMutable) {
 
 bool returnStatement(LinkedTlist *tokenList) {
   Token *token = popToken(tokenList);
-  if (getTkType(token) == TK_KW_RETURN) {
+  if (token != NULL &&
+      getTkType(token) == TK_KW_RETURN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                           // getTkType(token) in ifs"
     return returnTail(tokenList);
   }
   return false;
@@ -431,20 +472,25 @@ bool rValue(LinkedTlist *tokenList) {
   return expression(tokenList);
 }
 
-bool args(LinkedTlist *tokenList) {
-  if (term(tokenList)) {
-    return argsTail(tokenList);
+bool args(AstFunctionCall *funCall, LinkedTlist *tokenList) {  // there must be some args
+  AstExpression *arg = term(tokenList);
+  if (arg != NULL) {
+    astCallAppendArgument(funCall, astFunctionCallArgumentNew(arg));
+    return argsTail(funCall, tokenList);
   } else {
-    return true;  // epsilon
+    return false;
   }
 }
 
-bool argsTail(LinkedTlist *tokenList) {
+bool argsTail(AstFunctionCall *funCall, LinkedTlist *tokenList) {
   Token *token = lookAheadToken(tokenList, 0);
-  if (getTkType(token) == TK_COMMA) {
+  if (token != NULL && getTkType(token) == TK_COMMA) {  // AI [gpt-6-luna]: "Can you add token !=
+                                                        // NULL && to all getTkType(token) in ifs"
     popToken(tokenList);
-    if (term(tokenList)) {
-      return argsTail(tokenList);
+    AstExpression *arg = term(tokenList);
+    if (arg != NULL) {
+      astCallAppendArgument(funCall, astFunctionCallArgumentNew(arg));
+      return argsTail(funCall, tokenList);
     }
   } else {
     return true;  // epsilon
@@ -488,8 +534,11 @@ AstExpression *term(LinkedTlist *tokenList) {
 
   } else if (tkType == TK_LPAREN) {
     popToken(tokenList);
-    token = popToken(tokenList);
-    if (getTkType(token) == TK_RPAREN) {  // Confirmed: UNIT_LITERAL
+    token = lookAheadToken(tokenList, 0);
+    if (token != NULL &&
+        getTkType(token) == TK_RPAREN) {  // Confirmed: UNIT_LITERAL // AI [gpt-6-luna]: "Can you
+                                          // add token != NULL && to all getTkType(token) in ifs"
+      popToken(tokenList);
       term = astExpressionNew(UNIT_LITERAL, getLocation(token));
       return term;
     } else {  // missing )
@@ -512,38 +561,54 @@ bool ifStatement(LinkedTlist *tokenList) {
   popToken(tokenList);
   if (expression(tokenList)) {
     token = popToken(tokenList);
-    if (getTkType(token) != TK_KW_THEN) {
+    if (token == NULL ||
+        getTkType(token) != TK_KW_THEN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                           // getTkType(token) in ifs"
       die(ERR_SYNTAX, getLine(token), "Missing 'then' in if statement");
     }
     token = popToken(tokenList);
-    if (getTkType(token) != TK_NEWLINE) {
+    if (token == NULL ||
+        getTkType(token) != TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                           // getTkType(token) in ifs"
       die(ERR_SYNTAX, getLine(token), "Missing '\\n' in if statement");
     }
     token = popToken(tokenList);
-    if (getTkType(token) != TK_INDENT) {
+    if (token == NULL ||
+        getTkType(token) != TK_INDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                          // getTkType(token) in ifs"
       die(ERR_SYNTAX, getLine(token), "Missing indentation in if statement");
     }
     if (codeBlock(tokenList)) {
       token = popToken(tokenList);
-      if (getTkType(token) != TK_DEDENT) {
+      if (token == NULL ||
+          getTkType(token) != TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                            // getTkType(token) in ifs"
         die(ERR_SYNTAX, getLine(token),
             "Missing dedentation (inversion of indentation) in if statement");
       }
       token = popToken(tokenList);
-      if (getTkType(token) != TK_KW_ELSE) {
+      if (token == NULL ||
+          getTkType(token) != TK_KW_ELSE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
+                                             // all getTkType(token) in ifs"
         die(ERR_SYNTAX, getLine(token), "Missing 'else' in if statement");
       }
       token = popToken(tokenList);
-      if (getTkType(token) != TK_NEWLINE) {
+      if (token == NULL ||
+          getTkType(token) != TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
+                                             // all getTkType(token) in ifs"
         die(ERR_SYNTAX, getLine(token), "Missing '\\n' in else branch");
       }
       token = popToken(tokenList);
-      if (getTkType(token) != TK_INDENT) {
+      if (token == NULL ||
+          getTkType(token) != TK_INDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                            // getTkType(token) in ifs"
         die(ERR_SYNTAX, getLine(token), "Missing indentation in else branch");
       }
       if (codeBlock(tokenList)) {
         token = popToken(tokenList);
-        if (getTkType(token) != TK_DEDENT) {
+        if (token == NULL ||
+            getTkType(token) != TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
+                                              // all getTkType(token) in ifs"
           die(ERR_SYNTAX, getLine(token), "Missing dedentation in else branch");
         }
         return true;
@@ -561,20 +626,27 @@ bool whileStatement(LinkedTlist *tokenList) {
   }
   if (expression(tokenList)) {
     token = popToken(tokenList);
-    if (getTkType(token) != TK_KW_DO) {
+    if (token == NULL || getTkType(token) != TK_KW_DO) {  // AI [gpt-6-luna]: "Can you add token !=
+                                                          // NULL && to all getTkType(token) in ifs"
       die(ERR_SYNTAX, getLine(token), "Missing 'do' in while statement");
     }
     token = popToken(tokenList);
-    if (getTkType(token) != TK_NEWLINE) {
+    if (token == NULL ||
+        getTkType(token) != TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                           // getTkType(token) in ifs"
       die(ERR_SYNTAX, getLine(token), "Missing '\\n' in while statement");
     }
     token = popToken(tokenList);
-    if (getTkType(token) != TK_INDENT) {
+    if (token == NULL ||
+        getTkType(token) != TK_INDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                          // getTkType(token) in ifs"
       die(ERR_SYNTAX, getLine(token), "Missing indentation in while statement");
     }
     if (codeBlock(tokenList)) {
       token = popToken(tokenList);
-      if (getTkType(token) != TK_DEDENT) {
+      if (token == NULL ||
+          getTkType(token) != TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
+                                            // getTkType(token) in ifs"
         die(ERR_SYNTAX, getLine(token),
             "Missing dedentation (inversion of indentation) in while statement");
       }
