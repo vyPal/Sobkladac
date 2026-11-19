@@ -115,6 +115,14 @@ AstLocation getLocation(Token *token);
 PrecSymbol tokenToPrecSymbol(struct Token *token, struct Token *prevToken);
 
 /**
+ * @brief Checks whether the stack contains one complete reduced expression.
+ * @param stack Precedence stack to check.
+ * @return true if the stack contains the end marker followed by one
+ *         non-terminal and no pending breakpoint; otherwise false.
+ */
+bool stackCorrect(PrecStack stack);
+
+/**
  * @brief Parses an expression from a token list.
  * @param tokenList List whose leading tokens make up the expression.
  * @return true if parsing succeeds; otherwise false.

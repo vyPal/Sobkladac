@@ -5,7 +5,9 @@
  * @author Martin Stovicek <xstovim00>
  *
  * Brief explanation:
- *  Will be added later
+ *  This file implements precendent table, some converters to make table smaller,
+ *  stack for reduction terminals into Expression tree;
+ *  Rest of it are some helper functions
  */
 
 #include "syn-analyzator-bottom-up.h"
@@ -105,7 +107,7 @@ AstExpressionType tokenToExpressionType(Token *token) {
 
 PrecSymbol tokenToPrecSymbol(struct Token *token, struct Token *prevToken) {
   if (token == NULL)
-    return PREC_DOLLAR;
+    die(ERR_SYNTAX, getLine(prevToken), "Missing tokens");
   enum TkType type = getTkType(token);
   switch (type) {
     case TK_IDENT:
@@ -211,6 +213,9 @@ AstExpression *executeReduce(PrecStack *stack) {
   PrecStackItem popped[3];
 
   while (!isBreakPoint(stack)) {
+    if (count >= 3) {
+      return NULL;
+    }
     popped[count] = popItem(stack);
     count++;
   }
@@ -250,7 +255,8 @@ AstExpression *executeReduce(PrecStack *stack) {
   }
 
   // RULE 3: E-> -E (Unary - 2 symbols)
-  if (count == 2 && getTkType(popped[1].token) == TK_MINUS && popped[0].type == NON_TERMINAL) {
+  if (count == 2 && popped[1].type == TERMINAL && popped[1].symbol == PREC_UNARY_MINUS &&
+      popped[0].type == NON_TERMINAL) {
     AstExpression *ex = astExpressionNew(UNARY, getLocation(popped[1].token));
     ex->data.unary.operatorAst = NEGATION;
     ex->data.unary.expression = popped[0].astNode;
@@ -274,8 +280,11 @@ AstExpression *executeReduce(PrecStack *stack) {
 }
 
 bool stackCorrect(PrecStack stack) {
-  stack.capacity = stack.capacity;  // useless, just to lose warnings
-  return true;                      // TODO
+  PrecStackItem *dolar = getTopItem(&stack);
+  // Checks that first terminal is dollar, without any breakpoint '<' and on top of that is only one
+  // non-terminal
+  return dolar->symbol == PREC_DOLLAR && !dolar->startBrkP && stack.top == 1 &&
+         stack.items[stack.top].type == NON_TERMINAL;
 }
 
 /// function will be implemented in different file, because it is more complex and will be
@@ -288,7 +297,7 @@ bool expression(LinkedTlist *tokenList) {  // TODO: Add parametr: specific endin
       /* stack \     in  | plus | mul | U(-x) | REL | EQ | '(' | ')' | i | $ */
       /* + -             */ {'>', '<', '<', '>', '>', '<', '>', '<', '>'},  // ok
       /* * /             */ {'>', '>', '<', '>', '>', '<', '>', '<', '>'},  // ok
-      /* Unary(-x)       */ {'>', '>', '>', '>', '>', '<', '>', '<', '>'},  // ok
+      /* Unary(-x)       */ {'>', '>', '<', '>', '>', '<', '>', '<', '>'},  // ok
       /* REL(<,>,<=, >=) */ {'<', '<', '<', 'E', '>', '<', '>', '<', '>'},  // ok
       /* EQ (==, !=)     */ {'<', '<', '<', '<', 'E', '<', '>', '<', '>'},  // ok
       /* (               */ {'<', '<', '<', '<', '<', '<', '=', '<', 'E'},  // ok
@@ -300,29 +309,39 @@ bool expression(LinkedTlist *tokenList) {  // TODO: Add parametr: specific endin
   PrecStack stack;
   stackInit(&stack, 3);
   PrecStackItem item = makeTerminalItem(PREC_DOLLAR, NULL, false);
-  pushItem(item, &stack);              // default settings - I pushed $ on stack
-  Token *token = popToken(tokenList);  // guaranteed token
+  pushItem(item, &stack);                       // default settings - I pushed $ on stack
+  Token *token = lookAheadToken(tokenList, 0);  // guaranteed token
   Token *prevToken = token;
   PrecSymbol sym = tokenToPrecSymbol(token, prevToken);
+  if (sym == PREC_UNKNOWN) {
+    die(ERR_SYNTAX, getLine(token), "Unexpected token on input");
+  }
+
   PrecStackItem b, *a;
   AstExpression *expr;
+
   do {
     a = getTopItem(&stack);
     b = makeTerminalItem(sym, token, false);
     switch (precTable[a->symbol][b.symbol]) {
       case '<':
         a->startBrkP = true;
+        // fallthrough
       case '=':
         /*push b - 1st line, then read another symbol b on input - other lines*/
         pushItem(b, &stack);
-        prevToken = token;
-        token = popToken(tokenList);
+        prevToken = popToken(tokenList);
+        token = lookAheadToken(tokenList, 0);
         if (token == NULL) {
           die(ERR_SYNTAX, getLine(prevToken), "Missing other tokens");
         }
         sym = tokenToPrecSymbol(token, prevToken);
+        if (sym == PREC_UNKNOWN) {
+          die(ERR_SYNTAX, getLine(token), "Unexpected token on input");
+        }
         b = makeTerminalItem(sym, token, false);
         break;
+
       case '>':
         expr = executeReduce(&stack);
         if (expr == NULL) {
@@ -340,6 +359,6 @@ bool expression(LinkedTlist *tokenList) {  // TODO: Add parametr: specific endin
         die(ERR_SYNTAX, getLine(token), "Invalid expression");
         break;
     }
-  } while (b.symbol == PREC_DOLLAR && stackCorrect(stack));
-  return true;  // Only temporary
+  } while (!(b.symbol == PREC_DOLLAR && stackCorrect(stack)));
+  return true;  // All went through correctly
 }
