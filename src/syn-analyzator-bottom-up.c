@@ -289,7 +289,7 @@ bool stackCorrect(PrecStack stack) {
 
 /// function will be implemented in different file, because it is more complex and will be
 /// implemented as a precedence parser
-bool expression(LinkedTlist *tokenList) {  // TODO: Add parametr: specific ending token
+AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: specific ending token
   if (tokenList == NULL)
     die(ERR_SYNTAX, 999, "Missing tokens for expression");
   static const char precTable[PREC_TYPES][PREC_TYPES] = {
@@ -360,5 +360,5 @@ bool expression(LinkedTlist *tokenList) {  // TODO: Add parametr: specific endin
         break;
     }
   } while (!(b.symbol == PREC_DOLLAR && stackCorrect(stack)));
-  return true;  // All went through correctly
+  return stack.items[stack.top].astNode;  // All went through correctly
 }

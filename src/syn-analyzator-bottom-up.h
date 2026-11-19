@@ -125,10 +125,9 @@ bool stackCorrect(PrecStack stack);
 /**
  * @brief Parses an expression from a token list.
  * @param tokenList List whose leading tokens make up the expression.
- * @return true if parsing succeeds; otherwise false.
- * @note Expression parsing is currently incomplete.
+ * @return Expression if parsing succeeds; otherwise it won't return.
  */
-bool expression(LinkedTlist *tokenList);
+AstExpression *expression(LinkedTlist *tokenList);
 
 /**
  * @brief Extra function for getting correct binary operator.
