@@ -71,6 +71,17 @@ enum TkType {
   TK_KW_RESERVED
 };
 
+typedef struct Token {
+  enum TkType type;
+  union Value *value;
+  int line;
+} Token;
+
+typedef struct LinkedTlist {
+  struct Token *token;
+  struct LinkedTlist *next;
+} LinkedTlist;
+
 /**
  * @brief Structure for representing a string.
  */

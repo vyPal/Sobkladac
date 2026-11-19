@@ -1,0 +1,12 @@
+import ifj26.*
+
+@main def main(): Unit =
+  val a = 1
+  val b = 2
+  val c = a + b
+  print(c)
+  print("\n")
+  val x = -10
+  val y = x / 2
+  print(y)
+  print("\n")

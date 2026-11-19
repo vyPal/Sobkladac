@@ -118,10 +118,7 @@ bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {
   if (t == NULL || getTkType(t) != TK_RPAREN)
     die(ERR_SYNTAX, getLine(idTK), "Missing ')' in function definition");
 
-  AstDataType rt = optType(tokenList);
-  if (rt == UNKNOWN)
-    die(ERR_SYNTAX, getLine(idTK), "Incorrect return type");
-  fun->declaredReturnType = rt;
+  fun->declaredReturnType = optType(tokenList);
 
   t = popToken(tokenList);
   if (t == NULL || getTkType(t) != TK_ASSIGN)
@@ -184,6 +181,10 @@ bool funBody(AstFunction *function, LinkedTlist *tokenList) {
   } else {
     function->bodyType = VALUE;
     function->body.value = rValue(tokenList);
+    // layoutFilter terminates every logical line with a NEWLINE; consume it
+    token = lookAheadToken(tokenList, 0);
+    if (token != NULL && getTkType(token) == TK_NEWLINE)
+      popToken(tokenList);
     return true;
   }
   return false;
@@ -256,42 +257,45 @@ bool param(AstFunction *function, LinkedTlist *tokenList) {
 }
 
 AstDataType optType(LinkedTlist *tokenList) {
-  Token *token = popToken(tokenList);
+  Token *token = lookAheadToken(tokenList, 0);
 
   if (token != NULL && getTkType(token) == TK_COLON) {
+    popToken(tokenList);
     AstDataType type = dType(tokenList);
     if (type == UNKNOWN) {
-      fprintf(stderr, "Incorrect function type");
+      die(ERR_SYNTAX, getLine(token), "Incorrect type after ':'");
     }
     return type;
   }
 
-  if (token != NULL) {
-    pushToken(token, tokenList);
-  }
-
-  return ANY;  // epsilon: no type annotation
+  return UNKNOWN;  // epsilon: no type annotation (semantic analysis infers it)
 }
 
 AstDataType dType(LinkedTlist *tokenList) {
-  Token *token = popToken(tokenList);
+  Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL) {
     return UNKNOWN;
   }
 
+  AstDataType type;
   switch (getTkType(token)) {
     case TK_KW_INT:
-      return INT;
+      type = INT;
+      break;
     case TK_KW_DOUBLE:
-      return DOUBLE;
+      type = DOUBLE;
+      break;
     case TK_KW_STRING:
-      return STRING;
+      type = STRING;
+      break;
     case TK_KW_UNIT:
-      return UNIT;
+      type = UNIT;
+      break;
     default:
-      pushToken(token, tokenList);
-      return UNKNOWN;
+      return UNKNOWN;  // leave the token in the list
   }
+  popToken(tokenList);
+  return type;
 }
 
 // ---- Statements ----
@@ -383,6 +387,7 @@ bool simpleStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
     }
     cmd = astCodeCommandNew(EXPRESSION, getLocation(token));
     cmd->data.expressionAst.expression = expression(tokenList);
+    astBlockAppendCommand(block, cmd);
     return true;
   } else if (tokenType == TK_KW_RETURN) {
     cmd = astCodeCommandNew(RETURN, getLocation(token));
@@ -402,6 +407,7 @@ bool simpleStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
   } else {
     cmd = astCodeCommandNew(EXPRESSION, getLocation(token));
     cmd->data.expressionAst.expression = expression(tokenList);
+    astBlockAppendCommand(block, cmd);
     return true;
   }
 }
@@ -440,8 +446,9 @@ AstFunctionCall *functionCall(LinkedTlist *tokenList) {
     if (token != NULL &&
         getTkType(token) == TK_LPAREN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
                                           // getTkType(token) in ifs"
+      popToken(tokenList);
       funCall = astFunctionCallNew(getString(getValue(prevToken)->s), getLocation(prevToken));
-      Token *nextToken = lookAheadToken(tokenList, 1);
+      Token *nextToken = lookAheadToken(tokenList, 0);
       if ((nextToken != NULL && getTkType(nextToken) == TK_RPAREN) ||
           args(funCall, tokenList)) {  // It skips args if there are none
         token = popToken(tokenList);   // rparen
@@ -471,10 +478,6 @@ bool variableDeclaration(AstCommand *cmd, LinkedTlist *tokenList) {
       cmd->data.variableDeclaration.variableName = getString(getValue(token)->s);
 
       AstDataType dtype = optType(tokenList);
-      if (dtype == UNKNOWN) {
-        die(ERR_SYNTAX, getLine(token), "Incorrect variable type");
-        return false;
-      }
 
       cmd->data.variableDeclaration.isMutable = isMutable;
       cmd->data.variableDeclaration.declaredType = dtype;

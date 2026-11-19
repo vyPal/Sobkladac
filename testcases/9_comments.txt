@@ -1,0 +1,9 @@
+// leading comment
+import ifj26.*
+/* block /* nested */ comment */
+
+@main def main(): Unit =
+  val a = 1_000; val b = 2.5e1d
+  print(a); print(" ")
+  print(b)
+  print("\n")

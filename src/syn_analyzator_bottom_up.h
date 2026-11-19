@@ -17,7 +17,8 @@
  * @brief Precedence classes used to index the parser's precedence table.
  */
 typedef enum {
-  PREC_OPERAND,      // i (TK_IDENT, TK_NUMBER, TK_DECIMAL, TK_STRING)
+  // The order of the symbols up to PREC_DOLLAR must match the rows/columns of precTable
+  // in expression() (src/syn_analyzator_bottom_up.c).
   PREC_PLUS_MINUS,   // + a binární -
   PREC_MUL_DIV,      // * a /
   PREC_UNARY_MINUS,  // unární -
@@ -25,8 +26,9 @@ typedef enum {
   PREC_EQUAL,        // ==, !=
   PREC_LPAREN,       // (
   PREC_RPAREN,       // )
+  PREC_OPERAND,      // i (TK_IDENT, TK_NUMBER, TK_DECIMAL, TK_STRING)
   PREC_DOLLAR,       // $ (konec výrazu - newline, then, do, čárka, EOF...)
-  PREC_UNKNOWN       // neplatný symbol ve výrazu } PrecSymbol;
+  PREC_UNKNOWN       // neplatný symbol ve výrazu
 } PrecSymbol;
 
 /**
