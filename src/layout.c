@@ -12,7 +12,7 @@
 #include <string.h>
 
 #include "common.h"
-#include "syn-analyzator-top-down.h"
+#include "syn_analyzator_top_down.h"
 #include "token.h"
 
 /// @brief Checks if a comma is trailing

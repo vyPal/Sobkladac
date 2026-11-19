@@ -1,5 +1,5 @@
 /**
- * @file syn-analyzator-top-down.h
+ * @file syn_analyzator_top_down.h
  * Project: IFJ26 compiler
  * @brief Implementation of top-down syntax analyzer
  * @author Martin Stovicek <xstovim00>
@@ -12,7 +12,7 @@
 #define TOP_DOWN_H
 
 #include "ast.h"
-#include "syn-analyzator-bottom-up.h"
+#include "syn_analyzator_bottom_up.h"
 #include "token.h"
 
 AstProgram *topDown(struct LinkedTlist *tokenList);

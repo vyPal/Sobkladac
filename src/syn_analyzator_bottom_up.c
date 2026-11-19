@@ -1,5 +1,5 @@
 /**
- * @file syn-analyzator-bottom-up.h
+ * @file syn_analyzator_bottom_up.c
  * Project: IFJ26 compiler
  * @brief Implementation of precedence SA
  * @author Martin Stovicek <xstovim00>
@@ -10,7 +10,7 @@
  *  Rest of it are some helper functions
  */
 
-#include "syn-analyzator-bottom-up.h"
+#include "syn_analyzator_bottom_up.h"
 
 #include <limits.h>
 

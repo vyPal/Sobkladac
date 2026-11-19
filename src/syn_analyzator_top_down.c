@@ -1,9 +1,9 @@
 /**
- * @file syn-analyzator-top-down.c
+ * @file syn_analyzator_top_down.c
  * @brief Implementation of top-down syntax analyzer.
  * @author Martin Stovicek <xstovim00>
  */
-#include "syn-analyzator-top-down.h"
+#include "syn_analyzator_top_down.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -13,7 +13,7 @@
 #include "ast.h"
 #include "common.h"
 #include "layout.h"
-#include "syn-analyzator-bottom-up.h"
+#include "syn_analyzator_bottom_up.h"
 
 bool prolog(LinkedTlist *tokenList);                             // DONE
 bool funDefs(LinkedTlist *tokenList, AstProgram *asTree);        // DONE

@@ -1,5 +1,5 @@
 /**
- * @file syn-analyzator-bottom-up.h
+ * @file syn_analyzator_bottom_up.h
  * Project: IFJ26 compiler
  * @brief Data structures and functions for precedence-based expression parsing.
  * @author Martin Stovicek <xstovim00>
