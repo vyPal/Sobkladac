@@ -33,11 +33,11 @@ bool linesTail(LinkedTlist *tokenList);
 bool line(LinkedTlist *tokenList);
 
 bool simpleTail(LinkedTlist *tokenList);
-bool simpleStatement(LinkedTlist *tokenList);
-bool assignment(AstCommand *cmd, LinkedTlist *tokenList);  // DONE
-AstFunctionCall *functionCall(LinkedTlist *tokenList);     // DONE
-bool variableDeclaration(LinkedTlist *tokenList);
-bool varKW(LinkedTlist *tokenList, bool *isMutable);  // DONE
+bool simpleStatement(AstCodeBlock *block, LinkedTlist *tokenList);  // DONE
+bool assignment(AstCommand *cmd, LinkedTlist *tokenList);           // DONE
+AstFunctionCall *functionCall(LinkedTlist *tokenList);              // DONE
+bool variableDeclaration(AstCommand *cmd, LinkedTlist *tokenList);  // DONE
+bool varKW(LinkedTlist *tokenList, bool *isMutable);                // DONE
 bool returnStatement(LinkedTlist *tokenList);
 bool returnTail(LinkedTlist *tokenList);
 AstValue *rValue(LinkedTlist *tokenList);                         // DONE
@@ -182,7 +182,8 @@ bool funBody(LinkedTlist *tokenList) {
 }
 
 bool params(LinkedTlist *tokenList) {
-  if (lookAheadToken(tokenList, 1) == TK_IDENT) {
+  Token *token = lookAheadToken(tokenList, 1);
+  if (getTkType(token) == TK_IDENT) {
     if (param(tokenList)) {
       return paramsTail(tokenList);
     } else {
@@ -296,7 +297,7 @@ bool line(LinkedTlist *tokenList) {
     return ifStatement(tokenList);
   } else if (getTkType(token) == TK_KW_WHILE) {
     return whileStatement(tokenList);
-  } else if (simpleStatement(tokenList)) {
+  } else if (simpleStatement(block, tokenList)) {
     if (simpleTail(tokenList)) {
       token = popToken(tokenList);
       if (token != NULL &&
@@ -325,9 +326,10 @@ bool simpleTail(LinkedTlist *tokenList) {
   return false;  // No statement after semicolon
 }
 
-bool simpleStatement(LinkedTlist *tokenList) {
+bool simpleStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
+  AstCommand *cmd;
   Token *token = lookAheadToken(tokenList, 0);
-  if (token == NULL && getTkType(token) == TK_EOF) {
+  if (token == NULL || getTkType(token) == TK_EOF) {
     fprintf(stderr, "Unexpected end of file");
     return false;
   }
@@ -335,18 +337,41 @@ bool simpleStatement(LinkedTlist *tokenList) {
   if (tokenType == TK_IDENT) {
     Token *nextToken = lookAheadToken(tokenList, 1);
     if (nextToken != NULL && getTkType(nextToken) == TK_ASSIGN) {
-      return assignment(tokenList);
+      cmd = astCodeCommandNew(ASSIGNMENT, getLocation(token));
+      if (!assignment(cmd, tokenList)) {
+        return false;
+      }
+      astBlockAppendCommand(block, cmd);
+      return true;
     }
     if (nextToken != NULL && getTkType(nextToken) == TK_LPAREN) {
-      return functionCall(tokenList);
+      cmd = astCodeCommandNew(FUNCTION_CALL, getLocation(token));
+      cmd->data.call.functionCall = functionCall(tokenList);
+      astBlockAppendCommand(block, cmd);
+      return true;
     }
-    return expression(tokenList);
+    cmd = astCodeCommandNew(EXPRESSION, getLocation(token));
+    cmd->data.expressionAst.expression = expression(tokenList);
+    return true;
   } else if (tokenType == TK_KW_RETURN) {
-    return returnStatement(tokenList);
+    cmd = astCodeCommandNew(RETURN, getLocation(token));
+    if (!returnStatement(cmd, tokenList)) {
+      return false;
+    }
+    astBlockAppendCommand(block, cmd);
+    return true;
   } else if (tokenType == TK_KW_VAL || tokenType == TK_KW_VAR) {
-    return variableDeclaration(tokenList);
+    cmd = astCodeCommandNew(VARIABLE_DECLARATION, getLocation(token));
+    if (!variableDeclaration(cmd, tokenList)) {
+      return false;
+    }
+    astBlockAppendCommand(block, cmd);
+    return true;
+
   } else {
-    return expression(tokenList);
+    cmd = astCodeCommandNew(EXPRESSION, getLocation(token));
+    cmd->data.expressionAst.expression = expression(tokenList);
+    return true;
   }
 }
 
@@ -407,28 +432,37 @@ AstFunctionCall *functionCall(LinkedTlist *tokenList) {
   return NULL;
 }
 
-bool variableDeclaration(LinkedTlist *tokenList) {
+bool variableDeclaration(AstCommand *cmd, LinkedTlist *tokenList) {
   bool isMutable = false;
   if (varKW(tokenList, &isMutable)) {
-    popToken(tokenList);  // pop the found var/val
     Token *token = popToken(tokenList);
-    if (token != NULL && getTkType(token) == TK_IDENT) {  // AI [gpt-6-luna]: "Can you add token !=
-                                                          // NULL && to all getTkType(token) in ifs"
+    if (token != NULL && getTkType(token) == TK_IDENT) {
+      cmd->data.variableDeclaration.variableName = getString(getValue(token)->s);
+
       AstDataType dtype = optType(tokenList);
       if (dtype == UNKNOWN) {
-        fprintf(stderr, "Incorrect variable type");
+        die(ERR_SYNTAX, getLine(token), "Incorrect variable type");
         return false;
       }
+
+      cmd->data.variableDeclaration.isMutable = isMutable;
+      cmd->data.variableDeclaration.declaredType = dtype;
+      cmd->data.variableDeclaration.resolvedType = UNKNOWN;
+
       token = popToken(tokenList);
-      if (token != NULL &&
-          getTkType(token) == TK_ASSIGN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                            // getTkType(token) in ifs"
-        return rValue(tokenList);
+      if (token != NULL && getTkType(token) == TK_ASSIGN) {
+        cmd->data.variableDeclaration.value = rValue(tokenList);
+        if (cmd->data.variableDeclaration.value != NULL) {
+          return true;
+        }
+        return false;
       } else {
-        die(ERR_SYNTAX, getLine(token), "Missing '=' in function call");
+        die(ERR_SYNTAX, token != NULL ? getLine(token) : 999,
+            "Missing '=' in variable declaration");
       }
     } else {
-      die(ERR_SYNTAX, getLine(token), "Missing identifier in function call");
+      die(ERR_SYNTAX, token != NULL ? getLine(token) : 999,
+          "Missing identifier in variable declaration");
     }
   }
   return false;  // it didn't start with var/val
@@ -444,7 +478,9 @@ bool varKW(LinkedTlist *tokenList, bool *isMutable) {
     *isMutable = true;
   else if (tkType == TK_KW_VAL)
     *isMutable = false;
-  return false;
+  else
+    return false;
+  return true;
 }
 
 bool returnStatement(LinkedTlist *tokenList) {
