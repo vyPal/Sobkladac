@@ -47,6 +47,10 @@ AstExpression *term(LinkedTlist *tokenList);                        // DONE
 bool ifStatement(AstCodeBlock *block, LinkedTlist *tokenList);      // DONE
 bool whileStatement(AstCodeBlock *block, LinkedTlist *tokenList);   // DONE
 
+static int lineOf(Token *token) {
+  return token ? getLine(token) : 999;
+}
+
 bool prolog(LinkedTlist *tokenList) {
   Token *token = lookAheadToken(tokenList, 4);
   if (token == NULL) {
@@ -84,51 +88,50 @@ bool funDefsTail(LinkedTlist *tokenList, AstProgram *asTree) {
 }
 
 bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {
+  // skip blank lines before a function if your layout filter leaves them
+  Token *peek = lookAheadToken(tokenList, 0);
+  if (peek == NULL || getTkType(peek) == TK_EOF)
+    return false;
+
   bool isMain = mainAnnot(tokenList);
-  if (lookAheadToken(tokenList, 1) == NULL) {
+
+  Token *defTK = popToken(tokenList);
+  if (defTK == NULL || getTkType(defTK) != TK_KW_DEF) {
+    die(ERR_SYNTAX, defTK ? getLine(defTK) : 999, "Expected 'def'");
     return false;
   }
-  Token *defTK = popToken(tokenList);
   Token *idTK = popToken(tokenList);
-  if (getTkType(defTK) == TK_KW_DEF) {
-    if (getTkType(idTK) == TK_IDENT) {
-      // AstLocation location <- use getLocation(token);
-      AstFunction *fun = astFunctionNew(getString(getValue(idTK)->s), getLocation(idTK));
+  if (idTK == NULL || getTkType(idTK) != TK_IDENT)
+    die(ERR_SYNTAX, getLine(defTK), "Missing function name");
 
-      fun->isMain = isMain;
+  AstFunction *fun = astFunctionNew(getString(getValue(idTK)->s), getLocation(idTK));
+  fun->isMain = isMain;
 
-      Token *token = popToken(tokenList);
-      if (token != NULL &&
-          getTkType(token) == TK_LPAREN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                            // getTkType(token) in ifs"
-        if (params(fun, tokenList)) {
-          token = popToken(tokenList);
-          if (token != NULL &&
-              getTkType(token) == TK_RPAREN) {  // Confirmed: (Params) // AI [gpt-6-luna]: "Can you
-                                                // add token != NULL
-                                                // && to all getTkType(token) in ifs"
-            AstDataType returnType = optType(tokenList);
-            if (returnType == UNKNOWN) {
-              return false;  // incorrect return type
-            }
-            fun->declaredReturnType = returnType;
-            token = popToken(tokenList);
-            if (token != NULL &&
-                getTkType(token) == TK_ASSIGN) {  // AI [gpt-6-luna]: "Can you add token != NULL &&
-                                                  // to all getTkType(token) in ifs"
-              return funBody(fun, tokenList);
-            } else {
-              fprintf(stderr, "Missing '=' in function definition");
-            }
-          } else {
-            fprintf(stderr, "Missing ')' in function definition");
-          }
-        }
-      }
-    }
-    die(ERR_SYNTAX, getLine(defTK), "Ivalid function definition");
-  }
-  return false;
+  Token *t = popToken(tokenList);
+  if (t == NULL || getTkType(t) != TK_LPAREN)
+    die(ERR_SYNTAX, getLine(idTK), "Missing '(' in function definition");
+
+  if (!params(fun, tokenList))
+    die(ERR_SYNTAX, getLine(idTK), "Invalid parameters");
+
+  t = popToken(tokenList);
+  if (t == NULL || getTkType(t) != TK_RPAREN)
+    die(ERR_SYNTAX, getLine(idTK), "Missing ')' in function definition");
+
+  AstDataType rt = optType(tokenList);
+  if (rt == UNKNOWN)
+    die(ERR_SYNTAX, getLine(idTK), "Incorrect return type");
+  fun->declaredReturnType = rt;
+
+  t = popToken(tokenList);
+  if (t == NULL || getTkType(t) != TK_ASSIGN)
+    die(ERR_SYNTAX, getLine(idTK), "Missing '=' in function definition");
+
+  if (!funBody(fun, tokenList))
+    die(ERR_SYNTAX, getLine(idTK), "Invalid function body");
+
+  astProgramAppendFunction(asTree, fun);
+  return true;
 }
 
 /// @brief Checks for existence of @main anotation
@@ -508,6 +511,7 @@ bool varKW(LinkedTlist *tokenList, bool *isMutable) {
     *isMutable = false;
   else
     return false;
+  popToken(tokenList);  // pop found token
   return true;
 }
 
@@ -528,6 +532,7 @@ bool returnTail(AstCommand *cmd, LinkedTlist *tokenList) {
       getTkType(token) == TK_DEDENT || getTkType(token) == TK_EOF) {
     AstExpression *returnsNothing = astExpressionNew(UNIT_LITERAL, cmd->location);
     cmd->data.returnAst.value = astValueFromExpr(returnsNothing);
+    return true;
   }
 
   cmd->data.returnAst.value = rValue(tokenList);
@@ -699,7 +704,7 @@ bool ifStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
         if (token == NULL ||
             getTkType(token) != TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
                                               // all getTkType(token) in ifs"
-          die(ERR_SYNTAX, getLine(token), "Missing dedentation in else branch");
+          die(ERR_SYNTAX, lineOf(token), "Missing dedentation in else branch");
         }
         astBlockAppendCommand(block, cmd);
         return true;
@@ -715,12 +720,12 @@ bool whileStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
     die(ERR_SYNTAX, 999, "Unexpected end of file");
     return NULL;
   }
-
   int tkType = getTkType(token);
   if (tkType != TK_KW_WHILE) {
     die(ERR_SYNTAX, getLine(token), "Missing 'while' in while statement");
   }
   AstCommand *cmd = astCodeCommandNew(WHILE, getLocation(token));
+  popToken(tokenList);  // pop 'while'
   AstExpression *condition = expression(tokenList);
   if (condition != NULL) {
     cmd->data.whileAst.condition = condition;
@@ -747,7 +752,7 @@ bool whileStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
       if (token == NULL ||
           getTkType(token) != TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
                                             // getTkType(token) in ifs"
-        die(ERR_SYNTAX, getLine(token),
+        die(ERR_SYNTAX, lineOf(token),
             "Missing dedentation (inversion of indentation) in while statement");
       }
 
