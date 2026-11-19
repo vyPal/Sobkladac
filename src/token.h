@@ -44,7 +44,31 @@ enum TkType {
   TK_NEWLINE,    // \n
   TK_INDENT,     // int (number of spaces)
   TK_ATMAIN,     // @main
-  TK_EOF         // end of file
+  TK_EOF,        // end of file
+
+  // for layout.c - extra + keywords
+  TK_KW_IMPORT,
+  TK_DEDENT,  // oposite of TK_INDENT
+
+  TK_KW_INT,
+  TK_KW_DOUBLE,
+  TK_KW_STRING,
+  TK_KW_UNIT,
+
+  TK_KW_WHILE,
+  TK_KW_DO,
+
+  TK_KW_IF,
+  TK_KW_THEN,
+  TK_KW_ELSE,
+
+  TK_KW_DEF,
+  TK_KW_RETURN,
+
+  TK_KW_VAL,
+  TK_KW_VAR,
+
+  TK_KW_RESERVED
 };
 
 /**
