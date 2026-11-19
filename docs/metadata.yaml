@@ -1,0 +1,23 @@
+---
+lang: en
+documentclass: article
+geometry:
+  - a4paper
+  - margin=20mm
+fontsize: 11pt
+mainfont: "DejaVu Serif"
+monofont: "DejaVu Sans Mono"
+colorlinks: true
+linkcolor: black
+urlcolor: blue
+header-includes:
+  - \usepackage{float}
+  - \floatplacement{figure}{H}
+  - \usepackage{booktabs}
+  - \usepackage{fancyhdr}
+  - \pagestyle{fancy}
+  - \fancyhf{}
+  - \lhead{IFJ / IAL 2026 -- Project Documentation}
+  - \rhead{Tým xpalacj00}
+  - \cfoot{\thepage}
+---
