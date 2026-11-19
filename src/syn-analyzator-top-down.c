@@ -34,16 +34,16 @@ bool line(LinkedTlist *tokenList);
 
 bool simpleTail(LinkedTlist *tokenList);
 bool simpleStatement(LinkedTlist *tokenList);
-bool assignment(LinkedTlist *tokenList);
-AstFunctionCall *functionCall(LinkedTlist *tokenList);
+bool assignment(AstCommand *cmd, LinkedTlist *tokenList);  // DONE
+AstFunctionCall *functionCall(LinkedTlist *tokenList);     // DONE
 bool variableDeclaration(LinkedTlist *tokenList);
-bool varKW(LinkedTlist *tokenList, bool *isMutable);
+bool varKW(LinkedTlist *tokenList, bool *isMutable);  // DONE
 bool returnStatement(LinkedTlist *tokenList);
 bool returnTail(LinkedTlist *tokenList);
-bool rValue(LinkedTlist *tokenList);
-bool args(AstFunctionCall *funCall, LinkedTlist *tokenList);
-bool argsTail(AstFunctionCall *funCall, LinkedTlist *tokenList);
-AstExpression *term(LinkedTlist *tokenList);
+AstValue *rValue(LinkedTlist *tokenList);                         // DONE
+bool args(AstFunctionCall *funCall, LinkedTlist *tokenList);      // DONE
+bool argsTail(AstFunctionCall *funCall, LinkedTlist *tokenList);  // DONE
+AstExpression *term(LinkedTlist *tokenList);                      // DONE
 bool ifStatement(LinkedTlist *tokenList);
 bool whileStatement(LinkedTlist *tokenList);
 
@@ -353,20 +353,27 @@ bool simpleStatement(LinkedTlist *tokenList) {
   }
 }
 
-bool assignment(LinkedTlist *tokenList) {
-  Token *token = popToken(tokenList);
-  if (token != NULL && getTkType(token) == TK_IDENT) {  // AI [gpt-6-luna]: "Can you add token !=
-                                                        // NULL && to all getTkType(token) in ifs"
-    token = popToken(tokenList);
+bool assignment(AstCommand *cmd, LinkedTlist *tokenList) {
+  Token *prevToken, *token = lookAheadToken(tokenList, 0);
+  if (token == NULL || getTkType(token) == TK_EOF) {
+    die(ERR_SYNTAX, 999, "Unexpected EOF");
+  }
+  if (getTkType(token) == TK_IDENT) {
+    prevToken = popToken(tokenList);  // ident
+    token = lookAheadToken(tokenList, 0);
     if (token != NULL &&
         getTkType(token) == TK_ASSIGN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
                                           // getTkType(token) in ifs"
-      return rValue(tokenList);
+      cmd->data.assignment.variableName = getString(getValue(token)->s),
+      cmd->data.assignment.value = rValue(tokenList);
+      prevToken = popToken(tokenList);
+      return true;
     } else {
-      fprintf(stderr, "Missing '=' in assignment");
+      die(ERR_SYNTAX, getLine(prevToken), "Missing '=' in assignment");
       return false;
     }
   }
+  die(ERR_SYNTAX, getLine(token), "Incorect input for assignment");
   return false;
 }
 
@@ -432,14 +439,15 @@ bool variableDeclaration(LinkedTlist *tokenList) {
 
 bool varKW(LinkedTlist *tokenList, bool *isMutable) {
   Token *token = lookAheadToken(tokenList, 0);
+  if (token == NULL || getTkType(token) == TK_EOF) {
+    die(ERR_SYNTAX, 999, "Unexpected EOF");
+  }
   int tkType = getTkType(token);
   if (tkType == TK_KW_VAR)
     *isMutable = true;
   else if (tkType == TK_KW_VAL)
     *isMutable = false;
-  else
-    return false;
-  return true;
+  return false;
 }
 
 bool returnStatement(LinkedTlist *tokenList) {
@@ -456,7 +464,8 @@ bool returnTail(LinkedTlist *tokenList) {
   return rValue(tokenList) || true;  // epsilon
 }
 
-bool rValue(LinkedTlist *tokenList) {
+// DONE
+AstValue *rValue(LinkedTlist *tokenList) {
   Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL) {
     die(ERR_SYNTAX, 999, "Unexpected end of file");
@@ -466,12 +475,13 @@ bool rValue(LinkedTlist *tokenList) {
   if (tokenType == TK_IDENT) {
     Token *nextToken = lookAheadToken(tokenList, 1);
     if (nextToken != NULL && getTkType(nextToken) == TK_LPAREN) {
-      return functionCall(tokenList);
+      return astValueFromFunctionCall(functionCall(tokenList));
     }
   }
-  return expression(tokenList);
+  return astValueFromExpr(expression(tokenList));
 }
 
+// DONE
 bool args(AstFunctionCall *funCall, LinkedTlist *tokenList) {  // there must be some args
   AstExpression *arg = term(tokenList);
   if (arg != NULL) {
