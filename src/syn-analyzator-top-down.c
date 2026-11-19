@@ -38,14 +38,14 @@ bool assignment(AstCommand *cmd, LinkedTlist *tokenList);           // DONE
 AstFunctionCall *functionCall(LinkedTlist *tokenList);              // DONE
 bool variableDeclaration(AstCommand *cmd, LinkedTlist *tokenList);  // DONE
 bool varKW(LinkedTlist *tokenList, bool *isMutable);                // DONE
-bool returnStatement(LinkedTlist *tokenList);
-bool returnTail(LinkedTlist *tokenList);
-AstValue *rValue(LinkedTlist *tokenList);                         // DONE
-bool args(AstFunctionCall *funCall, LinkedTlist *tokenList);      // DONE
-bool argsTail(AstFunctionCall *funCall, LinkedTlist *tokenList);  // DONE
-AstExpression *term(LinkedTlist *tokenList);                      // DONE
-bool ifStatement(LinkedTlist *tokenList);
-bool whileStatement(LinkedTlist *tokenList);
+bool returnStatement(AstCommand *cmd, LinkedTlist *tokenList);      // DONE
+bool returnTail(AstCommand *cmd, LinkedTlist *tokenList);           // DONE
+AstValue *rValue(LinkedTlist *tokenList);                           // DONE
+bool args(AstFunctionCall *funCall, LinkedTlist *tokenList);        // DONE
+bool argsTail(AstFunctionCall *funCall, LinkedTlist *tokenList);    // DONE
+AstExpression *term(LinkedTlist *tokenList);                        // DONE
+bool ifStatement(AstCodeBlock *block, LinkedTlist *tokenList);
+bool whileStatement(AstCodeBlock *block, LinkedTlist *tokenList);
 
 bool prolog(LinkedTlist *tokenList) {
   Token *token = lookAheadToken(tokenList, 4);
@@ -494,18 +494,27 @@ bool varKW(LinkedTlist *tokenList, bool *isMutable) {
   return true;
 }
 
-bool returnStatement(LinkedTlist *tokenList) {
+bool returnStatement(AstCommand *cmd, LinkedTlist *tokenList) {
   Token *token = popToken(tokenList);
   if (token != NULL &&
       getTkType(token) == TK_KW_RETURN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
                                            // getTkType(token) in ifs"
-    return returnTail(tokenList);
+    return returnTail(cmd, tokenList);
   }
   return false;
 }
 
-bool returnTail(LinkedTlist *tokenList) {
-  return rValue(tokenList) || true;  // epsilon
+bool returnTail(AstCommand *cmd, LinkedTlist *tokenList) {
+  Token *token = lookAheadToken(tokenList, 0);
+
+  if (token == NULL || getTkType(token) == TK_NEWLINE || getTkType(token) == TK_SEMICOLON ||
+      getTkType(token) == TK_DEDENT || getTkType(token) == TK_EOF) {
+    AstExpression *returnsNothing = astExpressionNew(UNIT_LITERAL, cmd->location);
+    cmd->data.returnAst.value = astValueFromExpr(returnsNothing);
+  }
+
+  cmd->data.returnAst.value = rValue(tokenList);
+  return true;
 }
 
 // DONE
@@ -513,7 +522,7 @@ AstValue *rValue(LinkedTlist *tokenList) {
   Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL) {
     die(ERR_SYNTAX, 999, "Unexpected end of file");
-    return false;
+    return NULL;
   }
   int tokenType = getTkType(token);
   if (tokenType == TK_IDENT) {
@@ -606,7 +615,7 @@ AstExpression *term(LinkedTlist *tokenList) {
   return NULL;
 }
 
-bool ifStatement(LinkedTlist *tokenList) {
+bool ifStatement(AstCommand *cmd, LinkedTlist *tokenList) {
   Token *token = lookAheadToken(tokenList, 0);
   int tkType = getTkType(token);
   if (tkType != TK_KW_IF) {
@@ -672,7 +681,7 @@ bool ifStatement(LinkedTlist *tokenList) {
   return false;
 }
 
-bool whileStatement(LinkedTlist *tokenList) {
+bool whileStatement(AstCommand *cmd, LinkedTlist *tokenList) {
   Token *token = lookAheadToken(tokenList, 0);
   int tkType = getTkType(token);
   if (tkType != TK_KW_WHILE) {
