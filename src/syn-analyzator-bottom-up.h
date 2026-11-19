@@ -122,4 +122,18 @@ PrecSymbol tokenToPrecSymbol(struct Token *token, struct Token *prevToken);
  */
 bool expression(LinkedTlist *tokenList);
 
+/**
+ * @brief Extra function for getting correct binary operator.
+ * @param token Token to get Binary operator from
+ * @return correct operator on success, NEGATION Operator when token is not operator
+ */
+AstOperator tokenToOperator(Token *token);
+
+/**
+ * @brief Decides if expression type is literal or binary from token
+ * @param token Token to get Expression type from
+ * @return type - literal/binary on success, UNIT_LITERAL ExpType when token is different
+ */
+AstExpressionType tokenToExpressionType(Token *token);
+
 #endif  // SA_BOTTOM_UP_H

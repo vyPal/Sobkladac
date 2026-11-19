@@ -40,6 +40,38 @@ AstLocation getLocation(Token *token) {
   return location;
 }
 
+AstOperator tokenToOperator(Token *token) {
+  if (token == NULL) {
+    die(ERR_SYNTAX, 999, "Unexpected end of file");
+  }
+  enum TkType type = getTkType(token);
+  switch (type) {
+    case TK_PLUS:
+      return ADDITION;
+    case TK_MINUS:
+      return SUBTRACTION;
+    case TK_MULTIPLY:
+      return MULTIPLICATION;
+    case TK_DIVIDE:
+      return DIVISION;
+    case TK_BIGGER:
+      return GREATER;
+    case TK_SMALLER:
+      return LESSER;
+    case TK_BEQUAL:
+      return GREATER_EQUAL;
+    case TK_SEQUAL:
+      return LESSER_EQUAL;
+    case TK_EQUAL:
+      return EQUAL;
+    case TK_NOT_EQUAL:
+      return NOT_EQUAL;
+    default:
+      break;
+  }
+  return NEGATION;  // wrong input
+}
+
 AstExpressionType tokenToExpressionType(Token *token) {
   if (token == NULL) {
     die(ERR_SYNTAX, 999, "Unexpected end of file");
@@ -192,17 +224,52 @@ AstExpression *executeReduce(PrecStack *stack) {
     AstExpressionType ttET = tokenToExpressionType(onePop.token);
     if (ttET == UNIT_LITERAL || ttET == UNARY || ttET == BINARY)
       return NULL;
-    return astExpressionNew(ttET, getLocation(onePop.token));
+    AstExpression *ex = astExpressionNew(ttET, getLocation(onePop.token));
+    switch (getTkType(onePop.token)) {
+      case TK_NUMBER:
+        ex->data.intValue = getValue(onePop.token)->i;
+        break;
+      case TK_DECIMAL:
+        ex->data.doubleValue = getValue(onePop.token)->d;
+        break;
+      case TK_STRING:
+        ex->data.stringValue = getString(getValue(onePop.token)->s);
+        break;
+      case TK_IDENT:
+        ex->data.variable = getString(getValue(onePop.token)->s);
+      default:
+        break;
+    }
+    return ex;
   }
 
   // RULE 2: E-> (E) (3 symbols)
-  // if TODO
+  if (count == 3 && popped[2].symbol == PREC_LPAREN && popped[1].type == NON_TERMINAL &&
+      popped[0].symbol == PREC_RPAREN) {
+    return popped[1].astNode;
+  }
 
   // RULE 3: E-> -E (Unary - 2 symbols)
-  // if TODO
+  if (count == 2 && getTkType(popped[1].token) == TK_MINUS && popped[0].type == NON_TERMINAL) {
+    AstExpression *ex = astExpressionNew(UNARY, getLocation(popped[1].token));
+    ex->data.unary.operatorAst = NEGATION;
+    ex->data.unary.expression = popped[0].astNode;
+    return ex;
+  }
 
   // RULE 4: E-> E OPERATOR E (Binary 3 symbols)
-  // if TODO
+  if (count == 3 && popped[2].type == NON_TERMINAL &&
+      tokenToExpressionType(popped[1].token) == BINARY && popped[0].type == NON_TERMINAL) {
+    AstExpression *ex = astExpressionNew(BINARY, getLocation(popped[1].token));
+    AstOperator op = tokenToOperator(popped[1].token);
+    if (op == NEGATION) {
+      die(ERR_SYNTAX, getLine(popped[1].token), "Wrong operator for expression");
+    }
+    ex->data.binary.leftExpression = popped[2].astNode;
+    ex->data.binary.operatorAst = op;
+    ex->data.binary.rightExpression = popped[0].astNode;
+    return ex;
+  }
   return NULL;
 }
 
@@ -238,6 +305,7 @@ bool expression(LinkedTlist *tokenList) {  // TODO: Add parametr: specific endin
   Token *prevToken = token;
   PrecSymbol sym = tokenToPrecSymbol(token, prevToken);
   PrecStackItem b, *a;
+  AstExpression *expr;
   do {
     a = getTopItem(&stack);
     b = makeTerminalItem(sym, token, false);
@@ -256,7 +324,17 @@ bool expression(LinkedTlist *tokenList) {  // TODO: Add parametr: specific endin
         b = makeTerminalItem(sym, token, false);
         break;
       case '>':
-        executeReduce(&stack);
+        expr = executeReduce(&stack);
+        if (expr == NULL) {
+          die(ERR_SYNTAX, getLine(prevToken), "No suitable grammar rule!");
+        }
+        PrecStackItem item;
+        item.symbol = PREC_UNKNOWN;
+        item.token = token;
+        item.type = NON_TERMINAL;
+        item.startBrkP = false;
+        item.astNode = expr;
+        pushItem(item, &stack);
         break;
       default:
         die(ERR_SYNTAX, getLine(token), "Invalid expression");
