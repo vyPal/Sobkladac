@@ -1,0 +1,18 @@
+import ifj26.*
+
+@main def main(): Unit =
+  val s = "abcdef"
+  val sub = subStr(s, 1, 4)
+  val len = strLength(sub)
+  val code = ord(sub, 0)
+  val ch = chr(code)
+  print(s)
+  print("\n")
+  print(sub)
+  print("\n")
+  print(len)
+  print("\n")
+  print(code)
+  print("\n")
+  print(ch)
+  print("\n")

@@ -141,9 +141,12 @@ PrecSymbol tokenToPrecSymbol(struct Token *token, struct Token *prevToken) {
 
     // Tokeny, které ukončují výraz
     case TK_NEWLINE:
+    case TK_SEMICOLON:
     case TK_EOF:
     case TK_COMMA:
     case TK_COLON:
+    case TK_KW_THEN:
+    case TK_KW_DO:
       return PREC_DOLLAR;
     default:
       return PREC_UNKNOWN;
@@ -212,7 +215,11 @@ AstExpression *executeReduce(PrecStack *stack) {
   int count = 0;
   PrecStackItem popped[3];
 
-  while (!isBreakPoint(stack)) {
+  // The handle starts right above the breakpoint terminal and may begin with a non-terminal
+  // (e.g. E + E), so stop only when the item on top of the stack is the breakpoint itself.
+  while (stack->top >= 0 && !(stack->items[stack->top].type == TERMINAL &&
+                              (stack->items[stack->top].startBrkP ||
+                               stack->items[stack->top].symbol == PREC_DOLLAR))) {
     if (count >= 3) {
       return NULL;
     }
@@ -306,6 +313,16 @@ AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: spec
       /* $               */ {'<', '<', '<', '<', '<', '<', 'E', '<', 'E'}   // ok
 
   };
+  // `()` is the Unit literal; the precedence grammar has no rule for an empty pair of parentheses
+  Token *first = lookAheadToken(tokenList, 0);
+  Token *second = lookAheadToken(tokenList, 1);
+  if (first != NULL && second != NULL && getTkType(first) == TK_LPAREN &&
+      getTkType(second) == TK_RPAREN) {
+    popToken(tokenList);
+    popToken(tokenList);
+    return astExpressionNew(UNIT_LITERAL, getLocation(first));
+  }
+
   PrecStack stack;
   stackInit(&stack, 3);
   PrecStackItem item = makeTerminalItem(PREC_DOLLAR, NULL, false);

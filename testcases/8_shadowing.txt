@@ -1,0 +1,12 @@
+import ifj26.*
+
+@main def main(): Unit =
+  val x = "outer"
+  val a = 10
+  if a < 99 then
+    val x = "inner"
+    print(x)
+  else
+    ()
+  print(x)
+  print("\n")
