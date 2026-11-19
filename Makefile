@@ -29,7 +29,11 @@ DOC_META    := $(DOC_DIR)/metadata.yaml
 DOC_SOURCES := $(sort $(wildcard $(DOC_DIR)/*.md))
 DOC_IMAGES  := $(wildcard $(DOC_DIR)/*.pdf $(DOC_DIR)/img/*.pdf)
 
-.PHONY: all build dev asan test-build test test-asan check format format-check tidy cppcheck build-check clean check-all doc
+ZIP_NAME    := xpalacj00.zip
+SUBMIT_DIRS := $(SRC_DIR) $(TEST_DIR)
+SUBMIT_META := Makefile $(DOC_OUT) rozdeleni rozsireni
+
+.PHONY: all build dev asan test-build test test-asan check format format-check tidy cppcheck build-check clean check-all doc zip
 
 all: build
 
@@ -94,6 +98,13 @@ $(DOC_OUT): $(DOC_META) $(DOC_SOURCES) $(DOC_IMAGES)
 		--pdf-engine=xelatex \
 		--resource-path=$(DOC_DIR):$(DOC_DIR)/img \
 		-o $(DOC_OUT)
+
+zip: $(DOC_OUT)
+	rm -f $(ZIP_NAME)
+	zip -r $(ZIP_NAME) $(SUBMIT_META) $(SUBMIT_DIRS) \
+		-x "$(TEST_DIR)/bin/*" \
+		-x "*.o" -x "*.d" -x "*.out" \
+		-x "*/.*" -x ".*" -x "__MACOSX/*"
 
 clean:
 	rm -rf $(OBJ_DIR) $(TARGET)
