@@ -167,6 +167,7 @@ struct AstCommand {
 
     struct {  // ASSIGNMENT
       char *variableName;
+      AstDataType resolvedType;  // type of the assigned variable, set by semantic analysis
       AstValue *value;
     } assignment;
 
