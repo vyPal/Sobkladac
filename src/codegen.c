@@ -324,6 +324,8 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
       return (ValueInfo){.ty = DOUBLE, .val = floatOp(expr->data.doubleValue)};
     case STRING_LITERAL:
       return (ValueInfo){.ty = STRING, .val = stringOp(expr->data.stringValue)};
+    case BOOL_LITERAL:
+      return (ValueInfo){.ty = BOOL, .val = boolOp(expr->data.boolValue)};
     case UNIT_LITERAL:
       return (ValueInfo){.ty = UNIT, .val = nilOp()};
 
@@ -335,8 +337,9 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
       return (ValueInfo){.ty = expr->deducedDataType, .val = varOp(FT_LF, expr->data.variable)};
 
     // Only negation is allowed as unary op, subtract value from 0 or 0.0
-    case UNARY:
-      if (expr->data.unary.operatorAst != NEGATION)
+    case UNARY:;
+      AstOperator op = expr->data.unary.operatorAst;
+      if (op != NEGATION && op != LOGICAL_NEGATION)
         die(ERR_INTERNAL, (int)expr->location.line,
             "Binary operation cannot be performed on single operand");
 
@@ -344,11 +347,15 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
 
       dst = getResultOperand(preferredDst);
 
-      if (operand.ty == INT) {
-        EMIT(code, SUB, dst, intOp(0), operand.val);
-        emitIntWrap(code, dst);
-      } else
-        EMIT(code, SUB, dst, floatOp(0.0), operand.val);
+      if (op == NEGATION) {
+        if (operand.ty == INT) {
+          EMIT(code, SUB, dst, intOp(0), operand.val);
+          emitIntWrap(code, dst);
+        } else
+          EMIT(code, SUB, dst, floatOp(0.0), operand.val);
+      } else {
+        EMIT(code, NOT, dst, operand.val);
+      }
 
       return (ValueInfo){.ty = operand.ty, .val = dst};
 
@@ -425,6 +432,14 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
         case NOT_EQUAL:
           EMIT(code, EQ, dst, left.val, right.val);
           EMIT(code, NOT, dst, dst);
+          return (ValueInfo){.ty = BOOL, .val = dst};
+
+        case LOGICAL_AND:
+          EMIT(code, AND, dst, left.val, right.val);
+          return (ValueInfo){.ty = BOOL, .val = dst};
+
+        case LOGICAL_OR:
+          EMIT(code, OR, dst, left.val, right.val);
           return (ValueInfo){.ty = BOOL, .val = dst};
 
         default:
