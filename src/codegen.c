@@ -1,3 +1,12 @@
+/**
+ * @file codegen.c
+ * Project: IFJ26 compiler
+ * @brief Codegen implementation
+ * @author Jakub Palacky <xpalacj00>
+ *
+ * Codegen implementation
+ */
+
 #include "codegen.h"
 
 #include <stdbool.h>
