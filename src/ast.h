@@ -83,13 +83,18 @@ typedef enum {
   GREATER,         // >
   GREATER_EQUAL,   // >=
   EQUAL,           // ==
-  NOT_EQUAL        // !=
+  NOT_EQUAL,       // !=
+  // BOOLTHEN:
+  LOGICAL_NEGATION,  // !
+  LOGICAL_AND,       // &&
+  LOGICAL_OR         // ||
 } AstOperator;
 
 typedef enum {
   INT_LITERAL,
   DOUBLE_LITERAL,
   STRING_LITERAL,
+  BOOL_LITERAL,  // BOOLTHEN
   UNIT_LITERAL,
   VARIABLE,
   UNARY,
@@ -106,7 +111,7 @@ struct AstExpression {
     int32_t intValue;    // INT_LITERAL
     double doubleValue;  // DOUBLE_LITERAL
     char *stringValue;   // STRING_LITERAL
-    bool boolValue;      // BOOL
+    bool boolValue;      // BOOL_LITERAL
 
     // UNIT_LITERAL (no data)
 
@@ -183,7 +188,7 @@ struct AstCommand {
     struct {  // IF
       AstExpression *condition;
       AstCodeBlock *thenBlock;
-      AstCodeBlock *elseBlock;
+      AstCodeBlock *elseBlock;  // can be NULL
     } ifAst;
 
     struct {  // WHILE
