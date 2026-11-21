@@ -106,7 +106,7 @@ PrecStackItem makeTerminalItem(PrecSymbol symbol, Token *token, bool isBreakpoin
  * @param token Token to retrieve the location from.
  * @return The token's AST source location.
  */
-AstLocation getLocation(Token *token);
+AstLocation getLocation(const Token *token);
 
 /**
  * @brief Maps a token to its precedence class.
@@ -114,7 +114,7 @@ AstLocation getLocation(Token *token);
  * @param prevToken Previous token, used to distinguish unary and binary minus.
  * @return The token's precedence class.
  */
-PrecSymbol tokenToPrecSymbol(struct Token *token, struct Token *prevToken);
+PrecSymbol tokenToPrecSymbol(const struct Token *token, const struct Token *prevToken);
 
 /**
  * @brief Checks whether the stack contains one complete reduced expression.
@@ -136,13 +136,13 @@ AstExpression *expression(LinkedTlist *tokenList);
  * @param token Token to get Binary operator from
  * @return correct operator on success, NEGATION Operator when token is not operator
  */
-AstOperator tokenToOperator(Token *token);
+AstOperator tokenToOperator(const Token *token);
 
 /**
  * @brief Decides if expression type is literal or binary from token
  * @param token Token to get Expression type from
  * @return type - literal/binary on success, UNIT_LITERAL ExpType when token is different
  */
-AstExpressionType tokenToExpressionType(Token *token);
+AstExpressionType tokenToExpressionType(const Token *token);
 
 #endif  // SA_BOTTOM_UP_H

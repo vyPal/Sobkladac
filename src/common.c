@@ -163,14 +163,14 @@ void arenaCleanup(void) {
   }
 }
 
-void die(int code, int line, const char *fmt, ...) {
+void die(int code, unsigned int line, const char *fmt, ...) {
   if (code == ERR_OK) {
     arenaCleanup();
     exit(code);
   }
   va_list ap;
   if (line > 0)
-    fprintf(stderr, "error (line %d): ", line);
+    fprintf(stderr, "error (line %u): ", line);
   else
     fprintf(stderr, "error: ");
 

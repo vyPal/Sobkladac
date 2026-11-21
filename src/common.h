@@ -46,7 +46,7 @@ enum {
  * @note If line is `<=0`, no line information is printed
  * @note If code is `ERR_OK`, no error message is printed
  */
-void die(int code, int line, const char *fmt, ...)
+void die(int code, unsigned int line, const char *fmt, ...)
     __attribute__((__noreturn__, __format__(__printf__, 3, 4)));
 
 /**

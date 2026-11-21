@@ -251,7 +251,7 @@ void checkRecursion(AstProgram *ast, SymTable *globalSymTable) {
   }
 
   // create a list of all user functions
-  AstFunction **functionList = arenaAlloc(functionCount * sizeof(AstFunction *));
+  AstFunction **functionList = (AstFunction **)arenaAlloc(functionCount * sizeof(AstFunction *));
   function = ast->firstFunction;
   for (size_t functionPosition = 0; functionPosition < functionCount; functionPosition++) {
     functionList[functionPosition] = function;
@@ -259,7 +259,7 @@ void checkRecursion(AstProgram *ast, SymTable *globalSymTable) {
   }
 
   // create a 2D function dependency array
-  bool **functionDependenciesArray = arenaAlloc(functionCount * sizeof(bool *));
+  bool **functionDependenciesArray = (bool **)arenaAlloc(functionCount * sizeof(bool *));
   for (size_t functionPosition = 0; functionPosition < functionCount; functionPosition++) {
     functionDependenciesArray[functionPosition] = arenaZalloc(functionCount * sizeof(bool));
   }
@@ -352,25 +352,12 @@ AstDataType analyzeExpression(AstExpression *expression, SymTable *symTable) {
         expression->deducedDataType = STRING;
       }
     } else {  // logical operation
-      // size comparassion
-      if (op == LESSER || op == LESSER_EQUAL || op == GREATER || op == GREATER_EQUAL) {
-        // numbers
-        if ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) {
-          expression->deducedDataType = BOOL;
-        }
-        // strings
-        else if (typeL == STRING && typeR == STRING) {
-          expression->deducedDataType = BOOL;
-        }
-      }
-      // equality
-      else if (op == EQUAL || op == NOT_EQUAL) {
-        // numbers
-        if ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) {
-          expression->deducedDataType = BOOL;
-        }
-        // same type
-        else if (typeL == typeR) {
+      // size comparassion or equality
+      if (op == LESSER || op == LESSER_EQUAL || op == GREATER || op == GREATER_EQUAL ||
+          op == EQUAL || op == NOT_EQUAL) {
+        // numbers or strings
+        if (((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) ||
+            (typeL == STRING && typeR == STRING)) {
           expression->deducedDataType = BOOL;
         }
       }
