@@ -18,7 +18,7 @@ int main(void) {
 
   AstProgram *prog = topDown(list);
   semanticAnalysis(prog);
-  char *out = generateCode(*prog);
+  const char *out = generateCode(*prog);
 
   printf("%s", out);
 

@@ -13,13 +13,14 @@
 #include "syn_analyzator_bottom_up.h"
 
 #include <limits.h>
+#include <stddef.h>
 
 #include "ast.h"
 #include "common.h"
 
 #define PREC_TYPES 9
 
-bool isUnaryContext(Token *prevToken) {
+bool isUnaryContext(const Token *prevToken) {
   enum TkType type = getTkType(prevToken);
   switch (type) {
     case TK_IDENT:
@@ -33,7 +34,7 @@ bool isUnaryContext(Token *prevToken) {
   }
 }
 
-AstLocation getLocation(Token *token) {
+AstLocation getLocation(const Token *token) {
   AstLocation location = {
       .line = (unsigned)getLine(token),
       .column = 0,  // (unsigned)getColumn(token), // TODO after implementation this function in
@@ -42,7 +43,7 @@ AstLocation getLocation(Token *token) {
   return location;
 }
 
-AstOperator tokenToOperator(Token *token) {
+AstOperator tokenToOperator(const Token *token) {
   if (token == NULL) {
     die(ERR_SYNTAX, 999, "Unexpected end of file");
   }
@@ -74,7 +75,7 @@ AstOperator tokenToOperator(Token *token) {
   return NEGATION;  // wrong input
 }
 
-AstExpressionType tokenToExpressionType(Token *token) {
+AstExpressionType tokenToExpressionType(const Token *token) {
   if (token == NULL) {
     die(ERR_SYNTAX, 999, "Unexpected end of file");
   }
@@ -105,7 +106,7 @@ AstExpressionType tokenToExpressionType(Token *token) {
   return UNIT_LITERAL;  // incorrect one
 }
 
-PrecSymbol tokenToPrecSymbol(struct Token *token, struct Token *prevToken) {
+PrecSymbol tokenToPrecSymbol(const struct Token *token, const struct Token *prevToken) {
   if (token == NULL)
     die(ERR_SYNTAX, getLine(prevToken), "Missing tokens");
   enum TkType type = getTkType(token);
@@ -206,7 +207,7 @@ PrecStackItem makeTerminalItem(PrecSymbol sym, Token *token, bool isBreakpoint) 
 }
 
 bool isBreakPoint(PrecStack *stack) {
-  PrecStackItem *top = getTopItem(stack);
+  const PrecStackItem *top = getTopItem(stack);
   return top->startBrkP || top->symbol == PREC_DOLLAR;
 }
 
@@ -287,7 +288,7 @@ AstExpression *executeReduce(PrecStack *stack) {
 }
 
 bool stackCorrect(PrecStack stack) {
-  PrecStackItem *dolar = getTopItem(&stack);
+  const PrecStackItem *dolar = getTopItem(&stack);
   // Checks that first terminal is dollar, without any breakpoint '<' and on top of that is only one
   // non-terminal
   return dolar->symbol == PREC_DOLLAR && !dolar->startBrkP && stack.top == 1 &&
@@ -314,8 +315,8 @@ AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: spec
 
   };
   // `()` is the Unit literal; the precedence grammar has no rule for an empty pair of parentheses
-  Token *first = lookAheadToken(tokenList, 0);
-  Token *second = lookAheadToken(tokenList, 1);
+  const Token *first = lookAheadToken(tokenList, 0);
+  const Token *second = lookAheadToken(tokenList, 1);
   if (first != NULL && second != NULL && getTkType(first) == TK_LPAREN &&
       getTkType(second) == TK_RPAREN) {
     popToken(tokenList);
@@ -325,8 +326,8 @@ AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: spec
 
   PrecStack stack;
   stackInit(&stack, 3);
-  PrecStackItem item = makeTerminalItem(PREC_DOLLAR, NULL, false);
-  pushItem(item, &stack);                       // default settings - I pushed $ on stack
+  PrecStackItem termItem = makeTerminalItem(PREC_DOLLAR, NULL, false);
+  pushItem(termItem, &stack);                   // default settings - I pushed $ on stack
   Token *token = lookAheadToken(tokenList, 0);  // guaranteed token
   Token *prevToken = token;
   PrecSymbol sym = tokenToPrecSymbol(token, prevToken);
@@ -334,11 +335,11 @@ AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: spec
     die(ERR_SYNTAX, getLine(token), "Unexpected token on input");
   }
 
-  PrecStackItem b, *a;
+  PrecStackItem b;
   AstExpression *expr;
 
   do {
-    a = getTopItem(&stack);
+    PrecStackItem *a = getTopItem(&stack);
     b = makeTerminalItem(sym, token, false);
     switch (precTable[a->symbol][b.symbol]) {
       case '<':
