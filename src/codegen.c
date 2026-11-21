@@ -748,15 +748,21 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
       break;
     }
     case IF:;
-      Operand f = labelOp(newLabel("everything_is_one_function", "if_false"));
       Operand end = labelOp(newLabel("everything_is_one_function", "if_end"));
       ValueInfo ifcond = lowerExpression(code, cmd->data.ifAst.condition, NULL);
-      EMIT(code, JUMPIFEQ, f, ifcond.val, boolOp(false));
-      lowerCodeBlock(code, cmd->data.ifAst.thenBlock);
-      EMIT(code, JUMP, end);
-      EMIT(code, LABEL, f);
-      lowerCodeBlock(code, cmd->data.ifAst.elseBlock);
-      EMIT(code, LABEL, end);
+      if (cmd->data.ifAst.elseBlock == NULL) {
+        EMIT(code, JUMPIFEQ, end, ifcond.val, boolOp(false));
+        lowerCodeBlock(code, cmd->data.ifAst.thenBlock);
+        EMIT(code, JUMP, end);
+      } else {
+        Operand f = labelOp(newLabel("everything_is_one_function", "if_false"));
+        EMIT(code, JUMPIFEQ, f, ifcond.val, boolOp(false));
+        lowerCodeBlock(code, cmd->data.ifAst.thenBlock);
+        EMIT(code, JUMP, end);
+        EMIT(code, LABEL, f);
+        lowerCodeBlock(code, cmd->data.ifAst.elseBlock);
+        EMIT(code, LABEL, end);
+      }
       break;
     case WHILE:;
       Operand loop = labelOp(newLabel("everything_is_one_function", "when"));
