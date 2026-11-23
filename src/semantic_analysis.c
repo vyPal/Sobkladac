@@ -475,9 +475,6 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
           }
         }
       }
-      if (command->data.variableDeclaration.resolvedType == BOOL) {
-        die(ERR_TYPE, command->location.line, "bool initialization type is forbidden");
-      }
       // add variable to current symTable
       if (!insertVariableSymTable(block->symTable, command->data.variableDeclaration.variableName,
                                   command->location.line, command->location.column,
@@ -520,7 +517,7 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
           die(ERR_TYPE, command->location.line, "incompatible assignment type");
         }
       }
-      // rename variable and remember its type, codegen can't look it up by the new name
+      // rename variable
       command->data.assignment.variableName = symbol->uniqueID;
       command->data.assignment.resolvedType = symbol->data.variable.dataType;
       // FUNCTION_CALL
@@ -609,7 +606,9 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
                                                 block->symTable))) {
           die(ERR_TYPE, command->location.line, "incompatible return type");
         }
-      } else {  // return by function call
+        // return by function call
+      } else {
+        // check correct return type
         if (!isTypeCompatible(function->resolvedReturnType,
                               analyzeFunctionCall(ast, globalSymTable,
                                                   command->data.returnAst.value->data.functionCall,
@@ -629,10 +628,19 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
           function->declaredReturnType == UNIT) {
         bool explicitReturnFoundLeft = analyzeCodeBlock(
             ast, globalSymTable, function, command->data.ifAst.thenBlock, block->symTable, false);
-        bool explicitReturnFoundRight = analyzeCodeBlock(
-            ast, globalSymTable, function, command->data.ifAst.elseBlock, block->symTable, false);
-        if (explicitReturnFoundLeft && explicitReturnFoundRight) {
-          explicitReturnFound = true;
+        // has else block
+        if (command->data.ifAst.elseBlock != NULL) {
+          bool explicitReturnFoundRight = analyzeCodeBlock(
+              ast, globalSymTable, function, command->data.ifAst.elseBlock, block->symTable, false);
+          if (explicitReturnFoundLeft && explicitReturnFoundRight) {
+            explicitReturnFound = true;
+          }
+        }
+        // no else block
+        else {
+          if (explicitReturnFoundLeft) {
+            explicitReturnFound = true;
+          }
         }
       }
       // WHILE
@@ -648,9 +656,7 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
 
       // EXPRESSION
     } else if (command->type == EXPRESSION) {
-      if (analyzeExpression(command->data.expressionAst.expression, block->symTable) == BOOL) {
-        die(ERR_TYPE, command->location.line, "standalone bool expression is forbidden");
-      }
+      analyzeExpression(command->data.expressionAst.expression, block->symTable);
     }
 
     if (command->nextCommand != NULL) {
@@ -697,7 +703,7 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
       block->lastCommand = newCommand;
     }
     // return FUNCTION_CALL
-    if (command->type == FUNCTION_CALL && function->declaredReturnType != UNIT) {
+    else if (command->type == FUNCTION_CALL) {
       // set return
       if (function->resolvedReturnType == UNKNOWN) {
         function->resolvedReturnType = lastFunctionCallType;
@@ -717,7 +723,7 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
       block->lastCommand = newCommand;
     }
     // return EXPRESSION
-    else if (command->type == EXPRESSION && function->declaredReturnType != UNIT) {
+    else if (command->type == EXPRESSION) {
       // set return
       if (function->resolvedReturnType == UNKNOWN) {
         function->resolvedReturnType = command->data.expressionAst.expression->deducedDataType;
@@ -738,16 +744,24 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
       block->lastCommand = newCommand;
     }
     // IF return
-    if (command->type == IF && function->declaredReturnType != UNIT) {
+    else if (command->type == IF) {
       bool explicitReturnFoundLeft = analyzeCodeBlock(
           ast, globalSymTable, function, command->data.ifAst.thenBlock, block->symTable, true);
-      bool explicitReturnFoundRight = analyzeCodeBlock(
-          ast, globalSymTable, function, command->data.ifAst.elseBlock, block->symTable, true);
-
-      // all "if" end with explicit return
-      if (explicitReturnFoundLeft && explicitReturnFoundRight) {
-        explicitReturnFound = true;
-      } else {  // all "if" end with implicit return UNIT
+      // has else block
+      if (command->data.ifAst.elseBlock != NULL) {
+        bool explicitReturnFoundRight = analyzeCodeBlock(
+            ast, globalSymTable, function, command->data.ifAst.elseBlock, block->symTable, true);
+        if (explicitReturnFoundLeft && explicitReturnFoundRight) {
+          explicitReturnFound = true;
+        }
+      }
+      // no else block
+      else {
+        if (explicitReturnFoundLeft) {
+          explicitReturnFound = true;
+        }
+      }
+      if (!explicitReturnFound) {  // all "if" end with implicit return UNIT
         if (function->resolvedReturnType != UNIT) {
           die(ERR_TYPE, command->location.line,
               "function ends with an implicit return if statement that does not return UNIT");
