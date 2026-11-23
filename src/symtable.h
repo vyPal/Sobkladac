@@ -29,6 +29,7 @@ typedef struct {
 typedef struct {
   AstDataType returnType;
   AstDataType *parameterTypes;
+  char **parameterNames;
   size_t parameterCount;
   bool isBuiltin;
   bool isMain;

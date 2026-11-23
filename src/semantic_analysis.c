@@ -7,6 +7,7 @@
  */
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <string.h>
 
 #include "ast.h"
@@ -17,14 +18,15 @@
 // insert function into symTable
 // return FALSE if function already exists
 bool insertFunctionSymTable(SymTable *symTable, const char *name, unsigned line, unsigned column,
-                            AstDataType returnType, AstDataType *paramTypes, size_t paramCount,
-                            bool isBuiltin, bool isMain) {
+                            AstDataType returnType, AstDataType *paramTypes, char **paramNames,
+                            size_t paramCount, bool isBuiltin, bool isMain) {
   StSymbol *symbol = arenaAlloc(sizeof(StSymbol));
   symbol->type = ST_FUNCTION;
   symbol->declarationLocation.line = line;
   symbol->declarationLocation.column = column;
   symbol->data.function.returnType = returnType;
   symbol->data.function.parameterTypes = paramTypes;
+  symbol->data.function.parameterNames = paramNames;
   symbol->data.function.parameterCount = paramCount;
   symbol->data.function.isBuiltin = isBuiltin;
   symbol->data.function.isMain = isMain;
@@ -80,40 +82,42 @@ void initializeFunctions(const AstProgram *ast, SymTable *globalSymTable) {
   // add built-in functions
   AstDataType *printParams = arenaAlloc(sizeof(AstDataType));
   printParams[0] = ANY;
-  insertFunctionSymTable(globalSymTable, "print", 0, 0, UNIT, printParams, 1, true, false);
+  insertFunctionSymTable(globalSymTable, "print", 0, 0, UNIT, printParams, NULL, 1, true, false);
 
-  insertFunctionSymTable(globalSymTable, "readLine", 0, 0, STRING, NULL, 0, true, false);
+  insertFunctionSymTable(globalSymTable, "readLine", 0, 0, STRING, NULL, NULL, 0, true, false);
 
-  insertFunctionSymTable(globalSymTable, "readInt", 0, 0, INT, NULL, 0, true, false);
+  insertFunctionSymTable(globalSymTable, "readInt", 0, 0, INT, NULL, NULL, 0, true, false);
 
-  insertFunctionSymTable(globalSymTable, "readDouble", 0, 0, DOUBLE, NULL, 0, true, false);
+  insertFunctionSymTable(globalSymTable, "readDouble", 0, 0, DOUBLE, NULL, NULL, 0, true, false);
 
-  insertFunctionSymTable(globalSymTable, "readBoolean", 0, 0, BOOL, NULL, 0, true, false);
+  insertFunctionSymTable(globalSymTable, "readBoolean", 0, 0, BOOL, NULL, NULL, 0, true, false);
 
-  insertFunctionSymTable(globalSymTable, "toStr", 0, 0, STRING, printParams, 1, true, false);
+  insertFunctionSymTable(globalSymTable, "toStr", 0, 0, STRING, printParams, NULL, 1, true, false);
 
   AstDataType *toIntParams = arenaAlloc(sizeof(AstDataType));
   toIntParams[0] = DOUBLE;
-  insertFunctionSymTable(globalSymTable, "toInt", 0, 0, INT, toIntParams, 1, true, false);
+  insertFunctionSymTable(globalSymTable, "toInt", 0, 0, INT, toIntParams, NULL, 1, true, false);
 
   AstDataType *strLengthParams = arenaAlloc(sizeof(AstDataType));
   strLengthParams[0] = STRING;
-  insertFunctionSymTable(globalSymTable, "strLength", 0, 0, INT, strLengthParams, 1, true, false);
+  insertFunctionSymTable(globalSymTable, "strLength", 0, 0, INT, strLengthParams, NULL, 1, true,
+                         false);
 
   AstDataType *subStrParams = arenaAlloc(3 * sizeof(AstDataType));
   subStrParams[0] = STRING;
   subStrParams[1] = INT;
   subStrParams[2] = INT;
-  insertFunctionSymTable(globalSymTable, "subStr", 0, 0, STRING, subStrParams, 3, true, false);
+  insertFunctionSymTable(globalSymTable, "subStr", 0, 0, STRING, subStrParams, NULL, 3, true,
+                         false);
 
   AstDataType *ordParams = arenaAlloc(2 * sizeof(AstDataType));
   ordParams[0] = STRING;
   ordParams[1] = INT;
-  insertFunctionSymTable(globalSymTable, "ord", 0, 0, INT, ordParams, 2, true, false);
+  insertFunctionSymTable(globalSymTable, "ord", 0, 0, INT, ordParams, NULL, 2, true, false);
 
   AstDataType *chrParams = arenaAlloc(sizeof(AstDataType));
   chrParams[0] = INT;
-  insertFunctionSymTable(globalSymTable, "chr", 0, 0, STRING, chrParams, 1, true, false);
+  insertFunctionSymTable(globalSymTable, "chr", 0, 0, STRING, chrParams, NULL, 1, true, false);
 
   // add user functions
   const AstFunction *func = ast->firstFunction;
@@ -136,20 +140,23 @@ void initializeFunctions(const AstProgram *ast, SymTable *globalSymTable) {
     // add function to SymTable
     size_t paramCount = getParamCount(func);
     AstDataType *paramTypes = NULL;
+    char **paramNames = NULL;
     if (paramCount > 0) {
       // create functtion paramType list
       paramTypes = arenaAlloc(paramCount * sizeof(AstDataType));
+      paramNames = (char **)arenaAlloc(paramCount * sizeof(char *));
       const AstFunctionParameter *param = func->firstParameter;
       size_t i = 0;
       while (param != NULL) {
         paramTypes[i] = param->dataType;
+        paramNames[i] = param->parameterName;
         i++;
         param = param->nextParameter;
       }
     }
     if (!insertFunctionSymTable(globalSymTable, func->functionName, func->location.line,
                                 func->location.column, func->declaredReturnType, paramTypes,
-                                paramCount, false, func->isMain)) {
+                                paramNames, paramCount, false, func->isMain)) {
       die(ERR_REDEF, func->location.line, "function redefinition");
     }
     func = func->nextFunction;

@@ -132,15 +132,19 @@ static void attachSymbolTables(AstProgram *program) {
       paramCount++;
 
     AstDataType *paramTypes = arenaZalloc(sizeof(AstDataType) * (paramCount + 1));
+    char **paramNames = (char **)arenaZalloc(sizeof(char *) * (paramCount + 1));
     size_t i = 0;
-    for (AstFunctionParameter *p = func->firstParameter; p != NULL; p = p->nextParameter)
+    for (AstFunctionParameter *p = func->firstParameter; p != NULL; p = p->nextParameter) {
+      paramNames[i] = p->parameterName;
       paramTypes[i++] = p->dataType;
+    }
 
     StSymbol *symbol = arenaZalloc(sizeof(*symbol));
     symbol->type = ST_FUNCTION;
     symbol->declarationLocation = func->location;
     symbol->data.function.returnType = func->resolvedReturnType;
     symbol->data.function.parameterTypes = paramTypes;
+    symbol->data.function.parameterNames = paramNames;
     symbol->data.function.parameterCount = paramCount;
     symbol->data.function.isMain = func->isMain;
 

@@ -685,9 +685,6 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
     // function call. If we implement the extension for this, the argument building will have to
     // happen on LF beofre CREATEFRAME and will need to be copied to new TF only after all arguments
     // are evaluated
-    //
-    // NOTE: Could use function's declared parameter names rather than funcParam to avoid extra
-    // copy, would require symbol table to be accessible
     AstFunctionCallArgument *arg = call->firstArgument;
     const StSymbol *sym = symtableLookup(table, call->functionName);
     if (sym == NULL)
@@ -698,7 +695,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
     while (arg != NULL) {
       if (argc >= sym->data.function.parameterCount)
         die(ERR_INTERNAL, 0, "Too many arguments for function %s", call->functionName);
-      Operand op = varOp(FT_TF, funcParam(argc));
+      Operand op = varOp(FT_TF, sym->data.function.parameterNames[argc]);
       EMIT(code, DEFVAR, op);
       ValueInfo argValue = lowerExpression(code, arg->expression, &op);
       storeTyped(code, op, sym->data.function.parameterTypes[argc++], argValue);
@@ -803,19 +800,6 @@ void lowerFunction(StringBuilder *code, AstFunction *func) {
 
   // Emit un-mangled function name as entry label
   EMIT(code, LABEL, labelOp(func->functionName));
-
-  // Copy parameters to named variables
-  //
-  // NOTE: This extra copy could be avoided, see note above
-  AstFunctionParameter *param = func->firstParameter;
-  unsigned argc = 0;
-  while (param != NULL) {
-    Operand np = varOp(FT_LF, param->parameterName);
-    EMIT(code, DEFVAR, np);
-    Operand arg = varOp(FT_LF, funcParam(argc++));
-    EMIT(code, MOVE, np, arg);
-    param = param->nextParameter;
-  }
 
   // Repeated variable declarations are not allowed, so the function body is lowered into a separate
   // string builder while writing all declarations to the global registry. These declarations are
