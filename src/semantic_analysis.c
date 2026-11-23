@@ -660,15 +660,6 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
   // resolve an implicit return and replace it with an explicit return if necessary
   // command = last command
   if (hasToReturn && !explicitReturnFound) {
-    AstExpression *newExpression = arenaAlloc(sizeof(AstExpression));
-    AstValue *newValue = arenaAlloc(sizeof(AstValue));
-    AstCommand *newCommand = arenaAlloc(sizeof(AstCommand));
-    newCommand->type = RETURN;
-    newCommand->location.line = command->location.line;
-    newCommand->location.column = command->location.column;
-    newCommand->nextCommand = NULL;
-    newCommand->data.returnAst.value = newValue;
-
     // return UNIT
     if (command->type == VARIABLE_DECLARATION || command->type == ASSIGNMENT ||
         command->type == WHILE || function->declaredReturnType == UNIT) {
@@ -682,13 +673,12 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
           die(ERR_TYPE, command->location.line, "incompatible implicit return type");
         }
       }
-      // create return UNIT command
-      newExpression->expressionType = UNIT_LITERAL;
-      newExpression->location.line = command->location.line;
-      newExpression->location.column = command->location.column;
-      newExpression->deducedDataType = UNIT;
-      newValue->type = VALUE_EXPRESSION;
-      newValue->data.expression = newExpression;
+      // create return UNIT
+      AstCommand *newCommand = astCodeCommandNew(RETURN, command->location);
+      AstExpression *unitExpression = astExpressionNew(UNIT_LITERAL, command->location);
+      unitExpression->deducedDataType = UNIT;
+      newCommand->data.returnAst.value = astValueFromExpr(unitExpression);
+      // append return UNIT
       command->nextCommand = newCommand;
       block->lastCommand = newCommand;
     }
@@ -703,14 +693,9 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
         die(ERR_TYPE, command->location.line, "incompatible implicit return type");
       }
       // replace function call with return function call
-      newValue->type = VALUE_FUNCTION_CALL;
-      newValue->data.functionCall = command->data.call.functionCall;
-      if (previousCommand != NULL) {
-        previousCommand->nextCommand = newCommand;
-      } else {
-        block->firstCommand = newCommand;
-      }
-      block->lastCommand = newCommand;
+      AstFunctionCall *call = command->data.call.functionCall;
+      command->type = RETURN;
+      command->data.returnAst.value = astValueFromFunctionCall(call);
     }
     // return EXPRESSION
     else if (command->type == EXPRESSION) {
@@ -724,14 +709,9 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
         die(ERR_TYPE, command->location.line, "incompatible implicit return type");
       }
       // replace expression with return expression
-      newValue->type = VALUE_EXPRESSION;
-      newValue->data.expression = command->data.expressionAst.expression;
-      if (previousCommand != NULL) {
-        previousCommand->nextCommand = newCommand;
-      } else {
-        block->firstCommand = newCommand;
-      }
-      block->lastCommand = newCommand;
+      AstExpression *expression = command->data.expressionAst.expression;
+      command->type = RETURN;
+      command->data.returnAst.value = astValueFromExpr(expression);
     }
     // IF return
     else if (command->type == IF) {
