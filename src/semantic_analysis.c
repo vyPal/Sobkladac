@@ -539,15 +539,10 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
         // empty return
         if (command->data.returnAst.value == NULL) {
           // new UNIT expression
-          AstExpression *unitExpression = arenaAlloc(sizeof(AstExpression));
-          unitExpression->expressionType = UNIT_LITERAL;
-          unitExpression->location.line = command->location.line;
-          unitExpression->location.column = command->location.column;
+          AstExpression *unitExpression = astExpressionNew(UNIT_LITERAL, command->location);
           unitExpression->deducedDataType = UNIT;
           // create return() command
-          command->data.returnAst.value = arenaAlloc(sizeof(AstValue));
-          command->data.returnAst.value->type = VALUE_EXPRESSION;
-          command->data.returnAst.value->data.expression = unitExpression;
+          command->data.returnAst.value = astValueFromExpr(unitExpression);
         } else {  // non empty return
           bool unitReturn = false;
           if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
@@ -557,33 +552,28 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
           }
           // split return into expression or function call and return() if not done already
           if (!unitReturn) {
-            // new UNIT expression
-            AstExpression *unitExpression = arenaAlloc(sizeof(AstExpression));
-            unitExpression->expressionType = UNIT_LITERAL;
-            unitExpression->location.line = command->location.line;
-            unitExpression->location.column = command->location.column;
-            unitExpression->deducedDataType = UNIT;
+            AstCommand *newCommand;
+            // split into an expression
+            if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
+              newCommand = astCodeCommandNew(EXPRESSION, command->location);
+              newCommand->data.expressionAst.expression =
+                  command->data.returnAst.value->data.expression;
+            }
+            // split into a function call
+            else {
+              newCommand = astCodeCommandNew(FUNCTION_CALL, command->location);
+              newCommand->data.call.functionCall = command->data.returnAst.value->data.functionCall;
+            }
             // insert expression or function call in front of return
-            AstCommand *newCommand = arenaAlloc(sizeof(AstCommand));
-            newCommand->location.line = command->location.line;
-            newCommand->location.column = command->location.column;
             newCommand->nextCommand = command;
             if (previousCommand != NULL) {
               previousCommand->nextCommand = newCommand;
             } else {
               block->firstCommand = newCommand;
             }
-            // split into an expression
-            if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
-              // new expression
-              newCommand->type = EXPRESSION;
-              newCommand->data.expressionAst.expression =
-                  command->data.returnAst.value->data.expression;
-            } else {  // split into a function call
-              // new function call
-              newCommand->type = FUNCTION_CALL;
-              newCommand->data.call.functionCall = command->data.returnAst.value->data.functionCall;
-            }
+            // new UNIT expression
+            AstExpression *unitExpression = astExpressionNew(UNIT_LITERAL, command->location);
+            unitExpression->deducedDataType = UNIT;
             // rewrite return
             command->data.returnAst.value->type = VALUE_EXPRESSION;
             command->data.returnAst.value->data.expression = unitExpression;
