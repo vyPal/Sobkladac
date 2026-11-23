@@ -230,9 +230,11 @@ void getFunctionCodeBlockDependencies(size_t functionCount, AstFunction **functi
       getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
                                        functionPosition, globalSymTable,
                                        command->data.ifAst.thenBlock);
-      getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
-                                       functionPosition, globalSymTable,
-                                       command->data.ifAst.elseBlock);
+      if (command->data.ifAst.elseBlock != NULL) {
+        getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
+                                         functionPosition, globalSymTable,
+                                         command->data.ifAst.elseBlock);
+      }
     }
     // WHILE statement condition cant contain a function call according to specifications
     else if (command->type == WHILE) {
@@ -642,12 +644,6 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
             explicitReturnFound = true;
           }
         }
-        // no else block
-        else {
-          if (explicitReturnFoundLeft) {
-            explicitReturnFound = true;
-          }
-        }
       }
     } else if (command->type == WHILE) {
       // check condition
@@ -739,11 +735,17 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
         }
       }
       // no else block
-      else {
-        if (explicitReturnFoundLeft) {
-          explicitReturnFound = true;
-        }
+      else if (function->resolvedReturnType == UNIT) {
+        // create return UNIT
+        AstCommand *newCommand = astCodeCommandNew(RETURN, command->location);
+        AstExpression *unitExpression = astExpressionNew(UNIT_LITERAL, command->location);
+        unitExpression->deducedDataType = UNIT;
+        newCommand->data.returnAst.value = astValueFromExpr(unitExpression);
+        // append return UNIT
+        command->nextCommand = newCommand;
+        block->lastCommand = newCommand;
       }
+
       if (!explicitReturnFound) {  // all "if" end with implicit return UNIT
         if (function->resolvedReturnType != UNIT) {
           die(ERR_TYPE, command->location.line,
