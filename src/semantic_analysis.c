@@ -88,6 +88,8 @@ void initializeFunctions(const AstProgram *ast, SymTable *globalSymTable) {
 
   insertFunctionSymTable(globalSymTable, "readDouble", 0, 0, DOUBLE, NULL, 0, true, false);
 
+  insertFunctionSymTable(globalSymTable, "readBoolean", 0, 0, BOOL, NULL, 0, true, false);
+
   insertFunctionSymTable(globalSymTable, "toStr", 0, 0, STRING, printParams, 1, true, false);
 
   AstDataType *toIntParams = arenaAlloc(sizeof(AstDataType));
@@ -201,33 +203,41 @@ void getFunctionCodeBlockDependencies(size_t functionCount, AstFunction **functi
       functionCall = command->data.variableDeclaration.value->data.functionCall;
       addFunctionDependency(functionCount, functionList, functionDependenciesArray,
                             functionPosition, globalSymTable, functionCall);
-      // assignment using a function call
-    } else if (command->type == ASSIGNMENT &&
-               command->data.assignment.value->type == VALUE_FUNCTION_CALL) {
+
+    }
+    // assignment using a function call
+    else if (command->type == ASSIGNMENT &&
+             command->data.assignment.value->type == VALUE_FUNCTION_CALL) {
       functionCall = command->data.assignment.value->data.functionCall;
       addFunctionDependency(functionCount, functionList, functionDependenciesArray,
                             functionPosition, globalSymTable, functionCall);
-      // function call
-    } else if (command->type == FUNCTION_CALL) {
+    }
+    // function call
+    else if (command->type == FUNCTION_CALL) {
       functionCall = command->data.call.functionCall;
       addFunctionDependency(functionCount, functionList, functionDependenciesArray,
                             functionPosition, globalSymTable, functionCall);
-      // return using a function call
-    } else if (command->type == RETURN && command->data.returnAst.value != NULL &&
-               command->data.returnAst.value->type == VALUE_FUNCTION_CALL) {
+    }
+    // return using a function call
+    else if (command->type == RETURN && command->data.returnAst.value != NULL &&
+             command->data.returnAst.value->type == VALUE_FUNCTION_CALL) {
       functionCall = command->data.returnAst.value->data.functionCall;
       addFunctionDependency(functionCount, functionList, functionDependenciesArray,
                             functionPosition, globalSymTable, functionCall);
-      // IF statement condition cant contain a function call according to specifications
-    } else if (command->type == IF) {
+    }
+    // IF statement condition cant contain a function call according to specifications
+    else if (command->type == IF) {
       getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
                                        functionPosition, globalSymTable,
                                        command->data.ifAst.thenBlock);
-      getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
-                                       functionPosition, globalSymTable,
-                                       command->data.ifAst.elseBlock);
-      // WHILE statement condition cant contain a function call according to specifications
-    } else if (command->type == WHILE) {
+      if (command->data.ifAst.elseBlock != NULL) {
+        getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
+                                         functionPosition, globalSymTable,
+                                         command->data.ifAst.elseBlock);
+      }
+    }
+    // WHILE statement condition cant contain a function call according to specifications
+    else if (command->type == WHILE) {
       getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
                                        functionPosition, globalSymTable,
                                        command->data.whileAst.codeBlock);
@@ -251,7 +261,7 @@ void checkRecursion(AstProgram *ast, SymTable *globalSymTable) {
   }
 
   // create a list of all user functions
-  AstFunction **functionList = arenaAlloc(functionCount * sizeof(AstFunction *));
+  AstFunction **functionList = (AstFunction **)arenaAlloc(functionCount * sizeof(AstFunction *));
   function = ast->firstFunction;
   for (size_t functionPosition = 0; functionPosition < functionCount; functionPosition++) {
     functionList[functionPosition] = function;
@@ -259,7 +269,7 @@ void checkRecursion(AstProgram *ast, SymTable *globalSymTable) {
   }
 
   // create a 2D function dependency array
-  bool **functionDependenciesArray = arenaAlloc(functionCount * sizeof(bool *));
+  bool **functionDependenciesArray = (bool **)arenaAlloc(functionCount * sizeof(bool *));
   for (size_t functionPosition = 0; functionPosition < functionCount; functionPosition++) {
     functionDependenciesArray[functionPosition] = arenaZalloc(functionCount * sizeof(bool));
   }
@@ -276,7 +286,9 @@ void checkRecursion(AstProgram *ast, SymTable *globalSymTable) {
         addFunctionDependency(functionCount, functionList, functionDependenciesArray,
                               functionPosition, globalSymTable, functionCall);
       }
-    } else {  // check function code blocks
+    }
+    // check function code blocks
+    else {
       getFunctionCodeBlockDependencies(functionCount, functionList, functionDependenciesArray,
                                        functionPosition, globalSymTable, function->body.codeBlock);
     }
@@ -314,6 +326,8 @@ AstDataType analyzeExpression(AstExpression *expression, SymTable *symTable) {
     expression->deducedDataType = DOUBLE;
   } else if (expression->expressionType == STRING_LITERAL) {
     expression->deducedDataType = STRING;
+  } else if (expression->expressionType == BOOL_LITERAL) {
+    expression->deducedDataType = BOOL;
   } else if (expression->expressionType == UNIT_LITERAL) {
     expression->deducedDataType = UNIT;
   } else if (expression->expressionType == VARIABLE) {
@@ -324,56 +338,54 @@ AstDataType analyzeExpression(AstExpression *expression, SymTable *symTable) {
     expression->deducedDataType = symbol->data.variable.dataType;
     // rename variable
     expression->data.variable = symbol->uniqueID;
-    // unary operators only work with numers and keep their type
   } else if (expression->expressionType == UNARY) {
     AstOperator op = expression->data.unary.operatorAst;
     AstDataType type = analyzeExpression(expression->data.unary.expression, symTable);
-    // unary + is removed before semantic analysis
+    // numerical NEGATION
     if ((type == INT || type == DOUBLE) && op == NEGATION) {
+      expression->deducedDataType = type;
+    }
+    // LOGICAL_NEGATION
+    else if (type == BOOL && op == LOGICAL_NEGATION) {
       expression->deducedDataType = type;
     }
   } else if (expression->expressionType == BINARY) {
     AstOperator op = expression->data.binary.operatorAst;
     AstDataType typeL = analyzeExpression(expression->data.binary.leftExpression, symTable);
     AstDataType typeR = analyzeExpression(expression->data.binary.rightExpression, symTable);
-    // numerical operation or concantenation
-    if (op == MULTIPLICATION || op == DIVISION || op == ADDITION || op == SUBTRACTION) {
-      // numerical operation
-      if ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) {
-        // conversion to double
-        if (typeL == DOUBLE || typeR == DOUBLE) {
-          expression->deducedDataType = DOUBLE;
-        } else {  // both int
-          expression->deducedDataType = INT;
-        }
+    // concantenation
+    if (op == ADDITION && typeL == STRING && typeR == STRING) {
+      expression->deducedDataType = STRING;
+    }
+    // numerical operation
+    else if ((op == MULTIPLICATION || op == DIVISION || op == ADDITION || op == SUBTRACTION) &&
+             ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE))) {
+      // conversion to double
+      if (typeL == DOUBLE || typeR == DOUBLE) {
+        expression->deducedDataType = DOUBLE;
       }
-      // concantenation
-      else if (typeL == STRING && typeR == STRING && op == ADDITION) {
-        expression->deducedDataType = STRING;
+      // both int
+      else {
+        expression->deducedDataType = INT;
       }
-    } else {  // logical operation
-      // size comparassion
-      if (op == LESSER || op == LESSER_EQUAL || op == GREATER || op == GREATER_EQUAL) {
-        // numbers
-        if ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) {
-          expression->deducedDataType = BOOL;
-        }
-        // strings
-        else if (typeL == STRING && typeR == STRING) {
-          expression->deducedDataType = BOOL;
-        }
+    }
+    // equality
+    else if ((op == EQUAL || op == NOT_EQUAL) &&
+             ((typeL == typeR) ||
+              ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)))) {
+      expression->deducedDataType = BOOL;
+    }
+    // number and string comparassion
+    else if (op == LESSER || op == LESSER_EQUAL || op == GREATER || op == GREATER_EQUAL) {
+      // numbers or strings
+      if (((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) ||
+          (typeL == STRING && typeR == STRING)) {
+        expression->deducedDataType = BOOL;
       }
-      // equality
-      else if (op == EQUAL || op == NOT_EQUAL) {
-        // numbers
-        if ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) {
-          expression->deducedDataType = BOOL;
-        }
-        // same type
-        else if (typeL == typeR) {
-          expression->deducedDataType = BOOL;
-        }
-      }
+    }
+    // logicall operation
+    else if ((op == LOGICAL_AND || op == LOGICAL_OR) && typeL == BOOL && typeR == BOOL) {
+      expression->deducedDataType = BOOL;
     }
   } else {
     die(ERR_INTERNAL, expression->location.line, "unknown expression type");
@@ -442,7 +454,6 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
   AstCommand *previousCommand = NULL;
   AstDataType lastFunctionCallType = UNKNOWN;
   while (true) {
-    // VARIABLE_DECLARATION
     if (command->type == VARIABLE_DECLARATION) {
       command->data.variableDeclaration.resolvedType =
           command->data.variableDeclaration.declaredType;
@@ -452,7 +463,9 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
         if (command->data.variableDeclaration.resolvedType == UNKNOWN) {
           command->data.variableDeclaration.resolvedType = analyzeExpression(
               command->data.variableDeclaration.value->data.expression, block->symTable);
-        } else {  // check correct assignment type
+        }
+        // check correct assignment type
+        else {
           if (!isTypeCompatible(
                   command->data.variableDeclaration.resolvedType,
                   analyzeExpression(command->data.variableDeclaration.value->data.expression,
@@ -460,13 +473,17 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
             die(ERR_TYPE, command->location.line, "wrong initialization type");
           }
         }
-      } else {  // inicialized by a function call
+      }
+      // inicialized by a function call
+      else {
         // find variable type
         if (command->data.variableDeclaration.resolvedType == UNKNOWN) {
           command->data.variableDeclaration.resolvedType = analyzeFunctionCall(
               ast, globalSymTable, command->data.variableDeclaration.value->data.functionCall,
               block->symTable);
-        } else {  // check correct assignment type
+        }
+        // check correct assignment type
+        else {
           if (!isTypeCompatible(
                   command->data.variableDeclaration.resolvedType,
                   analyzeFunctionCall(ast, globalSymTable,
@@ -475,9 +492,6 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
             die(ERR_TYPE, command->location.line, "wrong initialization type");
           }
         }
-      }
-      if (command->data.variableDeclaration.resolvedType == BOOL) {
-        die(ERR_TYPE, command->location.line, "bool initialization type is forbidden");
       }
       // add variable to current symTable
       if (!insertVariableSymTable(block->symTable, command->data.variableDeclaration.variableName,
@@ -490,7 +504,6 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
       StSymbol *symbol =
           symtableLookup(block->symTable, command->data.variableDeclaration.variableName);
       command->data.variableDeclaration.variableName = symbol->uniqueID;
-      // ASSIGNMENT
     } else if (command->type == ASSIGNMENT) {
       // check if variable exists
       const StSymbol *symbol =
@@ -512,7 +525,9 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
                                                 block->symTable))) {
           die(ERR_TYPE, command->location.line, "incompatible assignment type");
         }
-      } else {  // assignment by a function call
+      }
+      // assignment by a function call
+      else {
         // check correct assignment type
         if (!isTypeCompatible(symbol->data.variable.dataType,
                               analyzeFunctionCall(ast, globalSymTable,
@@ -521,14 +536,12 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
           die(ERR_TYPE, command->location.line, "incompatible assignment type");
         }
       }
-      // rename variable and remember its type, codegen can't look it up by the new name
+      // rename variable
       command->data.assignment.variableName = symbol->uniqueID;
       command->data.assignment.resolvedType = symbol->data.variable.dataType;
-      // FUNCTION_CALL
     } else if (command->type == FUNCTION_CALL) {
       lastFunctionCallType = analyzeFunctionCall(ast, globalSymTable,
                                                  command->data.call.functionCall, block->symTable);
-      // RETURN
     } else if (command->type == RETURN) {
       explicitReturnFound = true;
 
@@ -543,16 +556,13 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
         // empty return
         if (command->data.returnAst.value == NULL) {
           // new UNIT expression
-          AstExpression *unitExpression = arenaAlloc(sizeof(AstExpression));
-          unitExpression->expressionType = UNIT_LITERAL;
-          unitExpression->location.line = command->location.line;
-          unitExpression->location.column = command->location.column;
+          AstExpression *unitExpression = astExpressionNew(UNIT_LITERAL, command->location);
           unitExpression->deducedDataType = UNIT;
           // create return() command
-          command->data.returnAst.value = arenaAlloc(sizeof(AstValue));
-          command->data.returnAst.value->type = VALUE_EXPRESSION;
-          command->data.returnAst.value->data.expression = unitExpression;
-        } else {  // non empty return
+          command->data.returnAst.value = astValueFromExpr(unitExpression);
+        }
+        // non empty return
+        else {
           bool unitReturn = false;
           if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
             if (command->data.returnAst.value->data.expression->expressionType == UNIT_LITERAL) {
@@ -561,33 +571,28 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
           }
           // split return into expression or function call and return() if not done already
           if (!unitReturn) {
-            // new UNIT expression
-            AstExpression *unitExpression = arenaAlloc(sizeof(AstExpression));
-            unitExpression->expressionType = UNIT_LITERAL;
-            unitExpression->location.line = command->location.line;
-            unitExpression->location.column = command->location.column;
-            unitExpression->deducedDataType = UNIT;
+            AstCommand *newCommand;
+            // split into an expression
+            if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
+              newCommand = astCodeCommandNew(EXPRESSION, command->location);
+              newCommand->data.expressionAst.expression =
+                  command->data.returnAst.value->data.expression;
+            }
+            // split into a function call
+            else {
+              newCommand = astCodeCommandNew(FUNCTION_CALL, command->location);
+              newCommand->data.call.functionCall = command->data.returnAst.value->data.functionCall;
+            }
             // insert expression or function call in front of return
-            AstCommand *newCommand = arenaAlloc(sizeof(AstCommand));
-            newCommand->location.line = command->location.line;
-            newCommand->location.column = command->location.column;
             newCommand->nextCommand = command;
             if (previousCommand != NULL) {
               previousCommand->nextCommand = newCommand;
             } else {
               block->firstCommand = newCommand;
             }
-            // split into an expression
-            if (command->data.returnAst.value->type == VALUE_EXPRESSION) {
-              // new expression
-              newCommand->type = EXPRESSION;
-              newCommand->data.expressionAst.expression =
-                  command->data.returnAst.value->data.expression;
-            } else {  // split into a function call
-              // new function call
-              newCommand->type = FUNCTION_CALL;
-              newCommand->data.call.functionCall = command->data.returnAst.value->data.functionCall;
-            }
+            // new UNIT expression
+            AstExpression *unitExpression = astExpressionNew(UNIT_LITERAL, command->location);
+            unitExpression->deducedDataType = UNIT;
             // rewrite return
             command->data.returnAst.value->type = VALUE_EXPRESSION;
             command->data.returnAst.value->data.expression = unitExpression;
@@ -610,7 +615,10 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
                                                 block->symTable))) {
           die(ERR_TYPE, command->location.line, "incompatible return type");
         }
-      } else {  // return by function call
+      }
+      // return by function call
+      else {
+        // check correct return type
         if (!isTypeCompatible(function->resolvedReturnType,
                               analyzeFunctionCall(ast, globalSymTable,
                                                   command->data.returnAst.value->data.functionCall,
@@ -618,8 +626,6 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
           die(ERR_TYPE, command->location.line, "incompatible return type");
         }
       }
-
-      // IF
     } else if (command->type == IF) {
       // check condition
       if (analyzeExpression(command->data.ifAst.condition, block->symTable) != BOOL) {
@@ -630,13 +636,15 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
           function->declaredReturnType == UNIT) {
         bool explicitReturnFoundLeft = analyzeCodeBlock(
             ast, globalSymTable, function, command->data.ifAst.thenBlock, block->symTable, false);
-        bool explicitReturnFoundRight = analyzeCodeBlock(
-            ast, globalSymTable, function, command->data.ifAst.elseBlock, block->symTable, false);
-        if (explicitReturnFoundLeft && explicitReturnFoundRight) {
-          explicitReturnFound = true;
+        // has else block
+        if (command->data.ifAst.elseBlock != NULL) {
+          bool explicitReturnFoundRight = analyzeCodeBlock(
+              ast, globalSymTable, function, command->data.ifAst.elseBlock, block->symTable, false);
+          if (explicitReturnFoundLeft && explicitReturnFoundRight) {
+            explicitReturnFound = true;
+          }
         }
       }
-      // WHILE
     } else if (command->type == WHILE) {
       // check condition
       if (analyzeExpression(command->data.whileAst.condition, block->symTable) != BOOL) {
@@ -646,12 +654,8 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
       // check code blocks
       analyzeCodeBlock(ast, globalSymTable, function, command->data.whileAst.codeBlock,
                        block->symTable, false);
-
-      // EXPRESSION
     } else if (command->type == EXPRESSION) {
-      if (analyzeExpression(command->data.expressionAst.expression, block->symTable) == BOOL) {
-        die(ERR_TYPE, command->location.line, "standalone bool expression is forbidden");
-      }
+      analyzeExpression(command->data.expressionAst.expression, block->symTable);
     }
 
     if (command->nextCommand != NULL) {
@@ -665,15 +669,6 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
   // resolve an implicit return and replace it with an explicit return if necessary
   // command = last command
   if (hasToReturn && !explicitReturnFound) {
-    AstExpression *newExpression = arenaAlloc(sizeof(AstExpression));
-    AstValue *newValue = arenaAlloc(sizeof(AstValue));
-    AstCommand *newCommand = arenaAlloc(sizeof(AstCommand));
-    newCommand->type = RETURN;
-    newCommand->location.line = command->location.line;
-    newCommand->location.column = command->location.column;
-    newCommand->nextCommand = NULL;
-    newCommand->data.returnAst.value = newValue;
-
     // return UNIT
     if (command->type == VARIABLE_DECLARATION || command->type == ASSIGNMENT ||
         command->type == WHILE || function->declaredReturnType == UNIT) {
@@ -687,18 +682,17 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
           die(ERR_TYPE, command->location.line, "incompatible implicit return type");
         }
       }
-      // create return UNIT command
-      newExpression->expressionType = UNIT_LITERAL;
-      newExpression->location.line = command->location.line;
-      newExpression->location.column = command->location.column;
-      newExpression->deducedDataType = UNIT;
-      newValue->type = VALUE_EXPRESSION;
-      newValue->data.expression = newExpression;
+      // create return UNIT
+      AstCommand *newCommand = astCodeCommandNew(RETURN, command->location);
+      AstExpression *unitExpression = astExpressionNew(UNIT_LITERAL, command->location);
+      unitExpression->deducedDataType = UNIT;
+      newCommand->data.returnAst.value = astValueFromExpr(unitExpression);
+      // append return UNIT
       command->nextCommand = newCommand;
       block->lastCommand = newCommand;
     }
     // return FUNCTION_CALL
-    if (command->type == FUNCTION_CALL && function->declaredReturnType != UNIT) {
+    else if (command->type == FUNCTION_CALL) {
       // set return
       if (function->resolvedReturnType == UNKNOWN) {
         function->resolvedReturnType = lastFunctionCallType;
@@ -708,17 +702,12 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
         die(ERR_TYPE, command->location.line, "incompatible implicit return type");
       }
       // replace function call with return function call
-      newValue->type = VALUE_FUNCTION_CALL;
-      newValue->data.functionCall = command->data.call.functionCall;
-      if (previousCommand != NULL) {
-        previousCommand->nextCommand = newCommand;
-      } else {
-        block->firstCommand = newCommand;
-      }
-      block->lastCommand = newCommand;
+      AstFunctionCall *call = command->data.call.functionCall;
+      command->type = RETURN;
+      command->data.returnAst.value = astValueFromFunctionCall(call);
     }
     // return EXPRESSION
-    else if (command->type == EXPRESSION && function->declaredReturnType != UNIT) {
+    else if (command->type == EXPRESSION) {
       // set return
       if (function->resolvedReturnType == UNKNOWN) {
         function->resolvedReturnType = command->data.expressionAst.expression->deducedDataType;
@@ -729,26 +718,35 @@ bool analyzeCodeBlock(AstProgram *ast, SymTable *globalSymTable, AstFunction *fu
         die(ERR_TYPE, command->location.line, "incompatible implicit return type");
       }
       // replace expression with return expression
-      newValue->type = VALUE_EXPRESSION;
-      newValue->data.expression = command->data.expressionAst.expression;
-      if (previousCommand != NULL) {
-        previousCommand->nextCommand = newCommand;
-      } else {
-        block->firstCommand = newCommand;
-      }
-      block->lastCommand = newCommand;
+      AstExpression *expression = command->data.expressionAst.expression;
+      command->type = RETURN;
+      command->data.returnAst.value = astValueFromExpr(expression);
     }
     // IF return
-    if (command->type == IF && function->declaredReturnType != UNIT) {
+    else if (command->type == IF) {
       bool explicitReturnFoundLeft = analyzeCodeBlock(
           ast, globalSymTable, function, command->data.ifAst.thenBlock, block->symTable, true);
-      bool explicitReturnFoundRight = analyzeCodeBlock(
-          ast, globalSymTable, function, command->data.ifAst.elseBlock, block->symTable, true);
+      // has else block
+      if (command->data.ifAst.elseBlock != NULL) {
+        bool explicitReturnFoundRight = analyzeCodeBlock(
+            ast, globalSymTable, function, command->data.ifAst.elseBlock, block->symTable, true);
+        if (explicitReturnFoundLeft && explicitReturnFoundRight) {
+          explicitReturnFound = true;
+        }
+      }
+      // no else block
+      else if (function->resolvedReturnType == UNIT) {
+        // create return UNIT
+        AstCommand *newCommand = astCodeCommandNew(RETURN, command->location);
+        AstExpression *unitExpression = astExpressionNew(UNIT_LITERAL, command->location);
+        unitExpression->deducedDataType = UNIT;
+        newCommand->data.returnAst.value = astValueFromExpr(unitExpression);
+        // append return UNIT
+        command->nextCommand = newCommand;
+        block->lastCommand = newCommand;
+      }
 
-      // all "if" end with explicit return
-      if (explicitReturnFoundLeft && explicitReturnFoundRight) {
-        explicitReturnFound = true;
-      } else {  // all "if" end with implicit return UNIT
+      if (!explicitReturnFound) {  // all "if" end with implicit return UNIT
         if (function->resolvedReturnType != UNIT) {
           die(ERR_TYPE, command->location.line,
               "function ends with an implicit return if statement that does not return UNIT");
@@ -802,7 +800,9 @@ AstDataType analyzeFunctionBody(AstProgram *ast, SymTable *globalSymTable, AstFu
                function->declaredReturnType != UNIT) {
         die(ERR_TYPE, function->location.line, "wrong return type");
       }
-    } else {  // check function call
+    }
+    // check function call
+    else {
       // find return type
       if (function->resolvedReturnType == UNKNOWN) {
         function->resolvedReturnType = analyzeFunctionCall(
@@ -817,16 +817,15 @@ AstDataType analyzeFunctionBody(AstProgram *ast, SymTable *globalSymTable, AstFu
         die(ERR_TYPE, function->location.line, "wrong return type");
       }
     }
-  } else {  // check code blocks
+  }
+  // check code blocks
+  else {
     analyzeCodeBlock(ast, globalSymTable, function, function->body.codeBlock, function->symTable,
                      true);
   }
 
   if (function->resolvedReturnType == UNKNOWN) {
     die(ERR_TYPE, function->location.line, "cannot resolve function return type");
-  }
-  if (function->resolvedReturnType == BOOL) {
-    die(ERR_TYPE, function->location.line, "bool initialization type is forbidden");
   }
   symbol = symtableLookup(globalSymTable, function->functionName);
   symbol->data.function.returnType = function->resolvedReturnType;
