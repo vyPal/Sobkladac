@@ -314,6 +314,8 @@ AstDataType analyzeExpression(AstExpression *expression, SymTable *symTable) {
     expression->deducedDataType = DOUBLE;
   } else if (expression->expressionType == STRING_LITERAL) {
     expression->deducedDataType = STRING;
+  } else if (expression->expressionType == BOOL_LITERAL) {
+    expression->deducedDataType = BOOL;
   } else if (expression->expressionType == UNIT_LITERAL) {
     expression->deducedDataType = UNIT;
   } else if (expression->expressionType == VARIABLE) {
@@ -324,43 +326,53 @@ AstDataType analyzeExpression(AstExpression *expression, SymTable *symTable) {
     expression->deducedDataType = symbol->data.variable.dataType;
     // rename variable
     expression->data.variable = symbol->uniqueID;
-    // unary operators only work with numers and keep their type
+    // unary operators keep data type
   } else if (expression->expressionType == UNARY) {
     AstOperator op = expression->data.unary.operatorAst;
     AstDataType type = analyzeExpression(expression->data.unary.expression, symTable);
-    // unary + is removed before semantic analysis
+    // numerical NEGATION
     if ((type == INT || type == DOUBLE) && op == NEGATION) {
+      expression->deducedDataType = type;
+    }
+    // LOGICAL_NEGATION
+    else if (type == BOOL && op == LOGICAL_NEGATION) {
       expression->deducedDataType = type;
     }
   } else if (expression->expressionType == BINARY) {
     AstOperator op = expression->data.binary.operatorAst;
     AstDataType typeL = analyzeExpression(expression->data.binary.leftExpression, symTable);
     AstDataType typeR = analyzeExpression(expression->data.binary.rightExpression, symTable);
-    // numerical operation or concantenation
-    if (op == MULTIPLICATION || op == DIVISION || op == ADDITION || op == SUBTRACTION) {
-      // numerical operation
-      if ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) {
-        // conversion to double
-        if (typeL == DOUBLE || typeR == DOUBLE) {
-          expression->deducedDataType = DOUBLE;
-        } else {  // both int
-          expression->deducedDataType = INT;
-        }
+    // concantenation
+    if (op == ADDITION && typeL == STRING && typeR == STRING) {
+      expression->deducedDataType = STRING;
+    }
+    // numerical operation
+    else if ((op == MULTIPLICATION || op == DIVISION || op == ADDITION || op == SUBTRACTION) &&
+             ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE))) {
+      // conversion to double
+      if (typeL == DOUBLE || typeR == DOUBLE) {
+        expression->deducedDataType = DOUBLE;
+      } else {  // both int
+        expression->deducedDataType = INT;
       }
-      // concantenation
-      else if (typeL == STRING && typeR == STRING && op == ADDITION) {
-        expression->deducedDataType = STRING;
+    }
+    // equality
+    else if ((op == EQUAL || op == NOT_EQUAL) &&
+             ((typeL == typeR) ||
+              ((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)))) {
+      expression->deducedDataType = BOOL;
+    }
+    // number and string comparassion
+    else if (op == LESSER || op == LESSER_EQUAL || op == GREATER || op == GREATER_EQUAL) {
+      // numbers or strings
+      if (((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) ||
+          (typeL == STRING && typeR == STRING)) {
+        expression->deducedDataType = BOOL;
       }
-    } else {  // logical operation
-      // size comparassion or equality
-      if (op == LESSER || op == LESSER_EQUAL || op == GREATER || op == GREATER_EQUAL ||
-          op == EQUAL || op == NOT_EQUAL) {
-        // numbers or strings
-        if (((typeL == INT || typeL == DOUBLE) && (typeR == INT || typeR == DOUBLE)) ||
-            (typeL == STRING && typeR == STRING)) {
-          expression->deducedDataType = BOOL;
-        }
-      }
+    }
+    // logicall operation
+    else if ((op == LOGICAL_AND || op == LOGICAL_OR) && typeL == BOOL && typeR == BOOL) {
+      expression->deducedDataType = BOOL;
     }
   } else {
     die(ERR_INTERNAL, expression->location.line, "unknown expression type");
