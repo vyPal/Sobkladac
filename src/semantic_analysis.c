@@ -785,7 +785,9 @@ AstDataType analyzeFunctionBody(AstProgram *ast, SymTable *globalSymTable, AstFu
                function->declaredReturnType != UNIT) {
         die(ERR_TYPE, function->location.line, "wrong return type");
       }
-    } else {  // check function call
+    }
+    // check function call
+    else {
       // find return type
       if (function->resolvedReturnType == UNKNOWN) {
         function->resolvedReturnType = analyzeFunctionCall(
@@ -807,9 +809,6 @@ AstDataType analyzeFunctionBody(AstProgram *ast, SymTable *globalSymTable, AstFu
 
   if (function->resolvedReturnType == UNKNOWN) {
     die(ERR_TYPE, function->location.line, "cannot resolve function return type");
-  }
-  if (function->resolvedReturnType == BOOL) {
-    die(ERR_TYPE, function->location.line, "bool initialization type is forbidden");
   }
   symbol = symtableLookup(globalSymTable, function->functionName);
   symbol->data.function.returnType = function->resolvedReturnType;
