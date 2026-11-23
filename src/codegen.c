@@ -536,6 +536,14 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
     EMIT(code, MOVE, dst, floatOp(0.0));
     EMIT(code, LABEL, ok);
     return (ValueInfo){.ty = DOUBLE, .val = dst};
+  } else if (strcmp(call->functionName, "readBoolean") == 0) {
+    Operand dst = getResultOperand(preferredDst);
+    Operand ok = labelOp(newLabel("everything_is_one_function", "readBoolean"));
+    EMIT(code, READ, dst, typeOp(CT_BOOL));
+    EMIT(code, JUMPIFNEQ, ok, dst, nilOp());
+    EMIT(code, MOVE, dst, boolOp(false));
+    EMIT(code, LABEL, ok);
+    return (ValueInfo){.ty = DOUBLE, .val = dst};
   } else if (strcmp(call->functionName, "toInt") == 0) {
     ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
     Operand dst = getResultOperand(preferredDst);
