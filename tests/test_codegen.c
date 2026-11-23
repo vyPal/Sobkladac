@@ -27,6 +27,7 @@
 #include "ast.h"
 #include "codegen.h"
 #include "common.h"
+#include "symtable.h"
 #include "tst.h"
 
 // AI-BEGIN [claude-opus-5-5, Claude Code]
@@ -73,6 +74,91 @@ static char *readWholeFile(FILE *file) {
   return content;
 }
 
+// ============================================================
+// Symbol tables
+// ============================================================
+
+static void attachToBlock(AstCodeBlock *block, SymTable *table);
+
+/// Registers a variable, a name declared twice in one function keeps its first
+/// type, which is fine as the tests never redeclare a name with another type
+static void insertVariable(SymTable *table, char *name, AstDataType type) {
+  StSymbol *symbol = arenaZalloc(sizeof(*symbol));
+  symbol->type = ST_VARIABLE;
+  symbol->data.variable.dataType = type;
+  symbol->data.variable.isMutable = true;
+  symtableInsertSymbol(table, name, symbol);
+}
+
+static void attachToCommands(AstCommand *cmd, SymTable *table) {
+  for (; cmd != NULL; cmd = cmd->nextCommand) {
+    if (cmd->type == VARIABLE_DECLARATION) {
+      insertVariable(table, cmd->data.variableDeclaration.variableName,
+                     cmd->data.variableDeclaration.resolvedType);
+    } else if (cmd->type == ASSIGNMENT) {
+      // Semantic analysis records the type of the assigned variable
+      const StSymbol *symbol = symtableLookup(table, cmd->data.assignment.variableName);
+      if (symbol == NULL)
+        die(ERR_INTERNAL, 0, "test assigns to undeclared %s", cmd->data.assignment.variableName);
+      cmd->data.assignment.resolvedType = symbol->data.variable.dataType;
+    } else if (cmd->type == IF) {
+      attachToBlock(cmd->data.ifAst.thenBlock, table);
+      attachToBlock(cmd->data.ifAst.elseBlock, table);
+    } else if (cmd->type == WHILE) {
+      attachToBlock(cmd->data.whileAst.codeBlock, table);
+    }
+  }
+}
+
+static void attachToBlock(AstCodeBlock *block, SymTable *table) {
+  if (block == NULL)
+    return;
+
+  block->symTable = table;
+  attachToCommands(block->firstCommand, table);
+}
+
+/// The tests build their ASTs by hand and skip semantic analysis, so this
+/// stands in for it: every user function is registered with its signature in
+/// a global table, and each function gets one child table holding its
+/// parameters and all of its variables, which is attached to all of its code
+/// blocks. Codegen only looks symbols up, so one scope per function is enough
+static void attachSymbolTables(AstProgram *program) {
+  SymTable *global = symtableCreate(NULL);
+
+  for (AstFunction *func = program->firstFunction; func != NULL; func = func->nextFunction) {
+    size_t paramCount = 0;
+    for (AstFunctionParameter *p = func->firstParameter; p != NULL; p = p->nextParameter)
+      paramCount++;
+
+    AstDataType *paramTypes = arenaZalloc(sizeof(AstDataType) * (paramCount + 1));
+    size_t i = 0;
+    for (AstFunctionParameter *p = func->firstParameter; p != NULL; p = p->nextParameter)
+      paramTypes[i++] = p->dataType;
+
+    StSymbol *symbol = arenaZalloc(sizeof(*symbol));
+    symbol->type = ST_FUNCTION;
+    symbol->declarationLocation = func->location;
+    symbol->data.function.returnType = func->resolvedReturnType;
+    symbol->data.function.parameterTypes = paramTypes;
+    symbol->data.function.parameterCount = paramCount;
+    symbol->data.function.isMain = func->isMain;
+
+    if (!symtableInsertSymbol(global, func->functionName, symbol))
+      die(ERR_INTERNAL, 0, "test defines function %s twice", func->functionName);
+  }
+
+  for (AstFunction *func = program->firstFunction; func != NULL; func = func->nextFunction) {
+    SymTable *local = symtableCreate(global);
+    for (AstFunctionParameter *p = func->firstParameter; p != NULL; p = p->nextParameter)
+      insertVariable(local, p->parameterName, p->dataType);
+
+    func->symTable = local;
+    if (func->bodyType == CODE_BLOCK)
+      attachToBlock(func->body.codeBlock, local);
+  }
+}
+
 /// Generates code in a child process, because generateCode() can die() or
 /// crash, and because its global state would otherwise keep pointing into the
 /// arena after arenaCleanup()
@@ -81,6 +167,7 @@ static bool generateInto(AstProgram program, FILE *file) {
 
   if (pid == 0) {
     alarm(TIMEOUT_SECONDS);
+    attachSymbolTables(&program);
 
     bool written = fputs(generateCode(program), file) >= 0 && fflush(file) == 0;
     _exit(written ? EXIT_SUCCESS : EXIT_FAILURE);
@@ -1702,6 +1789,219 @@ tstsuite("Code generator", ) {
     declareCall(body, "letter", STRING, CALL_OF("chr", intExpr(300)));
 
     EXPECT_RUN(program, "", 58, "before");
+    arenaCleanup();
+  }
+
+  // ============================================================
+  // Int to Double conversion
+  // ============================================================
+
+  tstcase("Int literal mixed with a Double in arithmetic", ) {
+    AstProgram program = {0};
+    AstCodeBlock *body = addMain(&program);
+
+    printAsString(body, "leftInt", binaryExpr(ADDITION, intExpr(1), doubleExpr(2.5), DOUBLE));
+    printAsString(body, "rightInt",
+                  binaryExpr(MULTIPLICATION, doubleExpr(2.5), intExpr(2), DOUBLE));
+    printAsString(body, "subtract", binaryExpr(SUBTRACTION, intExpr(10), doubleExpr(0.5), DOUBLE));
+
+    // Float division, IDIV would give 3
+    printAsString(body, "divide", binaryExpr(DIVISION, intExpr(7), doubleExpr(2.0), DOUBLE));
+    printAsString(body, "divideRight", binaryExpr(DIVISION, doubleExpr(7.0), intExpr(2), DOUBLE));
+
+    EXPECT_OUTPUT(program, "3.50\n5.00\n9.50\n3.50\n3.50\n");
+    arenaCleanup();
+  }
+
+  tstcase("Int variable mixed with a Double keeps its own type", ) {
+    AstProgram program = {0};
+    AstCodeBlock *body = addMain(&program);
+
+    // val i = 3; val d = 0.5
+    // toStr(i + d); toStr(d * i); print(i); print(i + 1)
+    declareVal(body, "i", INT, intExpr(3));
+    declareVal(body, "d", DOUBLE, doubleExpr(0.5));
+    printAsString(body, "sum", binaryExpr(ADDITION, intVar("i"), varExpr("d", DOUBLE), DOUBLE));
+    printAsString(body, "product",
+                  binaryExpr(MULTIPLICATION, varExpr("d", DOUBLE), intVar("i"), DOUBLE));
+
+    // The conversion must not overwrite i
+    printLine(body, intVar("i"));
+    printLine(body, intOperation(ADDITION, intVar("i"), intExpr(1)));
+
+    EXPECT_OUTPUT(program, "3.50\n1.50\n3\n4\n");
+    arenaCleanup();
+  }
+
+  tstcase("Int subexpression mixed with a Double", ) {
+    AstProgram program = {0};
+    AstCodeBlock *body = addMain(&program);
+
+    // toStr((i * 2) + 0.25), toStr(0.5 - (i + i))
+    declareVal(body, "i", INT, intExpr(3));
+    printAsString(body, "a",
+                  binaryExpr(ADDITION, intOperation(MULTIPLICATION, intVar("i"), intExpr(2)),
+                             doubleExpr(0.25), DOUBLE));
+    printAsString(body, "b",
+                  binaryExpr(SUBTRACTION, doubleExpr(0.5),
+                             intOperation(ADDITION, intVar("i"), intVar("i")), DOUBLE));
+
+    EXPECT_OUTPUT(program, "6.25\n-5.50\n");
+    arenaCleanup();
+  }
+
+  tstcase("Comparing an Int with a Double", ) {
+    AstProgram program = {0};
+    AstCodeBlock *body = addMain(&program);
+
+    declareVal(body, "i", INT, intExpr(2));
+    declareVal(body, "d", DOUBLE, doubleExpr(2.0));
+
+    printComparisons(body, intExpr(2), doubleExpr(2.5));
+    printComparisons(body, doubleExpr(2.0), intExpr(2));
+    printComparisons(body, intVar("i"), varExpr("d", DOUBLE));
+    printComparisons(body, varExpr("d", DOUBLE), intExpr(3));
+
+    EXPECT_OUTPUT(program, "TTFFFT\nFTFTTF\nFTFTTF\nTTFFFT\n");
+    arenaCleanup();
+  }
+
+  tstcase("Int argument for a Double parameter", ) {
+    AstProgram program = {0};
+
+    // def half(x: Double): Double = x / 2.0
+    AstFunction *func = valueFunction(
+        &program, "half", DOUBLE,
+        exprValue(binaryExpr(DIVISION, varExpr("x", DOUBLE), doubleExpr(2.0), DOUBLE)));
+    addParameter(func, "x", DOUBLE);
+
+    // def mix(a: Int, b: Double, c: Double): Double = a + b + c
+    AstFunction *mix =
+        valueFunction(&program, "mix", DOUBLE,
+                      exprValue(binaryExpr(
+                          ADDITION, binaryExpr(ADDITION, intVar("a"), varExpr("b", DOUBLE), DOUBLE),
+                          varExpr("c", DOUBLE), DOUBLE)));
+    addParameter(mix, "a", INT);
+    addParameter(mix, "b", DOUBLE);
+    addParameter(mix, "c", DOUBLE);
+
+    AstCodeBlock *body = addMain(&program);
+    declareVal(body, "i", INT, intExpr(5));
+    declareCall(body, "fromLiteral", DOUBLE, CALL_OF("half", intExpr(3)));
+    declareCall(body, "fromVariable", DOUBLE, CALL_OF("half", intVar("i")));
+    declareCall(body, "fromExpression", DOUBLE,
+                CALL_OF("half", intOperation(ADDITION, intVar("i"), intExpr(2))));
+    declareCall(body, "mixed", DOUBLE, CALL_OF("mix", intExpr(1), intVar("i"), doubleExpr(0.5)));
+
+    printAsString(body, "a", varExpr("fromLiteral", DOUBLE));
+    printAsString(body, "b", varExpr("fromVariable", DOUBLE));
+    printAsString(body, "c", varExpr("fromExpression", DOUBLE));
+    printAsString(body, "d", varExpr("mixed", DOUBLE));
+    printLine(body, intVar("i"));
+
+    EXPECT_OUTPUT(program, "1.50\n2.50\n3.50\n6.50\n5\n");
+    arenaCleanup();
+  }
+
+  tstcase("Int argument inside a Double parameter is a Double", ) {
+    AstProgram program = {0};
+
+    // def show(x: Double): Unit = print(x)
+    AstFunction *func = blockFunction(&program, "show", UNIT);
+    addParameter(func, "x", DOUBLE);
+    printLine(func->body.codeBlock, varExpr("x", DOUBLE));
+    returnExpr(func->body.codeBlock, unitExpr());
+
+    AstCodeBlock *body = addMain(&program);
+    callCommand(body, CALL_OF("show", intExpr(2)));
+
+    EXPECT_OUTPUT(program, "0x1p+1\n");
+    arenaCleanup();
+  }
+
+  tstcase("Int value declared as a Double", ) {
+    AstProgram program = {0};
+    addAddFunction(&program);
+    AstCodeBlock *body = addMain(&program);
+
+    // val i = 4; val a: Double = 5; val b: Double = i; val c: Double = i * 2
+    // val d: Double = add(1, 2)
+    declareVal(body, "i", INT, intExpr(4));
+    declareVal(body, "a", DOUBLE, intExpr(5));
+    declareVal(body, "b", DOUBLE, intVar("i"));
+    declareVal(body, "c", DOUBLE, intOperation(MULTIPLICATION, intVar("i"), intExpr(2)));
+    declareCall(body, "d", DOUBLE, CALL_OF("add", intExpr(1), intExpr(2)));
+
+    printLine(body, varExpr("a", DOUBLE));
+    printAsString(body, "sa", varExpr("a", DOUBLE));
+    printAsString(body, "sb", varExpr("b", DOUBLE));
+    printAsString(body, "sc", varExpr("c", DOUBLE));
+    printAsString(body, "sd", varExpr("d", DOUBLE));
+    printAsString(body, "sum", binaryExpr(ADDITION, varExpr("a", DOUBLE), doubleExpr(0.5), DOUBLE));
+    printLine(body, intVar("i"));
+
+    EXPECT_OUTPUT(program, "0x1.4p+2\n5.00\n4.00\n8.00\n3.00\n5.50\n4\n");
+    arenaCleanup();
+  }
+
+  tstcase("Int value assigned to a Double variable", ) {
+    AstProgram program = {0};
+    AstCodeBlock *body = addMain(&program);
+
+    // var d: Double = 1.5; val i = 7
+    // d = 2; toStr(d); d = i; toStr(d); d = d + i; toStr(d)
+    declareVal(body, "i", INT, intExpr(7));
+    declareVar(body, "d", DOUBLE, true, exprValue(doubleExpr(1.5)));
+    assignVar(body, "d", exprValue(intExpr(2)));
+    printAsString(body, "a", varExpr("d", DOUBLE));
+    assignVar(body, "d", exprValue(intVar("i")));
+    printAsString(body, "b", varExpr("d", DOUBLE));
+    assignVar(body, "d",
+              exprValue(binaryExpr(ADDITION, varExpr("d", DOUBLE), intVar("i"), DOUBLE)));
+    printAsString(body, "c", varExpr("d", DOUBLE));
+
+    EXPECT_OUTPUT(program, "2.00\n7.00\n14.00\n");
+    arenaCleanup();
+  }
+
+  tstcase("Int returned from a Double function", ) {
+    AstProgram program = {0};
+
+    // def literal(): Double = 4
+    valueFunction(&program, "literal", DOUBLE, exprValue(intExpr(4)));
+
+    // def explicit(n: Int): Double { return n + 1 }
+    AstFunction *explicitFunc = blockFunction(&program, "explicit", DOUBLE);
+    addParameter(explicitFunc, "n", INT);
+    returnExpr(explicitFunc->body.codeBlock, intOperation(ADDITION, intVar("n"), intExpr(1)));
+
+    // def viaCall(): Double = add(2, 3)
+    addAddFunction(&program);
+    valueFunction(&program, "viaCall", DOUBLE, callValue(CALL_OF("add", intExpr(2), intExpr(3))));
+
+    AstCodeBlock *body = addMain(&program);
+    declareCall(body, "a", DOUBLE, callNoArgs("literal"));
+    declareCall(body, "b", DOUBLE, CALL_OF("explicit", intExpr(9)));
+    declareCall(body, "c", DOUBLE, callNoArgs("viaCall"));
+    printAsString(body, "sa", varExpr("a", DOUBLE));
+    printAsString(body, "sb", varExpr("b", DOUBLE));
+    printAsString(body, "sc", varExpr("c", DOUBLE));
+
+    EXPECT_OUTPUT(program, "4.00\n10.00\n5.00\n");
+    arenaCleanup();
+  }
+
+  tstcase("toInt accepts an Int", ) {
+    AstProgram program = {0};
+    AstCodeBlock *body = addMain(&program);
+
+    declareVal(body, "i", INT, intExpr(-3));
+    declareCall(body, "a", INT, CALL_OF("toInt", intExpr(5)));
+    declareCall(body, "b", INT, CALL_OF("toInt", intVar("i")));
+    printLine(body, intVar("a"));
+    printLine(body, intVar("b"));
+
+    EXPECT_OUTPUT(program, "5\n-3\n");
     arenaCleanup();
   }
 }

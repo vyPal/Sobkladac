@@ -1,0 +1,6 @@
+import ifj26.*
+def f(a: Int): Int =
+  a = 3
+  a
+@main def main(): Unit =
+  ()

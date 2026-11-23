@@ -1,0 +1,6 @@
+import ifj26.*
+def f(n: Int) =
+  val m = n - 1
+  f(m)
+@main def main(): Unit =
+  ()

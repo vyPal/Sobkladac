@@ -49,7 +49,42 @@ enum TkType {
   TK_NOT,  // !
   TK_AND,  // &&
   TK_OR    // ||
+
+  // for layout.c - extra + keywords
+  TK_KW_IMPORT,
+  TK_DEDENT,  // oposite of TK_INDENT
+
+  TK_KW_INT,
+  TK_KW_DOUBLE,
+  TK_KW_STRING,
+  TK_KW_UNIT,
+
+  TK_KW_WHILE,
+  TK_KW_DO,
+
+  TK_KW_IF,
+  TK_KW_THEN,
+  TK_KW_ELSE,
+
+  TK_KW_DEF,
+  TK_KW_RETURN,
+
+  TK_KW_VAL,
+  TK_KW_VAR,
+
+  TK_KW_RESERVED
 };
+
+typedef struct Token {
+  enum TkType type;
+  union Value *value;
+  int line;
+} Token;
+
+typedef struct LinkedTlist {
+  struct Token *token;
+  struct LinkedTlist *next;
+} LinkedTlist;
 
 /**
  * @brief Structure for representing a string.

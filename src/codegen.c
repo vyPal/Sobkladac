@@ -8,6 +8,7 @@
 #include "ast.h"
 #include "common.h"
 #include "strbuf.h"
+#include "symtable.h"
 
 /// Global counter for name mangling
 static unsigned nameCounter;
@@ -231,6 +232,28 @@ static void storeValue(StringBuilder *code, Operand dst, ValueInfo value) {
   EMIT(code, MOVE, dst, value.val);
 }
 
+/// Converts an Int value to Double, any other value is returned unchanged
+/// Int constants are converted at compile time, anything else is converted into `dst` (or a new
+/// temporary if `dst` is NULL), so the source variable is never overwritten
+static ValueInfo intToDouble(StringBuilder *code, ValueInfo value, const Operand *dst) {
+  if (value.ty != INT)
+    return value;
+
+  if (value.val.type == OK_CONST)
+    return (ValueInfo){.ty = DOUBLE, .val = floatOp((double)value.val.value.cnst.i)};
+
+  Operand out = getResultOperand(dst);
+  EMIT(code, INT2FLOAT, out, value.val);
+  return (ValueInfo){.ty = DOUBLE, .val = out};
+}
+
+/// Stores value to a destination of type `dstType`, converting Int to Double when needed
+static void storeTyped(StringBuilder *code, Operand dst, AstDataType dstType, ValueInfo value) {
+  if (dstType == DOUBLE)
+    value = intToDouble(code, value, &dst);
+  storeValue(code, dst, value);
+}
+
 /// Global labels for integer wrapping helper/routine
 #define INT_WRAP_LABEL "$wrap32"
 #define INT_WRAP_VALUE "$wrap$value"
@@ -329,6 +352,11 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
       dst = getResultOperand(preferredDst);
       bool isIntOperation = left.ty == INT && right.ty == INT;
 
+      if (left.ty == DOUBLE || right.ty == DOUBLE) {
+        left = intToDouble(code, left, NULL);
+        right = intToDouble(code, right, NULL);
+      }
+
       switch (expr->data.binary.operatorAst) {
         case MULTIPLICATION:
           EMIT(code, MUL, dst, left.val, right.val);
@@ -400,8 +428,8 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
 
 /// Lowers a function call, preferredDst specifies the preferred destination operand, note that this
 /// operand does not have to be used, consult the returned info for the actual value location
-ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
-                            const Operand *preferredDst) {
+ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Operand *preferredDst,
+                            SymTable *table) {
   if (strcmp(call->functionName, "print") == 0) {
     ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
     switch (arg.ty) {
@@ -487,7 +515,10 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
   } else if (strcmp(call->functionName, "toInt") == 0) {
     ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
     Operand dst = getResultOperand(preferredDst);
-    EMIT(code, FLOAT2INT, dst, arg.val);
+    if (arg.ty == INT)
+      storeValue(code, dst, arg);
+    else
+      EMIT(code, FLOAT2INT, dst, arg.val);
     return (ValueInfo){.ty = INT, .val = dst};
   } else if (strcmp(call->functionName, "strLength") == 0) {
     ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
@@ -623,12 +654,19 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
     // NOTE: Could use function's declared parameter names rather than funcParam to avoid extra
     // copy, would require symbol table to be accessible
     AstFunctionCallArgument *arg = call->firstArgument;
+    const StSymbol *sym = symtableLookup(table, call->functionName);
+    if (sym == NULL)
+      die(ERR_INTERNAL, 0, "Could not find function %s in symbol table", call->functionName);
+    if (sym->type != ST_FUNCTION)
+      die(ERR_INTERNAL, 0, "Cannot call a variable");
     unsigned argc = 0;
     while (arg != NULL) {
-      Operand op = varOp(FT_TF, funcParam(argc++));
+      if (argc >= sym->data.function.parameterCount)
+        die(ERR_INTERNAL, 0, "Too many arguments for function %s", call->functionName);
+      Operand op = varOp(FT_TF, funcParam(argc));
       EMIT(code, DEFVAR, op);
       ValueInfo argValue = lowerExpression(code, arg->expression, &op);
-      storeValue(code, op, argValue);
+      storeTyped(code, op, sym->data.function.parameterTypes[argc++], argValue);
       arg = arg->nextArgument;
     }
 
@@ -637,46 +675,51 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call,
     EMIT(code, CALL, labelOp(call->functionName));  // Call function
     EMIT0(code, POPFRAME);                          // Pop frame so that we can access old LF
     EMIT(code, MOVE, dst, varOp(FT_TF, "$ret"));    // Move return value from TF to LF
-    return (ValueInfo){.ty = UNKNOWN, .val = dst};  // BUG: Needs symbol table to resolve data type
+    return (ValueInfo){.ty = sym->data.function.returnType,
+                       .val = dst};  // BUG: Needs symbol table to resolve data type
   }
 }
 
 /// Lowers a value (either expression or function call)
-ValueInfo lowerValue(StringBuilder *code, AstValue *val, const Operand *preferredDst) {
+ValueInfo lowerValue(StringBuilder *code, AstValue *val, const Operand *preferredDst,
+                     SymTable *table) {
   if (val->type == VALUE_EXPRESSION) {
     return lowerExpression(code, val->data.expression, preferredDst);
   }
-  return lowerFunctionCall(code, val->data.functionCall, preferredDst);
+  return lowerFunctionCall(code, val->data.functionCall, preferredDst, table);
 }
 
 void lowerCodeBlock(StringBuilder *code, AstCodeBlock *block);
 
+/// Function currently being lowered, needed to know the type returned values are converted to
+static AstFunction *currentFunction;
+
 /// Lowers a command
-void lowerCommand(StringBuilder *code, AstCommand *cmd) {
+void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
   switch (cmd->type) {
     case VARIABLE_DECLARATION: {
       // Declare and register variable operand for this variable, creates on LF
       Operand var = varOp(FT_LF, cmd->data.variableDeclaration.variableName);
       registerVariable(var);
-      ValueInfo value = lowerValue(code, cmd->data.variableDeclaration.value, &var);
-      storeValue(code, var, value);
+      ValueInfo value = lowerValue(code, cmd->data.variableDeclaration.value, &var, table);
+      storeTyped(code, var, cmd->data.variableDeclaration.resolvedType, value);
       break;
     }
     case ASSIGNMENT: {
       Operand dst = varOp(FT_LF, cmd->data.assignment.variableName);
-      ValueInfo value = lowerValue(code, cmd->data.assignment.value, &dst);
-      storeValue(code, dst, value);
+      ValueInfo value = lowerValue(code, cmd->data.assignment.value, &dst, table);
+      storeTyped(code, dst, cmd->data.assignment.resolvedType, value);
       break;
     }
     case FUNCTION_CALL:
       // Could return value, but this value is ignored
-      lowerFunctionCall(code, cmd->data.call.functionCall, NULL);
+      lowerFunctionCall(code, cmd->data.call.functionCall, NULL, table);
       break;
     case RETURN: {
       // Lower value and store or copy it to the return variable
       Operand ret = varOp(FT_LF, "$ret");
-      ValueInfo value = lowerValue(code, cmd->data.returnAst.value, &ret);
-      storeValue(code, ret, value);
+      ValueInfo value = lowerValue(code, cmd->data.returnAst.value, &ret, table);
+      storeTyped(code, ret, currentFunction->resolvedReturnType, value);
       EMIT0(code, RETURN);
       break;
     }
@@ -711,13 +754,15 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd) {
 void lowerCodeBlock(StringBuilder *code, AstCodeBlock *block) {
   AstCommand *cmd = block->firstCommand;
   while (cmd != NULL) {
-    lowerCommand(code, cmd);
+    lowerCommand(code, cmd, block->symTable);
     cmd = cmd->nextCommand;
   }
 }
 
 /// Lowers a function declaration
 void lowerFunction(StringBuilder *code, AstFunction *func) {
+  currentFunction = func;
+
   // Emit un-mangled function name as entry label
   EMIT(code, LABEL, labelOp(func->functionName));
 
@@ -741,8 +786,8 @@ void lowerFunction(StringBuilder *code, AstFunction *func) {
   registry.count = 0;
   if (func->bodyType == VALUE) {
     Operand ret = varOp(FT_LF, "$ret");
-    ValueInfo value = lowerValue(&internal, func->body.value, &ret);
-    storeValue(&internal, ret, value);
+    ValueInfo value = lowerValue(&internal, func->body.value, &ret, func->symTable);
+    storeTyped(&internal, ret, func->resolvedReturnType, value);
     EMIT0(&internal, RETURN);
     for (size_t i = 0; i < registry.count; i++) {
       EMIT(code, DEFVAR, varOp(FT_LF, registry.names[i]));

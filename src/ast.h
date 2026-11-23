@@ -3,6 +3,7 @@
  * Project: IFJ26 compiler
  * @brief Implementation of AST header
  * @author David Sobek <xsobekd00>
+ * @author Jakub Palacky <xpalacj00>
  *
  * Brief explanation:
  *  PROGRAM is split into FUNCTIONS
@@ -20,7 +21,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
+
+typedef struct SymTable SymTable;
 
 typedef struct AstProgram AstProgram;
 typedef struct AstFunction AstFunction;
@@ -81,13 +83,18 @@ typedef enum {
   GREATER,         // >
   GREATER_EQUAL,   // >=
   EQUAL,           // ==
-  NOT_EQUAL        // !=
+  NOT_EQUAL,       // !=
+  // BOOLTHEN:
+  LOGICAL_NEGATION,  // !
+  LOGICAL_AND,       // &&
+  LOGICAL_OR         // ||
 } AstOperator;
 
 typedef enum {
   INT_LITERAL,
   DOUBLE_LITERAL,
   STRING_LITERAL,
+  BOOL_LITERAL,  // BOOLTHEN
   UNIT_LITERAL,
   VARIABLE,
   UNARY,
@@ -104,7 +111,7 @@ struct AstExpression {
     int32_t intValue;    // INT_LITERAL
     double doubleValue;  // DOUBLE_LITERAL
     char *stringValue;   // STRING_LITERAL
-    bool boolValue;      // BOOL
+    bool boolValue;      // BOOL_LITERAL
 
     // UNIT_LITERAL (no data)
 
@@ -165,6 +172,7 @@ struct AstCommand {
 
     struct {  // ASSIGNMENT
       char *variableName;
+      AstDataType resolvedType;  // type of the assigned variable, set by semantic analysis
       AstValue *value;
     } assignment;
 
@@ -173,13 +181,14 @@ struct AstCommand {
     } call;
 
     struct {  // RETURN
+      // empty return == AstExpressionType UNIT_LITERAL
       AstValue *value;
     } returnAst;
 
     struct {  // IF
       AstExpression *condition;
       AstCodeBlock *thenBlock;
-      AstCodeBlock *elseBlock;
+      AstCodeBlock *elseBlock;  // can be NULL
     } ifAst;
 
     struct {  // WHILE
@@ -197,6 +206,7 @@ struct AstCommand {
 struct AstCodeBlock {
   AstCommand *firstCommand;
   AstCommand *lastCommand;
+  SymTable *symTable;
 };
 
 /// @brief IFJ26 function parameter
@@ -211,6 +221,7 @@ struct AstFunction {
   char *functionName;
   bool isMain;  // @main
   AstLocation location;
+  SymTable *symTable;
 
   AstFunctionParameter *firstParameter;
   AstFunctionParameter *lastParameter;
@@ -233,22 +244,69 @@ struct AstProgram {
   AstFunction *lastFunction;
 };
 
+/// Allocates a zero-initialized AstProgram
 AstProgram *astProgramNew(void);
+
+/// Allocates a zero-initialized AstFunction
+/// @param name Name of function
+/// @param location Location of function
+/// @warning name must be NULL terminated
+/// @note name will be duplicated into the arena to avoid use-after-free
 AstFunction *astFunctionNew(const char *name, AstLocation location);
+
+/// Allocates a zero-initialized AstFunctionParameter
+/// @param name Name of function parameter
+/// @param type DataType of parameter
+/// @warning name must be NULL terminated
+/// @note name will be duplicated into the arena to avoid use-after-free
 AstFunctionParameter *astFunctionParameterNew(const char *name, AstDataType type);
+
+/// Allocates a zero-initialized AstCodeBlock
 AstCodeBlock *astCodeBlockNew(void);
+
+/// Allocates a zero-initialized AstCommand
+/// @param type Type of command/statement
+/// @param location Location of statement
 AstCommand *astCodeCommandNew(AstCommandType type, AstLocation location);
+
+/// Allocates a zero-initialized AstExpression
+/// @param type Type of expression
+/// @param location Location of expression
 AstExpression *astExpressionNew(AstExpressionType type, AstLocation location);
+
+/// Allocates a zero-initialized AstFunctionCall
+/// @param name Name of function to be called
+/// @param location Location of function call
+/// @warning name must be NULL terminated
+/// @note name will be duplicated into the arena to avoid use-after-free
 AstFunctionCall *astFunctionCallNew(const char *name, AstLocation location);
+
+/// Allocates a zero-initialized AstFunctionCallArgument
+/// @param expression Expression that will act as the call's argument
 AstFunctionCallArgument *astFunctionCallArgumentNew(AstExpression *expression);
+
+/// Allocates a zero-initialized AstValue with type VALUE_EXPRESSION
+/// @param expression Expression to use as value's data
 AstValue *astValueFromExpr(AstExpression *expression);
+
+/// Allocates a zero-initialized AstValue with type VALUE_FUNCTION_CALL
+/// @param functionCall Function call to use as value's data
 AstValue *astValueFromFunctionCall(AstFunctionCall *functionCall);
 
+/// Appends function to program's list of functions
+/// @note Supplying a NULL program or function kills the compiler
 void astProgramAppendFunction(AstProgram *program, AstFunction *function);
-void astFunctionAppendParameter(AstFunction *function, AstFunctionParameter *parameter);
-void astBlockAppendCommand(AstCodeBlock *block, AstCommand *command);
-void astCallAppendArgument(AstFunctionCall *call, AstFunctionCallArgument *argument);
 
-void astFreeProgram(AstProgram *program);
+//// Appends parameter to function's paramter list
+/// @note Supplying a NULL function or parameter kills the compiler
+void astFunctionAppendParameter(AstFunction *function, AstFunctionParameter *parameter);
+
+/// Appends commands to code block's command list
+/// @note Supplying a NULL block or command kills the compiler
+void astBlockAppendCommand(AstCodeBlock *block, AstCommand *command);
+
+/// Appends argument to function call's list of arguments
+/// @note Supplying a NULL call or argument kills the compiler
+void astCallAppendArgument(AstFunctionCall *call, AstFunctionCallArgument *argument);
 
 #endif  // AST_H

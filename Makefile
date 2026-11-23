@@ -23,7 +23,17 @@ TEST_FLAGS := --report-error
 
 FORMAT_FILES := $(wildcard $(SRC_DIR)/*.c $(SRC_DIR)/*.h $(TEST_DIR)/*.c $(TEST_DIR)/*.h)
 
-.PHONY: all build dev asan test-build test test-asan check format format-check tidy cppcheck build-check clean check-all
+DOC_DIR     := docs
+DOC_OUT     := dokumentace.pdf
+DOC_META    := $(DOC_DIR)/metadata.yaml
+DOC_SOURCES := $(sort $(wildcard $(DOC_DIR)/*.md))
+DOC_IMAGES  := $(wildcard $(DOC_DIR)/*.pdf $(DOC_DIR)/img/*.pdf)
+
+ZIP_NAME    := xpalacj00.zip
+SUBMIT_DIRS := $(SRC_DIR) $(TEST_DIR)
+SUBMIT_META := Makefile $(DOC_OUT) rozdeleni rozsireni
+
+.PHONY: all build dev asan test-build test test-asan check format format-check tidy cppcheck build-check clean check-all doc zip
 
 all: build
 
@@ -80,6 +90,21 @@ check: format-check cppcheck
 build-check: check dev
 
 check-all: build-check tidy asan
+
+doc: $(DOC_OUT)
+
+$(DOC_OUT): $(DOC_META) $(DOC_SOURCES) $(DOC_IMAGES)
+	pandoc $(DOC_META) $(DOC_SOURCES) \
+		--pdf-engine=xelatex \
+		--resource-path=$(DOC_DIR):$(DOC_DIR)/img \
+		-o $(DOC_OUT)
+
+zip: $(DOC_OUT)
+	rm -f $(ZIP_NAME)
+	zip -r $(ZIP_NAME) $(SUBMIT_META) $(SUBMIT_DIRS) \
+		-x "$(TEST_DIR)/bin/*" \
+		-x "*.o" -x "*.d" -x "*.out" \
+		-x "*/.*" -x ".*" -x "__MACOSX/*"
 
 clean:
 	rm -rf $(OBJ_DIR) $(TARGET)

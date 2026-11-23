@@ -15,17 +15,6 @@
 
 #include "common.h"
 
-typedef struct Token {
-  enum TkType type;
-  union Value *value;
-  int line;
-} Token;
-
-typedef struct LinkedTlist {
-  struct Token *token;
-  struct LinkedTlist *next;
-} LinkedTlist;
-
 struct Token *newToken(enum TkType type, int line) {
   struct Token *token = arenaAlloc(sizeof(struct Token));
   token->type = type;
