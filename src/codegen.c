@@ -450,6 +450,9 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
   }
 }
 
+/// Function currently being lowered, needed to know the type returned values are converted to
+static AstFunction *currentFunction;
+
 /// Lowers a function call, preferredDst specifies the preferred destination operand, note that this
 /// operand does not have to be used, consult the returned info for the actual value location
 ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Operand *preferredDst,
@@ -492,8 +495,8 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
       case BOOL: {
         // Needs to compare value at runtime and return constant based on value
         Operand dst = getResultOperand(preferredDst);
-        Operand trueLabel = labelOp(newLabel("everything_is_one_function", "bool_to_str"));
-        Operand endLabel = labelOp(newLabel("everything_is_one_function", "bool_to_str"));
+        Operand trueLabel = labelOp(newLabel(currentFunction->functionName, "bool_to_str"));
+        Operand endLabel = labelOp(newLabel(currentFunction->functionName, "bool_to_str"));
 
         EMIT(code, JUMPIFEQ, trueLabel, arg.val, boolOp(true));
         EMIT(code, MOVE, dst, stringOp("false"));
@@ -516,8 +519,8 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
   } else if (strcmp(call->functionName, "readInt") == 0) {
     Operand dst = getResultOperand(preferredDst);
     Operand temp = varOp(FT_GF, INT_WRAP_TEMP);
-    Operand invalid = labelOp(newLabel("everything_is_one_function", "readInt_invalid"));
-    Operand ok = labelOp(newLabel("everything_is_one_function", "readInt"));
+    Operand invalid = labelOp(newLabel(currentFunction->functionName, "readInt_invalid"));
+    Operand ok = labelOp(newLabel(currentFunction->functionName, "readInt"));
     EMIT(code, READ, dst, typeOp(CT_INT));
     EMIT(code, JUMPIFEQ, invalid, dst, nilOp());
     EMIT(code, LT, temp, dst, intOp(INT32_MIN));
@@ -530,7 +533,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
     return (ValueInfo){.ty = INT, .val = dst};
   } else if (strcmp(call->functionName, "readDouble") == 0) {
     Operand dst = getResultOperand(preferredDst);
-    Operand ok = labelOp(newLabel("everything_is_one_function", "readFloat"));
+    Operand ok = labelOp(newLabel(currentFunction->functionName, "readFloat"));
     EMIT(code, READ, dst, typeOp(CT_FLOAT));
     EMIT(code, JUMPIFNEQ, ok, dst, nilOp());
     EMIT(code, MOVE, dst, floatOp(0.0));
@@ -538,7 +541,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
     return (ValueInfo){.ty = DOUBLE, .val = dst};
   } else if (strcmp(call->functionName, "readBoolean") == 0) {
     Operand dst = getResultOperand(preferredDst);
-    Operand ok = labelOp(newLabel("everything_is_one_function", "readBoolean"));
+    Operand ok = labelOp(newLabel(currentFunction->functionName, "readBoolean"));
     EMIT(code, READ, dst, typeOp(CT_BOOL));
     EMIT(code, JUMPIFNEQ, ok, dst, nilOp());
     EMIT(code, MOVE, dst, boolOp(false));
@@ -573,9 +576,9 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
     Operand tempOp = varOp(FT_LF, newTempVar());
     Operand index = varOp(FT_LF, newTempVar());
     Operand result = varOp(FT_LF, newTempVar());
-    Operand exit40 = labelOp(newLabel("everything_is_one_function", "sub_str"));
-    Operand loop = labelOp(newLabel("everything_is_one_function", "sub_str_loop"));
-    Operand ok = labelOp(newLabel("everything_is_one_function", "sub_str_ok"));
+    Operand exit40 = labelOp(newLabel(currentFunction->functionName, "sub_str"));
+    Operand loop = labelOp(newLabel(currentFunction->functionName, "sub_str_loop"));
+    Operand ok = labelOp(newLabel(currentFunction->functionName, "sub_str_ok"));
     Operand dst = getResultOperand(preferredDst);
 
     // Register temporaries
@@ -636,8 +639,8 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
   } else if (strcmp(call->functionName, "ord") == 0) {
     // Define temp vars and labels
     Operand tmp = varOp(FT_LF, newTempVar());
-    Operand err = labelOp(newLabel("everything_is_one_function", "ord_err"));
-    Operand ok = labelOp(newLabel("everything_is_one_function", "ord_ok"));
+    Operand err = labelOp(newLabel(currentFunction->functionName, "ord_err"));
+    Operand ok = labelOp(newLabel(currentFunction->functionName, "ord_ok"));
     Operand dst = getResultOperand(preferredDst);
 
     // Register temp
@@ -723,9 +726,6 @@ ValueInfo lowerValue(StringBuilder *code, AstValue *val, const Operand *preferre
 
 void lowerCodeBlock(StringBuilder *code, AstCodeBlock *block);
 
-/// Function currently being lowered, needed to know the type returned values are converted to
-static AstFunction *currentFunction;
-
 /// Lowers a command
 void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
   switch (cmd->type) {
@@ -756,14 +756,14 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
       break;
     }
     case IF:;
-      Operand end = labelOp(newLabel("everything_is_one_function", "if_end"));
+      Operand end = labelOp(newLabel(currentFunction->functionName, "if_end"));
       ValueInfo ifcond = lowerExpression(code, cmd->data.ifAst.condition, NULL);
       if (cmd->data.ifAst.elseBlock == NULL) {
         EMIT(code, JUMPIFEQ, end, ifcond.val, boolOp(false));
         lowerCodeBlock(code, cmd->data.ifAst.thenBlock);
         EMIT(code, JUMP, end);
       } else {
-        Operand f = labelOp(newLabel("everything_is_one_function", "if_false"));
+        Operand f = labelOp(newLabel(currentFunction->functionName, "if_false"));
         EMIT(code, JUMPIFEQ, f, ifcond.val, boolOp(false));
         lowerCodeBlock(code, cmd->data.ifAst.thenBlock);
         EMIT(code, JUMP, end);
@@ -773,8 +773,8 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
       }
       break;
     case WHILE:;
-      Operand loop = labelOp(newLabel("everything_is_one_function", "when"));
-      Operand loopEnd = labelOp(newLabel("everything_is_one_function", "when_end"));
+      Operand loop = labelOp(newLabel(currentFunction->functionName, "when"));
+      Operand loopEnd = labelOp(newLabel(currentFunction->functionName, "when_end"));
       EMIT(code, LABEL, loop);
       ValueInfo whilecond = lowerExpression(code, cmd->data.whileAst.condition, NULL);
       EMIT(code, JUMPIFEQ, loopEnd, whilecond.val, boolOp(false));
