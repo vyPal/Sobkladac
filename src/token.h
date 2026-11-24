@@ -46,20 +46,21 @@ enum TkType {
   TK_ATMAIN,     // @main
   TK_EOF,        // end of file
   // boolthen
-  TK_NOT,       // !
-  TK_AND,       // &&
-  TK_OR,        // ||
-  TK_KW_TRUE,   // true
-  TK_KW_FALSE,  // false
+  TK_NOT,         // !
+  TK_AND,         // &&
+  TK_OR,          // ||
+  TK_KW_TRUE,     // true
+  TK_KW_FALSE,    // false
+  TK_KW_BOOLEAN,  // Data type Boolean
 
   // for layout.c - extra + keywords
-  TK_KW_IMPORT,
-  TK_DEDENT,  // oposite of TK_INDENT
+  TK_KW_IMPORT,  // beginning word of prolog
+  TK_DEDENT,     // oposite of TK_INDENT
 
-  TK_KW_INT,
-  TK_KW_DOUBLE,
-  TK_KW_STRING,
-  TK_KW_UNIT,
+  TK_KW_INT,     // Data type Int
+  TK_KW_DOUBLE,  // Data type Double
+  TK_KW_STRING,  // Data type String
+  TK_KW_UNIT,    // Data type Unit
 
   TK_KW_WHILE,
   TK_KW_DO,
@@ -68,11 +69,13 @@ enum TkType {
   TK_KW_THEN,
   TK_KW_ELSE,
 
+  // VVVV for funDef VVVV
   TK_KW_DEF,
   TK_KW_RETURN,
 
   TK_KW_VAL,
   TK_KW_VAR,
+  //^^^^^^^^^^^^^^^^^^^^
 
   TK_KW_RESERVED
 };

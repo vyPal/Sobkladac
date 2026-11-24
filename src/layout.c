@@ -73,6 +73,8 @@ Token *toKeyword(Token *tk) {
     tk = newToken(TK_KW_TRUE, line);
   else if (strcmp(value, "false") == 0)
     tk = newToken(TK_KW_FALSE, line);
+  else if (strcmp(value, "Boolean") == 0)
+    tk = newToken(TK_KW_BOOLEAN, line);
   return tk;
 }
 

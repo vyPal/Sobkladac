@@ -286,6 +286,9 @@ AstDataType dType(LinkedTlist *tokenList) {
     case TK_KW_UNIT:
       type = UNIT;
       break;
+    case TK_KW_BOOLEAN:
+      type = BOOL;
+      break;
     default:
       return UNKNOWN;  // leave the token in the list
   }
@@ -611,6 +614,13 @@ AstExpression *term(LinkedTlist *tokenList) {
     popToken(tokenList);
     term = astExpressionNew(STRING_LITERAL, getLocation(token));
     term->data.stringValue = getString(getValue(token)->s);
+    return term;
+
+    // it is BOOL_LITERAL
+  } else if (tkType == TK_KW_TRUE || tkType == TK_KW_FALSE) {
+    popToken(tokenList);
+    term = astExpressionNew(BOOL_LITERAL, getLocation(token));
+    term->data.boolValue = tkType == TK_KW_TRUE;
     return term;
 
   } else if (tkType == TK_LPAREN) {

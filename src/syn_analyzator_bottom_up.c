@@ -94,6 +94,9 @@ AstExpressionType tokenToExpressionType(const Token *token) {
       return DOUBLE_LITERAL;
     case TK_STRING:
       return STRING_LITERAL;
+    case TK_KW_TRUE:
+    case TK_KW_FALSE:
+      return BOOL_LITERAL;
     case TK_PLUS:
     case TK_MINUS:  // unary minus is already checked
     case TK_MULTIPLY:
@@ -268,6 +271,14 @@ AstExpression *executeReduce(PrecStack *stack) {
         break;
       case TK_IDENT:
         ex->data.variable = getString(getValue(onePop.token)->s);
+        break;
+        // boolthen ext.
+      case TK_KW_TRUE:
+        ex->data.boolValue = true;
+        break;
+      case TK_KW_FALSE:
+        ex->data.boolValue = false;
+        break;
       default:
         break;
     }
@@ -284,7 +295,7 @@ AstExpression *executeReduce(PrecStack *stack) {
   if (count == 2 && popped[1].type == TERMINAL && popped[1].symbol == PREC_UNARY &&
       popped[0].type == NON_TERMINAL) {
     AstExpression *ex = astExpressionNew(UNARY, getLocation(popped[1].token));
-    const Token *token = popped[0].token;
+    const Token *token = popped[1].token;  // looks at unary operator
     if (token == NULL) {
       die(ERR_SYNTAX, lineOf(token), "Missing token");
     }
