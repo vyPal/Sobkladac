@@ -349,15 +349,30 @@ LinkedTlist *lexerMain(void) {
 
           if (nextChar == ' ') {
             indentCount++;
-          } else {
-            preloadedChar = true;
-            Token *tk = newToken(TK_INDENT, line);
-            int indent = indentCount;
-            union Value *value = arenaAlloc(sizeof(union Value));
-            (*value).i = indent;
-            setValue(tk, value);
-            lastToken = pushToken(tk, lastToken);
+            continue;
           }
+
+          if (nextChar == '\t') {
+            // tabulátor je chyba jen na neprázdném řádku
+            int c = nextCharInt;
+            while (c == ' ' || c == '\t' || c == '\r' || c == '\f' || c == '\v') {
+              c = fgetc(stdin);
+              position++;
+            }
+            if (c != '\n' && c != EOF)
+              die(1, line, "Tab in indentation at line %d column %d", line, position);
+            // prázdný řádek: pokračuje se od \n / EOF
+            nextCharInt = c;
+            nextChar = (char)c;
+            indentCount = 0;
+          }
+
+          preloadedChar = true;
+          Token *tk = newToken(TK_INDENT, line);
+          union Value *value = arenaAlloc(sizeof(union Value));
+          (*value).i = indentCount;
+          setValue(tk, value);
+          lastToken = pushToken(tk, lastToken);
         }
         break;
       case '@':
@@ -549,6 +564,10 @@ LinkedTlist *lexerMain(void) {
           die(1, line, "Unexpected character at line %d colum %d, expected \"&&\"", line, position);
         break;
       case ' ':
+      case '\t':
+      case '\r':
+      case '\f':
+      case '\v':
         break;
       default:
         // identifier
