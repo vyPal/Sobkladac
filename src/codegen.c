@@ -16,6 +16,7 @@
 
 #include "ast.h"
 #include "common.h"
+#include "hashtable.h"
 #include "strbuf.h"
 #include "symtable.h"
 
@@ -360,6 +361,8 @@ bool isConstNegOne(Operand op) {
   return op.type == OK_CONST && (op.value.cnst.type == CT_INT && op.value.cnst.i == -1);
 }
 
+static HashTable *knownConstants;
+
 /// Lower expression into IFJcode26
 /// @param code Reference to string builder
 /// @param expr Pointer to expression to lower
@@ -387,6 +390,9 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
       if (expr->deducedDataType == UNKNOWN) {
         die(ERR_INTERNAL, (int)expr->location.line, "Variable expression has no resolved type");
       }
+      const ValueInfo *info = htGet(knownConstants, expr->data.variable);
+      if (info != NULL)
+        return *info;
       return (ValueInfo){.ty = expr->deducedDataType, .val = varOp(FT_LF, expr->data.variable)};
 
     // Only negation is allowed as unary op, subtract value from 0 or 0.0
@@ -1012,7 +1018,15 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
       Operand var = varOp(FT_LF, cmd->data.variableDeclaration.variableName);
       registerVariable(var);
       ValueInfo value = lowerValue(code, cmd->data.variableDeclaration.value, &var, table);
-      storeTyped(code, var, cmd->data.variableDeclaration.resolvedType, value);
+      if (cmd->data.variableDeclaration.resolvedType == DOUBLE)
+        value = intToDouble(code, value, &var);
+      storeValue(code, var, value);
+      if (!cmd->data.variableDeclaration.isMutable && value.val.type == OK_CONST) {
+        ValueInfo *copy = arenaAlloc(sizeof(ValueInfo));
+        *copy = value;
+        if (!htInsert(knownConstants, cmd->data.variableDeclaration.variableName, copy))
+          die(ERR_INTERNAL, 0, "Unable to insert immutable variable into constant table");
+      }
       break;
     }
     case ASSIGNMENT: {
@@ -1103,6 +1117,7 @@ void lowerCodeBlock(StringBuilder *code, AstCodeBlock *block) {
 /// Lowers a function declaration
 void lowerFunction(StringBuilder *code, AstFunction *func) {
   currentFunction = func;
+  knownConstants = htCreate(32);
 
   // Emit un-mangled function name as entry label
   EMIT(code, LABEL, labelOp(func->functionName));
