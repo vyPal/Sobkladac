@@ -344,6 +344,22 @@ int64_t wrap32DivSext(int64_t a, int64_t b) {
   return (int64_t)(lhs / rhs);
 }
 
+/// Check if operand is a constant and is zero (int only)
+bool isConstZero(Operand op) {
+  return op.type == OK_CONST && (op.value.cnst.type == CT_INT && op.value.cnst.i == 0);
+}
+
+/// Check if operand is a constant and is one (int or float)
+bool isConstOne(Operand op) {
+  return op.type == OK_CONST && ((op.value.cnst.type == CT_INT && op.value.cnst.i == 1) ||
+                                 (op.value.cnst.type == CT_FLOAT && op.value.cnst.f == 1.0));
+}
+
+/// Check if operand is a constant and is negative one (int only)
+bool isConstNegOne(Operand op) {
+  return op.type == OK_CONST && (op.value.cnst.type == CT_INT && op.value.cnst.i == -1);
+}
+
 /// Lower expression into IFJcode26
 /// @param code Reference to string builder
 /// @param expr Pointer to expression to lower
@@ -570,16 +586,34 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
 
       switch (expr->data.binary.operatorAst) {
         case MULTIPLICATION:
-          EMIT(code, MUL, dst, left.val, right.val);
-          if (isIntOperation)
+          if (isConstOne(left.val))
+            storeValue(code, dst, right);
+          else if (isConstOne(right.val))
+            storeValue(code, dst, left);
+          else if (isConstNegOne(left.val)) {
+            EMIT(code, SUB, dst, intOp(0), right.val);
             emitIntWrap(code, dst);
+          } else if (isConstNegOne(right.val)) {
+            EMIT(code, SUB, dst, intOp(0), left.val);
+            emitIntWrap(code, dst);
+          } else if (isConstZero(left.val) || isConstZero(right.val))
+            return (ValueInfo){.ty = left.ty, .val = intOp(0)};
+          else {
+            EMIT(code, MUL, dst, left.val, right.val);
+            if (isIntOperation)
+              emitIntWrap(code, dst);
+          }
           return (ValueInfo){.ty = left.ty, .val = dst};
 
         case DIVISION:
-          if (left.ty == INT) {
+          if (isConstOne(right.val))
+            storeValue(code, dst, left);
+          else if (isConstNegOne(right.val)) {
+            EMIT(code, SUB, dst, intOp(0), left.val);
+            emitIntWrap(code, dst);
+          } else if (isIntOperation) {
             EMIT(code, IDIV, dst, left.val, right.val);
-            if (isIntOperation)
-              emitIntWrap(code, dst);
+            emitIntWrap(code, dst);
           } else
             EMIT(code, DIV, dst, left.val, right.val);
 
@@ -589,6 +623,10 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
           // Concatenation for strings
           if (left.ty == STRING)
             EMIT(code, CONCAT, dst, left.val, right.val);
+          else if (isConstZero(left.val))
+            storeValue(code, dst, right);
+          else if (isConstZero(right.val))
+            storeValue(code, dst, left);
           else {
             EMIT(code, ADD, dst, left.val, right.val);
             if (isIntOperation)
@@ -597,9 +635,13 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
           return (ValueInfo){.ty = left.ty, .val = dst};
 
         case SUBTRACTION:
-          EMIT(code, SUB, dst, left.val, right.val);
-          if (isIntOperation)
-            emitIntWrap(code, dst);
+          if (isConstZero(right.val))
+            storeValue(code, dst, left);
+          else {
+            EMIT(code, SUB, dst, left.val, right.val);
+            if (isIntOperation)
+              emitIntWrap(code, dst);
+          }
           return (ValueInfo){.ty = left.ty, .val = dst};
 
         case LESSER:
@@ -635,6 +677,10 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
           return (ValueInfo){.ty = BOOL, .val = dst, .negate = isCond};
 
         case LOGICAL_AND:
+          if (left.val.type == OK_CONST && !left.val.value.cnst.b)
+            return (ValueInfo){.ty = BOOL, .val = boolOp(false)};
+          if (right.val.type == OK_CONST && !right.val.value.cnst.b)
+            return (ValueInfo){.ty = BOOL, .val = boolOp(false)};
           if (!(left.negate && right.negate)) {
             if (left.negate) {
               EMIT(code, NOT, temp, left.val);
@@ -655,6 +701,10 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
           return (ValueInfo){.ty = BOOL, .val = dst};
 
         case LOGICAL_OR:
+          if (left.val.type == OK_CONST && left.val.value.cnst.b)
+            return (ValueInfo){.ty = BOOL, .val = boolOp(true)};
+          if (right.val.type == OK_CONST && right.val.value.cnst.b)
+            return (ValueInfo){.ty = BOOL, .val = boolOp(true)};
           if (!(left.negate && right.negate)) {
             if (left.negate) {
               EMIT(code, NOT, temp, left.val);
