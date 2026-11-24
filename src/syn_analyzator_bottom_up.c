@@ -36,7 +36,7 @@ bool isUnaryContext(const Token *prevToken) {
 
 AstLocation getLocation(const Token *token) {
   AstLocation location = {
-      .line = (unsigned)getLine(token),
+      .line = (unsigned)lineOf(token),
       .column = 0,  // (unsigned)getColumn(token), // TODO after implementation this function in
                     // lexer, uncomment and replace hard-coded 100
   };
