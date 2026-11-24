@@ -313,6 +313,36 @@ static void emitIntWrapRoutine(StringBuilder *code) {
   EMIT0(code, RETURN);
 }
 
+/// Add a and b wrapping them as if they were 32bit numbers
+int64_t wrap32AddSext(int64_t a, int64_t b) {
+  return (int64_t)(int32_t)((uint32_t)a + (uint32_t)b);
+}
+
+/// Subtract a and b wrapping them as if they were 32bit numbers
+int64_t wrap32SubSext(int64_t a, int64_t b) {
+  return (int64_t)(int32_t)((uint32_t)a - (uint32_t)b);
+}
+
+/// Multiply a and b wrapping them as if they were 32bit numbers
+int64_t wrap32MulSext(int64_t a, int64_t b) {
+  return (int64_t)(int32_t)((uint32_t)a * (uint32_t)b);
+}
+
+/// Divide a and b wrapping them as if they were 32bit numbers
+int64_t wrap32DivSext(int64_t a, int64_t b) {
+  int32_t lhs = (int32_t)(uint32_t)a;
+  int32_t rhs = (int32_t)(uint32_t)b;
+
+  if (rhs == 0) {
+    return 0;
+  }
+  if (lhs == INT32_MIN && rhs == -1) {
+    return (int64_t)INT32_MIN;
+  }
+
+  return (int64_t)(lhs / rhs);
+}
+
 /// Lower expression into IFJcode26
 /// @param code Reference to string builder
 /// @param expr Pointer to expression to lower
@@ -350,6 +380,18 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
 
       ValueInfo operand = lowerExpression(code, expr->data.unary.expression, NULL);
 
+      if (operand.val.type == OK_CONST) {
+        if (op == NEGATION) {
+          if (operand.ty == INT) {
+            return (ValueInfo){.ty = INT, .val = intOp(wrap32SubSext(0, operand.val.value.cnst.i))};
+          } else {
+            return (ValueInfo){.ty = DOUBLE, .val = floatOp(0.0 - operand.val.value.cnst.f)};
+          }
+        } else {
+          return (ValueInfo){.ty = BOOL, .val = boolOp(!operand.val.value.cnst.b)};
+        }
+      }
+
       dst = getResultOperand(preferredDst);
 
       if (op == NEGATION) {
@@ -370,13 +412,149 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
     case BINARY:;
       ValueInfo left = lowerExpression(code, expr->data.binary.leftExpression, NULL);
       ValueInfo right = lowerExpression(code, expr->data.binary.rightExpression, NULL);
-      dst = getResultOperand(preferredDst);
       bool isIntOperation = left.ty == INT && right.ty == INT;
 
       if (left.ty == DOUBLE || right.ty == DOUBLE) {
         left = intToDouble(code, left, NULL);
         right = intToDouble(code, right, NULL);
       }
+
+      if (left.val.type == OK_CONST && right.val.type == OK_CONST) {
+        switch (expr->data.binary.operatorAst) {
+          case MULTIPLICATION:
+            if (isIntOperation)
+              return (ValueInfo){
+                  .ty = INT,
+                  .val = intOp(wrap32MulSext(left.val.value.cnst.i, right.val.value.cnst.i))};
+            else
+              return (ValueInfo){.ty = DOUBLE,
+                                 .val = floatOp(left.val.value.cnst.f * right.val.value.cnst.f)};
+
+          case DIVISION:
+            if (isIntOperation) {
+              if (right.val.value.cnst.i == 0)
+                break;  // Fall through to runtime division to fail
+              return (ValueInfo){
+                  .ty = INT,
+                  .val = intOp(wrap32DivSext(left.val.value.cnst.i, right.val.value.cnst.i))};
+            } else {
+              if (right.val.value.cnst.f == 0.0)
+                break;  // Fall through to runtime division to fail
+              return (ValueInfo){.ty = DOUBLE,
+                                 .val = floatOp(left.val.value.cnst.f / right.val.value.cnst.f)};
+            }
+
+          case ADDITION:
+            if (left.ty == STRING) {
+              size_t len1 = strlen(left.val.value.cnst.s);
+              size_t len2 = strlen(right.val.value.cnst.s);
+              char *new = arenaAlloc(len1 + len2 + 1);
+              strncpy(new, left.val.value.cnst.s, len1);
+              strncpy(new + len1, right.val.value.cnst.s, len2);
+              new[len1 + len2] = 0;
+              return (ValueInfo){.ty = STRING, .val = stringOp(new)};
+            } else if (isIntOperation)
+              return (ValueInfo){
+                  .ty = INT,
+                  .val = intOp(wrap32AddSext(left.val.value.cnst.i, right.val.value.cnst.i))};
+            else
+              return (ValueInfo){.ty = DOUBLE,
+                                 .val = floatOp(left.val.value.cnst.f + right.val.value.cnst.f)};
+
+          case SUBTRACTION:
+            if (isIntOperation)
+              return (ValueInfo){
+                  .ty = INT,
+                  .val = intOp(wrap32SubSext(left.val.value.cnst.i, right.val.value.cnst.i))};
+            else
+              return (ValueInfo){.ty = DOUBLE,
+                                 .val = floatOp(left.val.value.cnst.f - right.val.value.cnst.f)};
+
+          case LESSER:
+            if (left.ty == STRING)
+              return (ValueInfo){
+                  .ty = BOOL,
+                  .val = boolOp(strcmp(left.val.value.cnst.s, right.val.value.cnst.s) < 0)};
+            if (left.ty == DOUBLE)
+              return (ValueInfo){.ty = BOOL,
+                                 .val = boolOp(left.val.value.cnst.f < right.val.value.cnst.f)};
+            return (ValueInfo){.ty = BOOL,
+                               .val = boolOp(left.val.value.cnst.i < right.val.value.cnst.i)};
+
+          case LESSER_EQUAL:
+            if (left.ty == STRING)
+              return (ValueInfo){
+                  .ty = BOOL,
+                  .val = boolOp(strcmp(left.val.value.cnst.s, right.val.value.cnst.s) <= 0)};
+            if (left.ty == DOUBLE)
+              return (ValueInfo){.ty = BOOL,
+                                 .val = boolOp(left.val.value.cnst.f <= right.val.value.cnst.f)};
+            return (ValueInfo){.ty = BOOL,
+                               .val = boolOp(left.val.value.cnst.i <= right.val.value.cnst.i)};
+
+          case GREATER:
+            if (left.ty == STRING)
+              return (ValueInfo){
+                  .ty = BOOL,
+                  .val = boolOp(strcmp(left.val.value.cnst.s, right.val.value.cnst.s) > 0)};
+            if (left.ty == DOUBLE)
+              return (ValueInfo){.ty = BOOL,
+                                 .val = boolOp(left.val.value.cnst.f > right.val.value.cnst.f)};
+            return (ValueInfo){.ty = BOOL,
+                               .val = boolOp(left.val.value.cnst.i > right.val.value.cnst.i)};
+
+          case GREATER_EQUAL:
+            if (left.ty == STRING)
+              return (ValueInfo){
+                  .ty = BOOL,
+                  .val = boolOp(strcmp(left.val.value.cnst.s, right.val.value.cnst.s) >= 0)};
+            if (left.ty == DOUBLE)
+              return (ValueInfo){.ty = BOOL,
+                                 .val = boolOp(left.val.value.cnst.f >= right.val.value.cnst.f)};
+            return (ValueInfo){.ty = BOOL,
+                               .val = boolOp(left.val.value.cnst.i >= right.val.value.cnst.i)};
+
+          case EQUAL:
+          case NOT_EQUAL: {
+            bool equal;
+            switch (left.ty) {
+              case INT:
+                equal = left.val.value.cnst.i == right.val.value.cnst.i;
+                break;
+              case DOUBLE:
+                equal = left.val.value.cnst.f == right.val.value.cnst.f;
+                break;
+              case STRING:
+                equal = strcmp(left.val.value.cnst.s, right.val.value.cnst.s) == 0;
+                break;
+              case BOOL:
+                equal = left.val.value.cnst.b == right.val.value.cnst.b;
+                break;
+              case UNIT:
+                equal = true;
+                break;
+              default:
+                die(ERR_INTERNAL, (int)expr->location.line,
+                    "Invalid operands for constant equality");
+            }
+            return (ValueInfo){
+                .ty = BOOL, .val = boolOp(expr->data.binary.operatorAst == EQUAL ? equal : !equal)};
+          }
+
+          case LOGICAL_AND:
+            return (ValueInfo){.ty = BOOL,
+                               .val = boolOp(left.val.value.cnst.b && right.val.value.cnst.b)};
+
+          case LOGICAL_OR:
+            return (ValueInfo){.ty = BOOL,
+                               .val = boolOp(left.val.value.cnst.b || right.val.value.cnst.b)};
+
+          default:
+            break;
+        }
+      }
+
+      dst = getResultOperand(preferredDst);
 
       switch (expr->data.binary.operatorAst) {
         case MULTIPLICATION:
