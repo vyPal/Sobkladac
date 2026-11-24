@@ -48,7 +48,7 @@ enum TkType {
   // boolthen
   TK_NOT,  // !
   TK_AND,  // &&
-  TK_OR    // ||
+  TK_OR,   // ||
 
   // for layout.c - extra + keywords
   TK_KW_IMPORT,
