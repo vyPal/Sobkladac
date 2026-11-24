@@ -207,6 +207,7 @@ static void registerVariable(Operand op) {
 typedef struct {
   AstDataType ty;
   Operand val;
+  bool negate;  // Flag for use in conditions to use JUMPIFNEQ instead of JUMPIFEQ
 } ValueInfo;
 
 /// Returns an operand to store the result in, uses `preferred` if non-NULL otherwise generates a
@@ -349,7 +350,8 @@ int64_t wrap32DivSext(int64_t a, int64_t b) {
 /// @param preferredDst Operand to return value in. Only a recommendation, uses temp if NULL
 /// @note Expects all used variables to be present in LF
 /// @note Resulting value info contains actual destination of value
-ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operand *preferredDst) {
+ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operand *preferredDst,
+                          bool isCond) {
   Operand dst;
   switch (expr->expressionType) {
     // Return constant operand for literals
@@ -378,7 +380,7 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
         die(ERR_INTERNAL, (int)expr->location.line,
             "Binary operation cannot be performed on single operand");
 
-      ValueInfo operand = lowerExpression(code, expr->data.unary.expression, NULL);
+      ValueInfo operand = lowerExpression(code, expr->data.unary.expression, NULL, isCond);
 
       if (operand.val.type == OK_CONST) {
         if (op == NEGATION) {
@@ -388,6 +390,8 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
             return (ValueInfo){.ty = DOUBLE, .val = floatOp(0.0 - operand.val.value.cnst.f)};
           }
         } else {
+          if (operand.negate)
+            return (ValueInfo){.ty = BOOL, .val = boolOp(operand.val.value.cnst.b)};
           return (ValueInfo){.ty = BOOL, .val = boolOp(!operand.val.value.cnst.b)};
         }
       }
@@ -401,7 +405,10 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
         } else
           EMIT(code, SUB, dst, floatOp(0.0), operand.val);
       } else {
-        EMIT(code, NOT, dst, operand.val);
+        if (!operand.negate)
+          EMIT(code, NOT, dst, operand.val);
+        else
+          storeValue(code, dst, operand);
       }
 
       return (ValueInfo){.ty = operand.ty, .val = dst};
@@ -410,8 +417,8 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
     // to use Assumes both operands are of the same data type Numerical operations return the same
     // type as the left operand, logic operations return bool
     case BINARY:;
-      ValueInfo left = lowerExpression(code, expr->data.binary.leftExpression, NULL);
-      ValueInfo right = lowerExpression(code, expr->data.binary.rightExpression, NULL);
+      ValueInfo left = lowerExpression(code, expr->data.binary.leftExpression, NULL, isCond);
+      ValueInfo right = lowerExpression(code, expr->data.binary.rightExpression, NULL, isCond);
       bool isIntOperation = left.ty == INT && right.ty == INT;
 
       if (left.ty == DOUBLE || right.ty == DOUBLE) {
@@ -529,6 +536,8 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
                 break;
               case BOOL:
                 equal = left.val.value.cnst.b == right.val.value.cnst.b;
+                if (left.negate != right.negate)
+                  equal = !equal;
                 break;
               case UNIT:
                 equal = true;
@@ -543,11 +552,13 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
 
           case LOGICAL_AND:
             return (ValueInfo){.ty = BOOL,
-                               .val = boolOp(left.val.value.cnst.b && right.val.value.cnst.b)};
+                               .val = boolOp((left.val.value.cnst.b != left.negate) &&
+                                             (right.val.value.cnst.b != right.negate))};
 
           case LOGICAL_OR:
             return (ValueInfo){.ty = BOOL,
-                               .val = boolOp(left.val.value.cnst.b || right.val.value.cnst.b)};
+                               .val = boolOp((left.val.value.cnst.b != left.negate) ||
+                                             (right.val.value.cnst.b != right.negate))};
 
           default:
             break;
@@ -555,6 +566,7 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
       }
 
       dst = getResultOperand(preferredDst);
+      Operand temp = varOp(FT_GF, INT_WRAP_TEMP);
 
       switch (expr->data.binary.operatorAst) {
         case MULTIPLICATION:
@@ -596,8 +608,9 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
 
         case LESSER_EQUAL:
           EMIT(code, GT, dst, left.val, right.val);
-          EMIT(code, NOT, dst, dst);
-          return (ValueInfo){.ty = BOOL, .val = dst};
+          if (!isCond)
+            EMIT(code, NOT, dst, dst);
+          return (ValueInfo){.ty = BOOL, .val = dst, .negate = isCond};
 
         case GREATER:
           EMIT(code, GT, dst, left.val, right.val);
@@ -605,24 +618,60 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
 
         case GREATER_EQUAL:
           EMIT(code, LT, dst, left.val, right.val);
-          EMIT(code, NOT, dst, dst);
-          return (ValueInfo){.ty = BOOL, .val = dst};
+          if (!isCond)
+            EMIT(code, NOT, dst, dst);
+          return (ValueInfo){.ty = BOOL, .val = dst, .negate = isCond};
 
         case EQUAL:
           EMIT(code, EQ, dst, left.val, right.val);
+          if (left.negate != right.negate)
+            EMIT(code, NOT, dst, dst);
           return (ValueInfo){.ty = BOOL, .val = dst};
 
         case NOT_EQUAL:
           EMIT(code, EQ, dst, left.val, right.val);
-          EMIT(code, NOT, dst, dst);
-          return (ValueInfo){.ty = BOOL, .val = dst};
+          if (!isCond != (left.negate != right.negate))
+            EMIT(code, NOT, dst, dst);
+          return (ValueInfo){.ty = BOOL, .val = dst, .negate = isCond};
 
         case LOGICAL_AND:
-          EMIT(code, AND, dst, left.val, right.val);
+          if (!(left.negate && right.negate)) {
+            if (left.negate) {
+              EMIT(code, NOT, temp, left.val);
+              EMIT(code, AND, dst, temp, right.val);
+            } else if (right.negate) {
+              EMIT(code, NOT, temp, right.val);
+              EMIT(code, AND, dst, temp, left.val);
+            } else
+              EMIT(code, AND, dst, left.val, right.val);
+          } else {
+            if (isCond) {
+              EMIT(code, OR, dst, left.val, right.val);
+              return (ValueInfo){.ty = BOOL, .val = dst, .negate = true};
+            }
+            EMIT(code, OR, dst, left.val, right.val);
+            EMIT(code, NOT, dst, dst);
+          }
           return (ValueInfo){.ty = BOOL, .val = dst};
 
         case LOGICAL_OR:
-          EMIT(code, OR, dst, left.val, right.val);
+          if (!(left.negate && right.negate)) {
+            if (left.negate) {
+              EMIT(code, NOT, temp, left.val);
+              EMIT(code, OR, dst, temp, right.val);
+            } else if (right.negate) {
+              EMIT(code, NOT, temp, right.val);
+              EMIT(code, OR, dst, temp, left.val);
+            } else
+              EMIT(code, OR, dst, left.val, right.val);
+          } else {
+            if (isCond) {
+              EMIT(code, AND, dst, left.val, right.val);
+              return (ValueInfo){.ty = BOOL, .val = dst, .negate = true};
+            }
+            EMIT(code, AND, dst, left.val, right.val);
+            EMIT(code, NOT, dst, dst);
+          }
           return (ValueInfo){.ty = BOOL, .val = dst};
 
         default:
@@ -641,7 +690,7 @@ static AstFunction *currentFunction;
 ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Operand *preferredDst,
                             SymTable *table) {
   if (strcmp(call->functionName, "print") == 0) {
-    ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
+    ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL, false);
     switch (arg.ty) {
       case INT:
       case DOUBLE:
@@ -660,7 +709,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
     }
     return (ValueInfo){.ty = UNIT, .val = nilOp()};
   } else if (strcmp(call->functionName, "toStr") == 0) {
-    ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
+    ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL, false);
     switch (arg.ty) {
       case STRING:
         return arg;
@@ -731,7 +780,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
     EMIT(code, LABEL, ok);
     return (ValueInfo){.ty = DOUBLE, .val = dst};
   } else if (strcmp(call->functionName, "toInt") == 0) {
-    ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
+    ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL, false);
     Operand dst = getResultOperand(preferredDst);
     if (arg.ty == INT)
       storeValue(code, dst, arg);
@@ -739,7 +788,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
       EMIT(code, FLOAT2INT, dst, arg.val);
     return (ValueInfo){.ty = INT, .val = dst};
   } else if (strcmp(call->functionName, "strLength") == 0) {
-    ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL);
+    ValueInfo arg = lowerExpression(code, call->firstArgument->expression, NULL, false);
     Operand dst = getResultOperand(preferredDst);
     EMIT(code, STRLEN, dst, arg.val);
     return (ValueInfo){.ty = INT, .val = dst};
@@ -772,12 +821,12 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
 
     // Compute source string, start and end
     AstFunctionCallArgument *arg = call->firstArgument;
-    ValueInfo str = lowerExpression(code, arg->expression, NULL);
+    ValueInfo str = lowerExpression(code, arg->expression, NULL, false);
     arg = arg->nextArgument;
     EMIT(code, STRLEN, strlen, str.val);
-    ValueInfo start = lowerExpression(code, arg->expression, NULL);
+    ValueInfo start = lowerExpression(code, arg->expression, NULL, false);
     arg = arg->nextArgument;
-    ValueInfo end = lowerExpression(code, arg->expression, NULL);
+    ValueInfo end = lowerExpression(code, arg->expression, NULL, false);
 
     // Check bounds, if rules are not met, jump to label that exits with code 40
     EMIT(code, LT, tempOp, start.val, intOp(0));
@@ -831,9 +880,9 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
 
     // Compute arguments
     AstFunctionCallArgument *arg = call->firstArgument;
-    ValueInfo str = lowerExpression(code, arg->expression, NULL);
+    ValueInfo str = lowerExpression(code, arg->expression, NULL, false);
     arg = arg->nextArgument;
-    ValueInfo index = lowerExpression(code, arg->expression, NULL);
+    ValueInfo index = lowerExpression(code, arg->expression, NULL, false);
 
     // Check bounds
     EMIT(code, LT, tmp, index.val, intOp(0));
@@ -854,7 +903,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
     return (ValueInfo){.ty = INT, .val = dst};
   } else if (strcmp(call->functionName, "chr") == 0) {
     Operand dst = getResultOperand(preferredDst);
-    ValueInfo ch = lowerExpression(code, call->firstArgument->expression, NULL);
+    ValueInfo ch = lowerExpression(code, call->firstArgument->expression, NULL, false);
     EMIT(code, INT2CHAR, dst, ch.val);
     return (ValueInfo){.ty = STRING, .val = dst};
   } else {
@@ -880,7 +929,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
         die(ERR_INTERNAL, 0, "Too many arguments for function %s", call->functionName);
       Operand op = varOp(FT_TF, sym->data.function.parameterNames[argc]);
       EMIT(code, DEFVAR, op);
-      ValueInfo argValue = lowerExpression(code, arg->expression, &op);
+      ValueInfo argValue = lowerExpression(code, arg->expression, &op, false);
       storeTyped(code, op, sym->data.function.parameterTypes[argc++], argValue);
       arg = arg->nextArgument;
     }
@@ -898,7 +947,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
 ValueInfo lowerValue(StringBuilder *code, AstValue *val, const Operand *preferredDst,
                      SymTable *table) {
   if (val->type == VALUE_EXPRESSION) {
-    return lowerExpression(code, val->data.expression, preferredDst);
+    return lowerExpression(code, val->data.expression, preferredDst, false);
   }
   return lowerFunctionCall(code, val->data.functionCall, preferredDst, table);
 }
@@ -936,14 +985,20 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
     }
     case IF:;
       Operand end = labelOp(newLabel(currentFunction->functionName, "if_end"));
-      ValueInfo ifcond = lowerExpression(code, cmd->data.ifAst.condition, NULL);
+      ValueInfo ifcond = lowerExpression(code, cmd->data.ifAst.condition, NULL, true);
       if (cmd->data.ifAst.elseBlock == NULL) {
-        EMIT(code, JUMPIFEQ, end, ifcond.val, boolOp(false));
+        if (ifcond.negate)
+          EMIT(code, JUMPIFEQ, end, ifcond.val, boolOp(true));
+        else
+          EMIT(code, JUMPIFEQ, end, ifcond.val, boolOp(false));
         lowerCodeBlock(code, cmd->data.ifAst.thenBlock);
         EMIT(code, JUMP, end);
       } else {
         Operand f = labelOp(newLabel(currentFunction->functionName, "if_false"));
-        EMIT(code, JUMPIFEQ, f, ifcond.val, boolOp(false));
+        if (ifcond.negate)
+          EMIT(code, JUMPIFEQ, f, ifcond.val, boolOp(true));
+        else
+          EMIT(code, JUMPIFEQ, f, ifcond.val, boolOp(false));
         lowerCodeBlock(code, cmd->data.ifAst.thenBlock);
         EMIT(code, JUMP, end);
         EMIT(code, LABEL, f);
@@ -955,14 +1010,17 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
       Operand loop = labelOp(newLabel(currentFunction->functionName, "when"));
       Operand loopEnd = labelOp(newLabel(currentFunction->functionName, "when_end"));
       EMIT(code, LABEL, loop);
-      ValueInfo whilecond = lowerExpression(code, cmd->data.whileAst.condition, NULL);
-      EMIT(code, JUMPIFEQ, loopEnd, whilecond.val, boolOp(false));
+      ValueInfo whilecond = lowerExpression(code, cmd->data.whileAst.condition, NULL, true);
+      if (whilecond.negate)
+        EMIT(code, JUMPIFEQ, loopEnd, whilecond.val, boolOp(true));
+      else
+        EMIT(code, JUMPIFEQ, loopEnd, whilecond.val, boolOp(false));
       lowerCodeBlock(code, cmd->data.whileAst.codeBlock);
       EMIT(code, JUMP, loop);
       EMIT(code, LABEL, loopEnd);
       break;
     case EXPRESSION:
-      lowerExpression(code, cmd->data.expressionAst.expression, NULL);
+      lowerExpression(code, cmd->data.expressionAst.expression, NULL, false);
       break;
   }
 }
