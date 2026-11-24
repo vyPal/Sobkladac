@@ -780,6 +780,8 @@ AstDataType analyzeFunctionBody(AstProgram *ast, SymTable *globalSymTable, AstFu
 
   AstFunctionParameter *param = function->firstParameter;
   StSymbol *symbol;
+  StSymbol *functionSymbol = symtableLookup(globalSymTable, function->functionName);
+  size_t paramIndex = 0;
   while (param != NULL) {
     if (!insertVariableSymTable(function->symTable, param->parameterName, function->location.line,
                                 function->location.column, param->dataType, false)) {
@@ -788,6 +790,7 @@ AstDataType analyzeFunctionBody(AstProgram *ast, SymTable *globalSymTable, AstFu
     // rename function params
     symbol = symtableLookup(function->symTable, param->parameterName);
     param->parameterName = symbol->uniqueID;
+    functionSymbol->data.function.parameterNames[paramIndex++] = param->parameterName;
     param = param->nextParameter;
   }
 
