@@ -1,0 +1,7 @@
+{
+  "compiler": {
+    "status": 3,
+    "stderr": "error: @main not found\n"
+  },
+  "interpreter": null
+}

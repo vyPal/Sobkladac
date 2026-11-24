@@ -18,7 +18,7 @@ jobs:
         run: make check-all
 
   build-and-test:
-    name: Build Project and Run Unit Tests
+    name: Build Project and Run Tests
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
@@ -26,7 +26,7 @@ jobs:
       - name: Build Standard Executable
         run: make build
 
-      - name: Run Unit Tests
+      - name: Run Unit and End-to-End Tests
         run: make test
 
   test-asan:

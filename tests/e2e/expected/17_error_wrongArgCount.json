@@ -1,0 +1,7 @@
+{
+  "compiler": {
+    "status": 5,
+    "stderr": "error (line 4): too many function call parameters\n"
+  },
+  "interpreter": null
+}

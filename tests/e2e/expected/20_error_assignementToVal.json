@@ -1,0 +1,7 @@
+{
+  "compiler": {
+    "status": 7,
+    "stderr": "error (line 4): immutable variable assignment attemp\n"
+  },
+  "interpreter": null
+}
