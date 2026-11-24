@@ -1,0 +1,11 @@
+{
+  "compiler": {
+    "status": 0,
+    "stderr": ""
+  },
+  "interpreter": {
+    "status": 0,
+    "stdout": "innerouter\n",
+    "stderr": ""
+  }
+}

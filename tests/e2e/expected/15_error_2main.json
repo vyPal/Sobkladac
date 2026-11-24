@@ -1,0 +1,7 @@
+{
+  "compiler": {
+    "status": 4,
+    "stderr": "error (line 4): second @main definition\n"
+  },
+  "interpreter": null
+}
