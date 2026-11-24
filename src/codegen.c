@@ -270,9 +270,23 @@ static void storeTyped(StringBuilder *code, Operand dst, AstDataType dstType, Va
 
 /// Emits a call to the int wrapping helper
 static void emitIntWrap(StringBuilder *code, Operand dst) {
+  Operand skipWrap = labelOp(newLabel("int_wrap_routine", "skip"));
+  Operand doWrap = labelOp(newLabel("int_wrap_routine", "do"));
+  Operand temp = varOp(FT_GF, INT_WRAP_TEMP);
+
+  // Check whether value needs to be wrapped before calling wrap routine
+  EMIT(code, LT, temp, dst, intOp(INT32_MIN));
+  EMIT(code, JUMPIFEQ, doWrap, temp, boolOp(true));
+  EMIT(code, GT, temp, dst, intOp(INT32_MAX));
+  EMIT(code, JUMPIFEQ, doWrap, temp, boolOp(true));
+  EMIT(code, JUMP, skipWrap);
+
+  EMIT(code, LABEL, doWrap);
   EMIT(code, MOVE, varOp(FT_GF, INT_WRAP_VALUE), dst);
   EMIT(code, CALL, labelOp(INT_WRAP_LABEL));
   EMIT(code, MOVE, dst, varOp(FT_GF, INT_WRAP_VALUE));
+
+  EMIT(code, LABEL, skipWrap);
 }
 
 /// Emits the int wrapping routing itself
@@ -282,20 +296,11 @@ static void emitIntWrap(StringBuilder *code, Operand dst) {
 static void emitIntWrapRoutine(StringBuilder *code) {
   Operand value = varOp(FT_GF, INT_WRAP_VALUE);
   Operand temp = varOp(FT_GF, INT_WRAP_TEMP);
-  Operand wrap = labelOp("$wrap32$wrap");
   Operand positive = labelOp("$wrap32$positive");
-
-  // Check whether value needs to be wrapped
-  EMIT(code, LABEL, labelOp(INT_WRAP_LABEL));
-  EMIT(code, LT, temp, value, intOp(INT32_MIN));
-  EMIT(code, JUMPIFEQ, wrap, temp, boolOp(true));
-  EMIT(code, GT, temp, value, intOp(INT32_MAX));
-  EMIT(code, JUMPIFEQ, wrap, temp, boolOp(true));
-  EMIT0(code, RETURN);
 
   // Wrap value
   // value = ((value + 2^31) mod 2^32) - 2^31
-  EMIT(code, LABEL, wrap);
+  EMIT(code, LABEL, labelOp(INT_WRAP_LABEL));
   EMIT(code, ADD, value, value, intOp(INT64_C(1) << 31));
   EMIT(code, IDIV, temp, value, intOp(INT64_C(1) << 32));
   EMIT(code, MUL, temp, temp, intOp(INT64_C(1) << 32));
