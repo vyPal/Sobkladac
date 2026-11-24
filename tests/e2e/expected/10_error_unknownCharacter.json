@@ -1,0 +1,7 @@
+{
+  "compiler": {
+    "status": 1,
+    "stderr": "error (line 3): Unexpected character at line 3 colum 13\n"
+  },
+  "interpreter": null
+}

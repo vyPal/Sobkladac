@@ -1,5 +1,7 @@
 SRC_DIR := src
 TEST_DIR := tests
+UNIT_TEST_DIR := $(TEST_DIR)/unit
+E2E_TEST_DIR := $(TEST_DIR)/e2e
 OBJ_DIR := obj
 
 CC := gcc
@@ -12,16 +14,16 @@ SRCS := $(wildcard $(SRC_DIR)/*.c)
 OBJS := $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
 LIB_OBJS := $(filter-out $(OBJ_DIR)/main.o, $(OBJS))
-TEST_SRCS := $(wildcard $(TEST_DIR)/test_*.c)
-TEST_BINS := $(TEST_SRCS:$(TEST_DIR)/%.c=$(OBJ_DIR)/%)
+UNIT_TEST_SRCS := $(wildcard $(UNIT_TEST_DIR)/test_*.c)
+UNIT_TEST_BINS := $(UNIT_TEST_SRCS:$(UNIT_TEST_DIR)/%.c=$(OBJ_DIR)/%)
 
-DEPS := $(OBJS:.o=.d) $(TEST_BINS:=.d)
+DEPS := $(OBJS:.o=.d) $(UNIT_TEST_BINS:=.d)
 
 DEV_CFLAGS := $(STD) -Wall -Wextra -pedantic -Werror -g -O0 -I$(SRC_DIR)
 ASAN_FLAGS := -fsanitize=address,undefined -fno-omit-frame-pointer
 TEST_FLAGS := --report-error
 
-FORMAT_FILES := $(wildcard $(SRC_DIR)/*.c $(SRC_DIR)/*.h $(TEST_DIR)/*.c $(TEST_DIR)/*.h)
+FORMAT_FILES := $(wildcard $(SRC_DIR)/*.c $(SRC_DIR)/*.h $(UNIT_TEST_DIR)/*.c $(UNIT_TEST_DIR)/*.h)
 
 DOC_DIR     := docs
 DOC_OUT     := dokumentace.pdf
@@ -33,7 +35,7 @@ ZIP_NAME    := xpalacj00.zip
 SUBMIT_DIRS := $(SRC_DIR) $(TEST_DIR)
 SUBMIT_META := Makefile $(DOC_OUT) rozdeleni rozsireni
 
-.PHONY: all build dev asan test-build test test-asan check format format-check tidy cppcheck build-check clean check-all doc zip
+.PHONY: all build dev asan test-build test test-unit test-e2e test-e2e-update test-asan check format format-check tidy cppcheck build-check clean check-all doc zip
 
 all: build
 
@@ -42,22 +44,30 @@ build: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-test-build: $(TEST_BINS)
+test-build: $(UNIT_TEST_BINS)
 
-$(TEST_BINS): $(OBJ_DIR)/%: $(OBJ_DIR)/%.o $(LIB_OBJS)
+$(UNIT_TEST_BINS): $(OBJ_DIR)/%: $(OBJ_DIR)/%.o $(LIB_OBJS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-test: test-build
-	@fail=0; for t in $(TEST_BINS); do ./$$t $(TEST_FLAGS) || fail=1; done; exit $$fail
+test-unit: test-build
+	@fail=0; for t in $(UNIT_TEST_BINS); do ./$$t $(TEST_FLAGS) || fail=1; done; exit $$fail
+
+test-e2e: $(TARGET)
+	python3 $(E2E_TEST_DIR)/run.py
+
+test-e2e-update: $(TARGET)
+	python3 $(E2E_TEST_DIR)/run.py --update
+
+test: test-unit test-e2e
 
 test-asan:
 	$(MAKE) clean
-	$(MAKE) test CFLAGS="$(DEV_CFLAGS) $(ASAN_FLAGS)" LDFLAGS="$(ASAN_FLAGS)"
+	$(MAKE) test-unit CFLAGS="$(DEV_CFLAGS) $(ASAN_FLAGS)" LDFLAGS="$(ASAN_FLAGS)"
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
-$(OBJ_DIR)/%.o: $(TEST_DIR)/%.c | $(OBJ_DIR)
+$(OBJ_DIR)/%.o: $(UNIT_TEST_DIR)/%.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
 $(OBJ_DIR):

@@ -1,0 +1,7 @@
+{
+  "compiler": {
+    "status": 3,
+    "stderr": "error (line 3): undefined variable\n"
+  },
+  "interpreter": null
+}

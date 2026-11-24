@@ -45,6 +45,10 @@ enum TkType {
   TK_INDENT,     // int (number of spaces)
   TK_ATMAIN,     // @main
   TK_EOF,        // end of file
+  // boolthen
+  TK_NOT,  // !
+  TK_AND,  // &&
+  TK_OR,   // ||
 
   // for layout.c - extra + keywords
   TK_KW_IMPORT,
