@@ -68,6 +68,11 @@ Token *toKeyword(Token *tk) {
     tk = newToken(TK_KW_VAL, line);
   else if (strcmp(value, "var") == 0)
     tk = newToken(TK_KW_VAR, line);
+  // boolthen extension
+  else if (strcmp(value, "true") == 0)
+    tk = newToken(TK_KW_TRUE, line);
+  else if (strcmp(value, "false") == 0)
+    tk = newToken(TK_KW_FALSE, line);
   return tk;
 }
 

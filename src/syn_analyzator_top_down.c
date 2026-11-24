@@ -262,7 +262,7 @@ AstDataType optType(LinkedTlist *tokenList) {
     popToken(tokenList);
     AstDataType type = dType(tokenList);
     if (type == UNKNOWN) {
-      die(ERR_SYNTAX, getLine(token), "Incorrect type after ':'");
+      die(ERR_SYNTAX, lineOf(token), "Incorrect type after ':'");
     }
     return type;
   }
@@ -436,7 +436,6 @@ bool assignment(AstCommand *cmd, LinkedTlist *tokenList) {
 }
 
 AstFunctionCall *functionCall(LinkedTlist *tokenList) {
-  AstFunctionCall *funCall;
   const Token *prevToken, *token = lookAheadToken(tokenList, 0);  // ident
   if (token != NULL && getTkType(token) == TK_IDENT) {  // AI [gpt-6-luna]: "Can you add token !=
                                                         // NULL && to all getTkType(token) in ifs"
@@ -446,7 +445,8 @@ AstFunctionCall *functionCall(LinkedTlist *tokenList) {
         getTkType(token) == TK_LPAREN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
                                           // getTkType(token) in ifs"
       popToken(tokenList);
-      funCall = astFunctionCallNew(getString(getValue(prevToken)->s), getLocation(prevToken));
+      AstFunctionCall *funCall =
+          astFunctionCallNew(getString(getValue(prevToken)->s), getLocation(prevToken));
       const Token *nextToken = lookAheadToken(tokenList, 0);
       if ((nextToken != NULL && getTkType(nextToken) == TK_RPAREN) ||
           args(funCall, tokenList)) {  // It skips args if there are none
@@ -465,7 +465,7 @@ AstFunctionCall *functionCall(LinkedTlist *tokenList) {
       return NULL;
     }
   }
-  die(ERR_SYNTAX, 999, "Unexpected EOF");
+  die(ERR_SYNTAX, lineOf(token), "Unexpected EOF");
   return NULL;
 }
 
@@ -658,10 +658,10 @@ bool ifStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
     cmd->data.ifAst.condition = condition;
     token = popToken(tokenList);
     if (token == NULL)
-      die(ERR_SYNTAX, 0, "Missing 'then' in if statement");
+      die(ERR_SYNTAX, lineOf(token), "Missing 'then' in if statement");
     if (getTkType(token) != TK_KW_THEN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
                                            // getTkType(token) in ifs"
-      die(ERR_SYNTAX, getLine(token), "Missing 'then' in if statement");
+      die(ERR_SYNTAX, lineOf(token), "Missing 'then' in if statement");
     }
     token = popToken(tokenList);
     if (token == NULL)

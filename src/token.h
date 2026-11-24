@@ -46,9 +46,11 @@ enum TkType {
   TK_ATMAIN,     // @main
   TK_EOF,        // end of file
   // boolthen
-  TK_NOT,  // !
-  TK_AND,  // &&
-  TK_OR    // ||
+  TK_NOT,       // !
+  TK_AND,       // &&
+  TK_OR,        // ||
+  TK_KW_TRUE,   // true
+  TK_KW_FALSE,  // false
 
   // for layout.c - extra + keywords
   TK_KW_IMPORT,
