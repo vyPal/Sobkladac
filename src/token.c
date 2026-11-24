@@ -40,7 +40,7 @@ int getLine(const struct Token *token) {
 }
 
 int lineOf(const struct Token *token) {
-  return token == NULL ? 999 : getLine(token);
+  return token == NULL ? 0 : getLine(token);
 }
 
 void printToken(const struct Token *token) {
