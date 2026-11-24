@@ -45,7 +45,7 @@ AstLocation getLocation(const Token *token) {
 
 AstOperator tokenToOperator(const Token *token) {
   if (token == NULL) {
-    die(ERR_SYNTAX, 999, "Unexpected end of file");
+    die(ERR_SYNTAX, 0, "Unexpected end of file");
   }
   enum TkType type = getTkType(token);
   switch (type) {
@@ -82,7 +82,7 @@ AstOperator tokenToOperator(const Token *token) {
 
 AstExpressionType tokenToExpressionType(const Token *token) {
   if (token == NULL) {
-    die(ERR_SYNTAX, 999, "Unexpected end of file");
+    die(ERR_SYNTAX, 0, "Unexpected end of file");
   }
   enum TkType type = getTkType(token);
   switch (type) {
@@ -119,7 +119,7 @@ AstExpressionType tokenToExpressionType(const Token *token) {
 
 PrecSymbol tokenToPrecSymbol(const struct Token *token, const struct Token *prevToken) {
   if (token == NULL)
-    die(ERR_SYNTAX, getLine(prevToken), "Missing tokens");
+    die(ERR_SYNTAX, lineOf(prevToken), "Missing tokens");
   enum TkType type = getTkType(token);
   switch (type) {
     case TK_IDENT:
@@ -201,7 +201,7 @@ void pushItem(PrecStackItem item, PrecStack *stack) {
 
 PrecStackItem popItem(PrecStack *stack) {
   if (stack == NULL || stack->top < 0)
-    die(ERR_SYNTAX, 999, "Missing item on stack to pop");
+    die(ERR_SYNTAX, 0, "Missing item on stack to pop");
 
   return stack->items[stack->top--];
 }
@@ -254,7 +254,7 @@ AstExpression *executeReduce(PrecStack *stack) {
   if (count == 1 && popped[0].type == TERMINAL) {
     PrecStackItem onePop = popped[0];
     if (onePop.symbol != PREC_OPERAND)
-      die(ERR_SYNTAX, getLine(onePop.token), "Wrong operand");
+      die(ERR_SYNTAX, lineOf(onePop.token), "Wrong operand");
     AstExpressionType ttET = tokenToExpressionType(onePop.token);
     if (ttET == UNIT_LITERAL || ttET == UNARY || ttET == BINARY)
       return NULL;
@@ -316,7 +316,7 @@ AstExpression *executeReduce(PrecStack *stack) {
     AstExpression *ex = astExpressionNew(BINARY, getLocation(popped[1].token));
     AstOperator op = tokenToOperator(popped[1].token);
     if (op == NEGATION) {
-      die(ERR_SYNTAX, getLine(popped[1].token), "Wrong operator for expression");
+      die(ERR_SYNTAX, lineOf(popped[1].token), "Wrong operator for expression");
     }
     ex->data.binary.leftExpression = popped[2].astNode;
     ex->data.binary.operatorAst = op;
@@ -338,7 +338,7 @@ bool stackCorrect(PrecStack stack) {
 /// implemented as a precedence parser
 AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: specific ending token
   if (tokenList == NULL)
-    die(ERR_SYNTAX, 999, "Missing tokens for expression");
+    die(ERR_SYNTAX, 0, "Missing tokens for expression");
   static const char precTable[PREC_TYPES][PREC_TYPES] = {
       /*                     0     1    2    3    4    5    6    7   8     9   10 */
       /* stack \     in  | plus | mul | U | REL| EQ | '('| ')' | i |  $ | AND| OR |*/
@@ -373,7 +373,7 @@ AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: spec
   Token *prevToken = token;
   PrecSymbol sym = tokenToPrecSymbol(token, prevToken);
   if (sym == PREC_UNKNOWN) {
-    die(ERR_SYNTAX, getLine(token), "Unexpected token on input");
+    die(ERR_SYNTAX, lineOf(token), "Unexpected token on input");
   }
 
   PrecStackItem b;
@@ -392,11 +392,11 @@ AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: spec
         prevToken = popToken(tokenList);
         token = lookAheadToken(tokenList, 0);
         if (token == NULL) {
-          die(ERR_SYNTAX, getLine(prevToken), "Missing other tokens");
+          die(ERR_SYNTAX, lineOf(prevToken), "Missing other tokens");
         }
         sym = tokenToPrecSymbol(token, prevToken);
         if (sym == PREC_UNKNOWN) {
-          die(ERR_SYNTAX, getLine(token), "Unexpected token on input");
+          die(ERR_SYNTAX, lineOf(token), "Unexpected token on input");
         }
         b = makeTerminalItem(sym, token, false);
         break;
@@ -404,7 +404,7 @@ AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: spec
       case '>':
         expr = executeReduce(&stack);
         if (expr == NULL) {
-          die(ERR_SYNTAX, getLine(prevToken), "No suitable grammar rule!");
+          die(ERR_SYNTAX, lineOf(prevToken), "No suitable grammar rule!");
         }
         PrecStackItem item;
         item.symbol = PREC_UNKNOWN;
@@ -415,7 +415,7 @@ AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: spec
         pushItem(item, &stack);
         break;
       default:
-        die(ERR_SYNTAX, getLine(token), "Invalid expression");
+        die(ERR_SYNTAX, lineOf(token), "Invalid expression");
         break;
     }
   } while (!(b.symbol == PREC_DOLLAR && stackCorrect(stack)));

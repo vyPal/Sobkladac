@@ -97,30 +97,30 @@ bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {
   }
   const Token *idTK = popToken(tokenList);
   if (idTK == NULL || getTkType(idTK) != TK_IDENT)
-    die(ERR_SYNTAX, getLine(defTK), "Missing function name");
+    die(ERR_SYNTAX, lineOf(defTK), "Missing function name");
 
   AstFunction *fun = astFunctionNew(getString(getValue(idTK)->s), getLocation(idTK));
   fun->isMain = isMain;
 
   const Token *t = popToken(tokenList);
   if (t == NULL || getTkType(t) != TK_LPAREN)
-    die(ERR_SYNTAX, getLine(idTK), "Missing '(' in function definition");
+    die(ERR_SYNTAX, lineOf(idTK), "Missing '(' in function definition");
 
   if (!params(fun, tokenList))
-    die(ERR_SYNTAX, getLine(idTK), "Invalid parameters");
+    die(ERR_SYNTAX, lineOf(idTK), "Invalid parameters");
 
   t = popToken(tokenList);
   if (t == NULL || getTkType(t) != TK_RPAREN)
-    die(ERR_SYNTAX, getLine(idTK), "Missing ')' in function definition");
+    die(ERR_SYNTAX, lineOf(idTK), "Missing ')' in function definition");
 
   fun->declaredReturnType = optType(tokenList);
 
   t = popToken(tokenList);
   if (t == NULL || getTkType(t) != TK_ASSIGN)
-    die(ERR_SYNTAX, getLine(idTK), "Missing '=' in function definition");
+    die(ERR_SYNTAX, lineOf(idTK), "Missing '=' in function definition");
 
   if (!funBody(fun, tokenList))
-    die(ERR_SYNTAX, getLine(idTK) + 1, "Invalid function body");
+    die(ERR_SYNTAX, lineOf(idTK) + 1, "Invalid function body");
 
   astProgramAppendFunction(asTree, fun);
   return true;
@@ -426,7 +426,7 @@ bool assignment(AstCommand *cmd, LinkedTlist *tokenList) {
       cmd->data.assignment.value = rValue(tokenList);
       return true;
     } else {
-      die(ERR_SYNTAX, getLine(prevToken), "Missing '=' in assignment");
+      die(ERR_SYNTAX, lineOf(prevToken), "Missing '=' in assignment");
       return false;
     }
   }
@@ -455,12 +455,12 @@ AstFunctionCall *functionCall(LinkedTlist *tokenList) {
                                               // all getTkType(token) in ifs"
           return funCall;
         } else {
-          die(ERR_SYNTAX, getLine(prevToken), "Missing ')' in function call");
+          die(ERR_SYNTAX, lineOf(prevToken), "Missing ')' in function call");
           return NULL;
         }
       }
     } else {
-      die(ERR_SYNTAX, getLine(prevToken), "Missing '(' in function call");
+      die(ERR_SYNTAX, lineOf(prevToken), "Missing '(' in function call");
       return NULL;
     }
   }
