@@ -563,8 +563,23 @@ LinkedTlist *lexerMain(void) {
         else
           die(1, line, "Unexpected character at line %d colum %d, expected \"&&\"", line, position);
         break;
-      case ' ':
       case '\t':
+        if (line == 1 && lastToken->token == NULL) {
+          int c = nextCharInt;
+          while (c == ' ' || c == '\t' || c == '\r' || c == '\f' || c == '\v') {
+            c = fgetc(stdin);
+            position++;
+          }
+
+          if (c != '\n' && c != EOF)
+            die(1, line, "Tab in indentation at line %d column %d", line, position);
+
+          nextCharInt = c;
+          nextChar = (char)c;
+          preloadedChar = true;
+        }
+        break;
+      case ' ':
       case '\r':
       case '\f':
       case '\v':
