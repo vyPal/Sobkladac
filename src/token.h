@@ -152,6 +152,13 @@ union Value *getValue(const struct Token *token);
  */
 int getLine(const struct Token *token);
 
+/**
+ * @brief Gets the source line for a token, or 999 when the token is NULL.
+ * @param token Token to retrieve the line from.
+ * @return The token's line, or 999 if token is NULL.
+ */
+int lineOf(const struct Token *token);
+
 void printToken(const struct Token *token);
 
 // STRING FUNCTIONS

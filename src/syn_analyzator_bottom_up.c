@@ -69,6 +69,11 @@ AstOperator tokenToOperator(const Token *token) {
       return EQUAL;
     case TK_NOT_EQUAL:
       return NOT_EQUAL;
+    // Boolthen ext.
+    case TK_AND:
+      return LOGICAL_AND;
+    case TK_OR:
+      return LOGICAL_OR;
     default:
       break;
   }
@@ -99,6 +104,9 @@ AstExpressionType tokenToExpressionType(const Token *token) {
     case TK_SEQUAL:
     case TK_EQUAL:
     case TK_NOT_EQUAL:
+    // boolthen ext.
+    case TK_AND:
+    case TK_OR:
       return BINARY;
     default:
       break;
@@ -272,11 +280,21 @@ AstExpression *executeReduce(PrecStack *stack) {
     return popped[1].astNode;
   }
 
-  // RULE 3: E-> -E (Unary - 2 symbols)
+  // RULE 3: E-> -E | !E (Unary - 2 symbols)
   if (count == 2 && popped[1].type == TERMINAL && popped[1].symbol == PREC_UNARY &&
       popped[0].type == NON_TERMINAL) {
     AstExpression *ex = astExpressionNew(UNARY, getLocation(popped[1].token));
-    ex->data.unary.operatorAst = NEGATION;
+    const Token *token = popped[0].token;
+    if (token == NULL) {
+      die(ERR_SYNTAX, lineOf(token), "Missing token");
+    }
+    if (getTkType(token) == TK_NOT) {
+      ex->data.unary.operatorAst = LOGICAL_NEGATION;
+    } else if (getTkType(token) == TK_MINUS) {
+      ex->data.unary.operatorAst = NEGATION;
+    } else
+      die(ERR_SYNTAX, lineOf(token), "Invalid unary token (Valid only -x or !x)");
+
     ex->data.unary.expression = popped[0].astNode;
     return ex;
   }

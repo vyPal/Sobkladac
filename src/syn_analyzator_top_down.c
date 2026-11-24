@@ -46,10 +46,6 @@ AstExpression *term(LinkedTlist *tokenList);                        // DONE
 bool ifStatement(AstCodeBlock *block, LinkedTlist *tokenList);      // DONE
 bool whileStatement(AstCodeBlock *block, LinkedTlist *tokenList);   // DONE
 
-static int lineOf(const Token *token) {
-  return token ? getLine(token) : 999;
-}
-
 bool prolog(LinkedTlist *tokenList) {
   const Token *token = lookAheadToken(tokenList, 4);
   if (token == NULL) {
