@@ -18,7 +18,7 @@
 #include "ast.h"
 #include "common.h"
 
-#define PREC_TYPES 9
+#define PREC_TYPES 11
 
 bool isUnaryContext(const Token *prevToken) {
   enum TkType type = getTkType(prevToken);
@@ -115,13 +115,15 @@ PrecSymbol tokenToPrecSymbol(const struct Token *token, const struct Token *prev
     case TK_NUMBER:
     case TK_DECIMAL:
     case TK_STRING:
+    case TK_KW_TRUE:   // ext. boolthen
+    case TK_KW_FALSE:  // ext. boolthen
       return PREC_OPERAND;
     case TK_PLUS:
       return PREC_PLUS_MINUS;
     case TK_MINUS:
-      // Unární mínus poznáme podle toho, co stálo před ním
+      // We can identify unary minus by looking at what preceded it
       if (isUnaryContext(prevToken)) {
-        return PREC_UNARY_MINUS;
+        return PREC_UNARY;
       }
       return PREC_PLUS_MINUS;
     case TK_MULTIPLY:
@@ -140,7 +142,15 @@ PrecSymbol tokenToPrecSymbol(const struct Token *token, const struct Token *prev
     case TK_NOT_EQUAL:
       return PREC_EQUAL;
 
-    // Tokeny, které ukončují výraz
+    // Boolthen
+    case TK_NOT:
+      return PREC_UNARY;
+    case TK_AND:
+      return PREC_AND;
+    case TK_OR:
+      return PREC_OR;
+
+    // Tokens that terminate an expression
     case TK_NEWLINE:
     case TK_SEMICOLON:
     case TK_EOF:
@@ -263,7 +273,7 @@ AstExpression *executeReduce(PrecStack *stack) {
   }
 
   // RULE 3: E-> -E (Unary - 2 symbols)
-  if (count == 2 && popped[1].type == TERMINAL && popped[1].symbol == PREC_UNARY_MINUS &&
+  if (count == 2 && popped[1].type == TERMINAL && popped[1].symbol == PREC_UNARY &&
       popped[0].type == NON_TERMINAL) {
     AstExpression *ex = astExpressionNew(UNARY, getLocation(popped[1].token));
     ex->data.unary.operatorAst = NEGATION;
@@ -301,17 +311,19 @@ AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: spec
   if (tokenList == NULL)
     die(ERR_SYNTAX, 999, "Missing tokens for expression");
   static const char precTable[PREC_TYPES][PREC_TYPES] = {
-      /*                     0     1      2       3    4    5     6    7   8*/
-      /* stack \     in  | plus | mul | U(-x) | REL | EQ | '(' | ')' | i | $ */
-      /* + -             */ {'>', '<', '<', '>', '>', '<', '>', '<', '>'},  // ok
-      /* * /             */ {'>', '>', '<', '>', '>', '<', '>', '<', '>'},  // ok
-      /* Unary(-x)       */ {'>', '>', '<', '>', '>', '<', '>', '<', '>'},  // ok
-      /* REL(<,>,<=, >=) */ {'<', '<', '<', 'E', '>', '<', '>', '<', '>'},  // ok
-      /* EQ (==, !=)     */ {'<', '<', '<', '<', 'E', '<', '>', '<', '>'},  // ok
-      /* (               */ {'<', '<', '<', '<', '<', '<', '=', '<', 'E'},  // ok
-      /* )               */ {'>', '>', 'E', '>', '>', 'E', '>', 'E', '>'},  // ok
-      /* i               */ {'>', '>', 'E', '>', '>', 'E', '>', 'E', '>'},  // ok
-      /* $               */ {'<', '<', '<', '<', '<', '<', 'E', '<', 'E'}   // ok
+      /*                     0     1    2    3    4    5    6    7   8     9   10 */
+      /* stack \     in  | plus | mul | U | REL| EQ | '('| ')' | i |  $ | AND| OR |*/
+      /* + -             */ {'>', '<', '<', '>', '>', '<', '>', '<', '>', '>', '>'},  // ok
+      /* * /             */ {'>', '>', '<', '>', '>', '<', '>', '<', '>', '>', '>'},  // ok
+      /* Unary(-x)       */ {'>', '>', '<', '>', '>', '<', '>', '<', '>', '>', '>'},  // ok
+      /* REL(<,>,<=, >=) */ {'<', '<', '<', 'E', '>', '<', '>', '<', '>', '>', '>'},  // ok
+      /* EQ (==, !=)     */ {'<', '<', '<', '<', 'E', '<', '>', '<', '>', '>', '>'},  // ok
+      /* (               */ {'<', '<', '<', '<', '<', '<', '=', '<', 'E', '<', '<'},  // ok
+      /* )               */ {'>', '>', 'E', '>', '>', 'E', '>', 'E', '>', '>', '>'},  // ok
+      /* i               */ {'>', '>', 'E', '>', '>', 'E', '>', 'E', '>', '>', '>'},  // ok
+      /* $               */ {'<', '<', '<', '<', '<', '<', 'E', '<', 'E', '<', '<'},  // ok
+      /* AND             */ {'<', '<', '<', '<', '<', '<', '>', '<', '>', '>', '>'},  // ok
+      /* OR              */ {'<', '<', '<', '<', '<', '<', '>', '<', '>', '<', '>'}   // ok
 
   };
   // `()` is the Unit literal; the precedence grammar has no rule for an empty pair of parentheses
