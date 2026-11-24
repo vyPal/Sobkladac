@@ -986,6 +986,13 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
     case IF:;
       Operand end = labelOp(newLabel(currentFunction->functionName, "if_end"));
       ValueInfo ifcond = lowerExpression(code, cmd->data.ifAst.condition, NULL, true);
+      if (ifcond.val.type == OK_CONST) {
+        if (ifcond.val.value.cnst.b != ifcond.negate)
+          lowerCodeBlock(code, cmd->data.ifAst.thenBlock);
+        else if (cmd->data.ifAst.elseBlock != NULL)
+          lowerCodeBlock(code, cmd->data.ifAst.elseBlock);
+        break;
+      }
       if (cmd->data.ifAst.elseBlock == NULL) {
         if (ifcond.negate)
           EMIT(code, JUMPIFEQ, end, ifcond.val, boolOp(true));
@@ -1011,6 +1018,15 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
       Operand loopEnd = labelOp(newLabel(currentFunction->functionName, "when_end"));
       EMIT(code, LABEL, loop);
       ValueInfo whilecond = lowerExpression(code, cmd->data.whileAst.condition, NULL, true);
+      if (whilecond.val.type == OK_CONST) {
+        if (whilecond.val.value.cnst.b != whilecond.negate) {
+          Operand loopInner = labelOp(newLabel(currentFunction->functionName, "when_inner"));
+          EMIT(code, LABEL, loopInner);
+          lowerCodeBlock(code, cmd->data.whileAst.codeBlock);
+          EMIT(code, JUMP, loopInner);
+        }
+        break;
+      }
       if (whilecond.negate)
         EMIT(code, JUMPIFEQ, loopEnd, whilecond.val, boolOp(true));
       else
@@ -1041,9 +1057,9 @@ void lowerFunction(StringBuilder *code, AstFunction *func) {
   // Emit un-mangled function name as entry label
   EMIT(code, LABEL, labelOp(func->functionName));
 
-  // Repeated variable declarations are not allowed, so the function body is lowered into a separate
-  // string builder while writing all declarations to the global registry. These declarations are
-  // appended to the main string builder before the function body
+  // Repeated variable declarations are not allowed, so the function body is lowered into a
+  // separate string builder while writing all declarations to the global registry. These
+  // declarations are appended to the main string builder before the function body
   StringBuilder internal = sbNew(0);
   registry.count = 0;
   if (func->bodyType == VALUE) {
