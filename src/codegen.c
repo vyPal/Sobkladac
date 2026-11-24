@@ -707,8 +707,7 @@ ValueInfo lowerFunctionCall(StringBuilder *code, AstFunctionCall *call, const Op
     EMIT(code, CALL, labelOp(call->functionName));  // Call function
     EMIT0(code, POPFRAME);                          // Pop frame so that we can access old LF
     EMIT(code, MOVE, dst, varOp(FT_TF, "$ret"));    // Move return value from TF to LF
-    return (ValueInfo){.ty = sym->data.function.returnType,
-                       .val = dst};  // BUG: Needs symbol table to resolve data type
+    return (ValueInfo){.ty = sym->data.function.returnType, .val = dst};
   }
 }
 
