@@ -648,73 +648,72 @@ bool ifStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
   }
 
   int tkType = getTkType(token);
+  // token if
   if (tkType != TK_KW_IF) {
     die(ERR_SYNTAX, getLine(token), "Missing 'if' in if statement");
   }
   AstCommand *cmd = astCodeCommandNew(IF, getLocation(token));
   popToken(tokenList);
   AstExpression *condition = expression(tokenList);
+  // after expression
   if (condition != NULL) {
     cmd->data.ifAst.condition = condition;
-    token = popToken(tokenList);
-    if (token == NULL)
-      die(ERR_SYNTAX, lineOf(token), "Missing 'then' in if statement");
-    if (getTkType(token) != TK_KW_THEN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                           // getTkType(token) in ifs"
+
+    token = popToken(tokenList);  // pop TK_KW_THEN
+    if (token == NULL || getTkType(token) != TK_KW_THEN) {
       die(ERR_SYNTAX, lineOf(token), "Missing 'then' in if statement");
     }
-    token = popToken(tokenList);
-    if (token == NULL)
-      die(ERR_SYNTAX, 0, "Missing '\\n' in if statement");
-    if (getTkType(token) != TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                           // getTkType(token) in ifs"
-      die(ERR_SYNTAX, getLine(token), "Missing '\\n' in if statement");
+
+    token = popToken(tokenList);  // pop TK_NEWLINE
+    if (token == NULL || getTkType(token) != TK_NEWLINE) {
+      die(ERR_SYNTAX, lineOf(token), "Missing '\\n' in if statement");
     }
-    token = popToken(tokenList);
-    if (token == NULL)
-      die(ERR_SYNTAX, 0, "Missing indentation in if statement");
-    if (getTkType(token) != TK_INDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                          // getTkType(token) in ifs"
-      die(ERR_SYNTAX, getLine(token), "Missing indentation in if statement");
+    token = popToken(tokenList);  // pop TK_INDENT
+    if (token == NULL || getTkType(token) != TK_INDENT) {
+      die(ERR_SYNTAX, lineOf(token), "Missing indentation in if statement");
     }
     cmd->data.ifAst.thenBlock = astCodeBlockNew();
     if (codeBlock(cmd->data.ifAst.thenBlock, tokenList)) {
-      token = popToken(tokenList);
-      if (token == NULL)
-        die(ERR_SYNTAX, 0, "Missing dedentation in if statement");
-      if (getTkType(token) != TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                            // getTkType(token) in ifs"
-        die(ERR_SYNTAX, getLine(token),
+      // we created a block -> token after:
+      token = popToken(tokenList);  // TK_DEDENT
+      if (token == NULL || getTkType(token) != TK_DEDENT) {
+        die(ERR_SYNTAX, lineOf(token),
             "Missing dedentation (inversion of indentation) in if statement");
       }
-      token = popToken(tokenList);
-      if (token == NULL)
-        die(ERR_SYNTAX, 0, "Missing 'else' in if statement");
-      if (getTkType(token) != TK_KW_ELSE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
-                                             // all getTkType(token) in ifs"
-        die(ERR_SYNTAX, getLine(token), "Missing 'else' in if statement");
+
+      token = lookAheadToken(tokenList, 0);
+      if (token == NULL) {
+        die(ERR_SYNTAX, lineOf(token), "Unexpected EOF");
       }
-      token = popToken(tokenList);
+      if (getTkType(token) != TK_KW_ELSE) {  // missing else block
+        cmd->data.ifAst.elseBlock = NULL;
+        astBlockAppendCommand(block, cmd);
+      }
+      popToken(tokenList);  // pop TK_KW_ELSE
+      token = lookAheadToken(tokenList, 0);
       if (token == NULL)
-        die(ERR_SYNTAX, 0, "Missing '\\n' in else branch");
-      if (getTkType(token) != TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
-                                             // all getTkType(token) in ifs"
+        die(ERR_SYNTAX, lineOf(token), "Unexpected EOF");
+
+      // else if command
+      else if (getTkType(token) == TK_KW_IF) {
+        cmd->data.ifAst.elseBlock = astCodeBlockNew();
+        if (!ifStatement(cmd->data.ifAst.elseBlock, tokenList))
+          die(ERR_SYNTAX, lineOf(token), "Wrong syntax else if command");
+        astBlockAppendCommand(block, cmd);
+        return true;
+      } else if (getTkType(token) != TK_NEWLINE) {
         die(ERR_SYNTAX, getLine(token), "Missing '\\n' in else branch");
       }
+      popToken(tokenList);  // pop TK_NEWLINE
+      /* expected normal else block */
       token = popToken(tokenList);
-      if (token == NULL)
-        die(ERR_SYNTAX, 0, "Missing indentation in else branch");
-      if (getTkType(token) != TK_INDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                            // getTkType(token) in ifs"
-        die(ERR_SYNTAX, getLine(token), "Missing indentation in else branch");
+      if (token == NULL || getTkType(token) != TK_INDENT) {
+        die(ERR_SYNTAX, lineOf(token), "Missing indentation in else branch");
       }
       cmd->data.ifAst.elseBlock = astCodeBlockNew();
       if (codeBlock(cmd->data.ifAst.elseBlock, tokenList)) {
         token = popToken(tokenList);
-        if (token == NULL)
-          die(ERR_SYNTAX, 0, "Missing dedentation in else branch");
-        if (getTkType(token) != TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
-                                              // all getTkType(token) in ifs"
+        if (token == NULL || getTkType(token) != TK_DEDENT) {
           die(ERR_SYNTAX, lineOf(token), "Missing dedentation in else branch");
         }
         astBlockAppendCommand(block, cmd);
@@ -741,25 +740,16 @@ bool whileStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
   if (condition != NULL) {
     cmd->data.whileAst.condition = condition;
     token = popToken(tokenList);
-    if (token == NULL)
-      die(ERR_SYNTAX, 0, "Missing 'do' in while statement");
-    if (getTkType(token) != TK_KW_DO) {  // AI [gpt-6-luna]: "Can you add token !=
-                                         // NULL && to all getTkType(token) in ifs"
-      die(ERR_SYNTAX, getLine(token), "Missing 'do' in while statement");
+    if (token == NULL || getTkType(token) != TK_KW_DO) {
+      die(ERR_SYNTAX, lineOf(token), "Missing 'do' in while statement");
     }
     token = popToken(tokenList);
-    if (token == NULL)
-      die(ERR_SYNTAX, 0, "Missing '\\n' in while statement");
-    if (getTkType(token) != TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                           // getTkType(token) in ifs"
-      die(ERR_SYNTAX, getLine(token), "Missing '\\n' in while statement");
+    if (token == NULL || getTkType(token) != TK_NEWLINE) {
+      die(ERR_SYNTAX, lineOf(token), "Missing '\\n' in while statement");
     }
     token = popToken(tokenList);
-    if (token == NULL)
-      die(ERR_SYNTAX, 0, "Missing indentation in while statement");
-    if (getTkType(token) != TK_INDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                          // getTkType(token) in ifs"
-      die(ERR_SYNTAX, getLine(token), "Missing indentation in while statement");
+    if (token == NULL || getTkType(token) != TK_INDENT) {
+      die(ERR_SYNTAX, lineOf(token), "Missing indentation in while statement");
     }
     cmd->data.whileAst.codeBlock = astCodeBlockNew();
     if (codeBlock(cmd->data.whileAst.codeBlock, tokenList)) {
