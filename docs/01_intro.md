@@ -13,7 +13,7 @@
 | :--- | :--- | :--- | :---: |
 | **Jakub Palacký** (Team Leader) | xpalacj00 | 282025 | 25% |
 | David Sobek | xsobekd00 | 282391 | 25% |
-| Martin Šťovíček | xstovim00 |  | 25% |
+| Martin Šťovíček | xstovim00 | 270348 | 25% |
 | Vojtěch Vítek | xvitekv00 | 281829 | 25% |
 
 - **Selected Variant:** `TRP-izp`
