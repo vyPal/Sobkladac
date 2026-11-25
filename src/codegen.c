@@ -361,7 +361,11 @@ bool isConstNegOne(Operand op) {
   return op.type == OK_CONST && (op.value.cnst.type == CT_INT && op.value.cnst.i == -1);
 }
 
+/// Hash table with known compil-time constants in current function
 static HashTable *knownConstants;
+
+/// Function currently being lowered, needed to know the type returned values are converted to
+static AstFunction *currentFunction;
 
 /// Lower expression into IFJcode26
 /// @param code Reference to string builder
@@ -439,6 +443,38 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
     // to use Assumes both operands are of the same data type Numerical operations return the same
     // type as the left operand, logic operations return bool
     case BINARY:;
+      if (expr->data.binary.operatorAst == LOGICAL_AND ||
+          expr->data.binary.operatorAst == LOGICAL_OR) {
+        bool isAnd = expr->data.binary.operatorAst == LOGICAL_AND;
+        ValueInfo left = lowerExpression(code, expr->data.binary.leftExpression, NULL, false);
+
+        if (left.val.type == OK_CONST) {
+          bool leftValue = left.val.value.cnst.b != left.negate;
+          if ((isAnd && !leftValue) || (!isAnd && leftValue)) {
+            return (ValueInfo){.ty = BOOL, .val = boolOp(leftValue)};
+          }
+          return lowerExpression(code, expr->data.binary.rightExpression, preferredDst, false);
+        }
+
+        Operand result = getResultOperand(preferredDst);
+        Operand skipRight = labelOp(
+            newLabel(currentFunction->functionName, isAnd ? "and_skip_right" : "or_skip_right"));
+        Operand done =
+            labelOp(newLabel(currentFunction->functionName, isAnd ? "and_done" : "or_done"));
+
+        EMIT(code, JUMPIFEQ, skipRight, left.val, boolOp(isAnd ? left.negate : !left.negate));
+
+        ValueInfo right = lowerExpression(code, expr->data.binary.rightExpression, &result, false);
+        storeValue(code, result, right);
+        EMIT(code, JUMP, done);
+
+        EMIT(code, LABEL, skipRight);
+        EMIT(code, MOVE, result, boolOp(!isAnd));
+        EMIT(code, LABEL, done);
+
+        return (ValueInfo){.ty = BOOL, .val = result};
+      }
+
       ValueInfo left = lowerExpression(code, expr->data.binary.leftExpression, NULL, isCond);
       ValueInfo right = lowerExpression(code, expr->data.binary.rightExpression, NULL, isCond);
       bool isIntOperation = left.ty == INT && right.ty == INT;
@@ -737,9 +773,6 @@ ValueInfo lowerExpression(StringBuilder *code, AstExpression *expr, const Operan
       die(ERR_INTERNAL, 0, "Unknown expression type");
   }
 }
-
-/// Function currently being lowered, needed to know the type returned values are converted to
-static AstFunction *currentFunction;
 
 /// Lowers a function call, preferredDst specifies the preferred destination operand, note that this
 /// operand does not have to be used, consult the returned info for the actual value location
