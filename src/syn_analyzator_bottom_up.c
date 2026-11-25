@@ -13,13 +13,14 @@
 #include "syn_analyzator_bottom_up.h"
 
 #include <limits.h>
+#include <stddef.h>
 
 #include "ast.h"
 #include "common.h"
 
-#define PREC_TYPES 9
+#define PREC_TYPES 11
 
-bool isUnaryContext(Token *prevToken) {
+bool isUnaryContext(const Token *prevToken) {
   enum TkType type = getTkType(prevToken);
   switch (type) {
     case TK_IDENT:
@@ -33,18 +34,18 @@ bool isUnaryContext(Token *prevToken) {
   }
 }
 
-AstLocation getLocation(Token *token) {
+AstLocation getLocation(const Token *token) {
   AstLocation location = {
-      .line = (unsigned)getLine(token),
+      .line = (unsigned)lineOf(token),
       .column = 0,  // (unsigned)getColumn(token), // TODO after implementation this function in
                     // lexer, uncomment and replace hard-coded 100
   };
   return location;
 }
 
-AstOperator tokenToOperator(Token *token) {
+AstOperator tokenToOperator(const Token *token) {
   if (token == NULL) {
-    die(ERR_SYNTAX, 999, "Unexpected end of file");
+    die(ERR_SYNTAX, 0, "Unexpected end of file");
   }
   enum TkType type = getTkType(token);
   switch (type) {
@@ -68,15 +69,20 @@ AstOperator tokenToOperator(Token *token) {
       return EQUAL;
     case TK_NOT_EQUAL:
       return NOT_EQUAL;
+    // Boolthen ext.
+    case TK_AND:
+      return LOGICAL_AND;
+    case TK_OR:
+      return LOGICAL_OR;
     default:
       break;
   }
   return NEGATION;  // wrong input
 }
 
-AstExpressionType tokenToExpressionType(Token *token) {
+AstExpressionType tokenToExpressionType(const Token *token) {
   if (token == NULL) {
-    die(ERR_SYNTAX, 999, "Unexpected end of file");
+    die(ERR_SYNTAX, 0, "Unexpected end of file");
   }
   enum TkType type = getTkType(token);
   switch (type) {
@@ -88,6 +94,9 @@ AstExpressionType tokenToExpressionType(Token *token) {
       return DOUBLE_LITERAL;
     case TK_STRING:
       return STRING_LITERAL;
+    case TK_KW_TRUE:
+    case TK_KW_FALSE:
+      return BOOL_LITERAL;
     case TK_PLUS:
     case TK_MINUS:  // unary minus is already checked
     case TK_MULTIPLY:
@@ -98,6 +107,9 @@ AstExpressionType tokenToExpressionType(Token *token) {
     case TK_SEQUAL:
     case TK_EQUAL:
     case TK_NOT_EQUAL:
+    // boolthen ext.
+    case TK_AND:
+    case TK_OR:
       return BINARY;
     default:
       break;
@@ -105,22 +117,24 @@ AstExpressionType tokenToExpressionType(Token *token) {
   return UNIT_LITERAL;  // incorrect one
 }
 
-PrecSymbol tokenToPrecSymbol(struct Token *token, struct Token *prevToken) {
+PrecSymbol tokenToPrecSymbol(const struct Token *token, const struct Token *prevToken) {
   if (token == NULL)
-    die(ERR_SYNTAX, getLine(prevToken), "Missing tokens");
+    die(ERR_SYNTAX, lineOf(prevToken), "Missing tokens");
   enum TkType type = getTkType(token);
   switch (type) {
     case TK_IDENT:
     case TK_NUMBER:
     case TK_DECIMAL:
     case TK_STRING:
+    case TK_KW_TRUE:   // ext. boolthen
+    case TK_KW_FALSE:  // ext. boolthen
       return PREC_OPERAND;
     case TK_PLUS:
       return PREC_PLUS_MINUS;
     case TK_MINUS:
-      // Unární mínus poznáme podle toho, co stálo před ním
+      // We can identify unary minus by looking at what preceded it
       if (isUnaryContext(prevToken)) {
-        return PREC_UNARY_MINUS;
+        return PREC_UNARY;
       }
       return PREC_PLUS_MINUS;
     case TK_MULTIPLY:
@@ -139,7 +153,15 @@ PrecSymbol tokenToPrecSymbol(struct Token *token, struct Token *prevToken) {
     case TK_NOT_EQUAL:
       return PREC_EQUAL;
 
-    // Tokeny, které ukončují výraz
+    // Boolthen
+    case TK_NOT:
+      return PREC_UNARY;
+    case TK_AND:
+      return PREC_AND;
+    case TK_OR:
+      return PREC_OR;
+
+    // Tokens that terminate an expression
     case TK_NEWLINE:
     case TK_SEMICOLON:
     case TK_EOF:
@@ -179,7 +201,7 @@ void pushItem(PrecStackItem item, PrecStack *stack) {
 
 PrecStackItem popItem(PrecStack *stack) {
   if (stack == NULL || stack->top < 0)
-    die(ERR_SYNTAX, 999, "Missing item on stack to pop");
+    die(ERR_SYNTAX, 0, "Missing item on stack to pop");
 
   return stack->items[stack->top--];
 }
@@ -206,7 +228,7 @@ PrecStackItem makeTerminalItem(PrecSymbol sym, Token *token, bool isBreakpoint) 
 }
 
 bool isBreakPoint(PrecStack *stack) {
-  PrecStackItem *top = getTopItem(stack);
+  const PrecStackItem *top = getTopItem(stack);
   return top->startBrkP || top->symbol == PREC_DOLLAR;
 }
 
@@ -232,7 +254,7 @@ AstExpression *executeReduce(PrecStack *stack) {
   if (count == 1 && popped[0].type == TERMINAL) {
     PrecStackItem onePop = popped[0];
     if (onePop.symbol != PREC_OPERAND)
-      die(ERR_SYNTAX, getLine(onePop.token), "Wrong operand");
+      die(ERR_SYNTAX, lineOf(onePop.token), "Wrong operand");
     AstExpressionType ttET = tokenToExpressionType(onePop.token);
     if (ttET == UNIT_LITERAL || ttET == UNARY || ttET == BINARY)
       return NULL;
@@ -249,6 +271,14 @@ AstExpression *executeReduce(PrecStack *stack) {
         break;
       case TK_IDENT:
         ex->data.variable = getString(getValue(onePop.token)->s);
+        break;
+        // boolthen ext.
+      case TK_KW_TRUE:
+        ex->data.boolValue = true;
+        break;
+      case TK_KW_FALSE:
+        ex->data.boolValue = false;
+        break;
       default:
         break;
     }
@@ -261,11 +291,21 @@ AstExpression *executeReduce(PrecStack *stack) {
     return popped[1].astNode;
   }
 
-  // RULE 3: E-> -E (Unary - 2 symbols)
-  if (count == 2 && popped[1].type == TERMINAL && popped[1].symbol == PREC_UNARY_MINUS &&
+  // RULE 3: E-> -E | !E (Unary - 2 symbols)
+  if (count == 2 && popped[1].type == TERMINAL && popped[1].symbol == PREC_UNARY &&
       popped[0].type == NON_TERMINAL) {
     AstExpression *ex = astExpressionNew(UNARY, getLocation(popped[1].token));
-    ex->data.unary.operatorAst = NEGATION;
+    const Token *token = popped[1].token;  // looks at unary operator
+    if (token == NULL) {
+      die(ERR_SYNTAX, lineOf(token), "Missing token");
+    }
+    if (getTkType(token) == TK_NOT) {
+      ex->data.unary.operatorAst = LOGICAL_NEGATION;
+    } else if (getTkType(token) == TK_MINUS) {
+      ex->data.unary.operatorAst = NEGATION;
+    } else
+      die(ERR_SYNTAX, lineOf(token), "Invalid unary token (Valid only -x or !x)");
+
     ex->data.unary.expression = popped[0].astNode;
     return ex;
   }
@@ -276,7 +316,7 @@ AstExpression *executeReduce(PrecStack *stack) {
     AstExpression *ex = astExpressionNew(BINARY, getLocation(popped[1].token));
     AstOperator op = tokenToOperator(popped[1].token);
     if (op == NEGATION) {
-      die(ERR_SYNTAX, getLine(popped[1].token), "Wrong operator for expression");
+      die(ERR_SYNTAX, lineOf(popped[1].token), "Wrong operator for expression");
     }
     ex->data.binary.leftExpression = popped[2].astNode;
     ex->data.binary.operatorAst = op;
@@ -287,7 +327,7 @@ AstExpression *executeReduce(PrecStack *stack) {
 }
 
 bool stackCorrect(PrecStack stack) {
-  PrecStackItem *dolar = getTopItem(&stack);
+  const PrecStackItem *dolar = getTopItem(&stack);
   // Checks that first terminal is dollar, without any breakpoint '<' and on top of that is only one
   // non-terminal
   return dolar->symbol == PREC_DOLLAR && !dolar->startBrkP && stack.top == 1 &&
@@ -298,24 +338,26 @@ bool stackCorrect(PrecStack stack) {
 /// implemented as a precedence parser
 AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: specific ending token
   if (tokenList == NULL)
-    die(ERR_SYNTAX, 999, "Missing tokens for expression");
+    die(ERR_SYNTAX, 0, "Missing tokens for expression");
   static const char precTable[PREC_TYPES][PREC_TYPES] = {
-      /*                     0     1      2       3    4    5     6    7   8*/
-      /* stack \     in  | plus | mul | U(-x) | REL | EQ | '(' | ')' | i | $ */
-      /* + -             */ {'>', '<', '<', '>', '>', '<', '>', '<', '>'},  // ok
-      /* * /             */ {'>', '>', '<', '>', '>', '<', '>', '<', '>'},  // ok
-      /* Unary(-x)       */ {'>', '>', '<', '>', '>', '<', '>', '<', '>'},  // ok
-      /* REL(<,>,<=, >=) */ {'<', '<', '<', 'E', '>', '<', '>', '<', '>'},  // ok
-      /* EQ (==, !=)     */ {'<', '<', '<', '<', 'E', '<', '>', '<', '>'},  // ok
-      /* (               */ {'<', '<', '<', '<', '<', '<', '=', '<', 'E'},  // ok
-      /* )               */ {'>', '>', 'E', '>', '>', 'E', '>', 'E', '>'},  // ok
-      /* i               */ {'>', '>', 'E', '>', '>', 'E', '>', 'E', '>'},  // ok
-      /* $               */ {'<', '<', '<', '<', '<', '<', 'E', '<', 'E'}   // ok
+      /*                     0     1    2    3    4    5    6    7   8     9   10 */
+      /* stack \     in  | plus | mul | U | REL| EQ | '('| ')' | i |  $ | AND| OR |*/
+      /* + -             */ {'>', '<', '<', '>', '>', '<', '>', '<', '>', '>', '>'},  // ok
+      /* * /             */ {'>', '>', '<', '>', '>', '<', '>', '<', '>', '>', '>'},  // ok
+      /* Unary(-x)       */ {'>', '>', '<', '>', '>', '<', '>', '<', '>', '>', '>'},  // ok
+      /* REL(<,>,<=, >=) */ {'<', '<', '<', 'E', '>', '<', '>', '<', '>', '>', '>'},  // ok
+      /* EQ (==, !=)     */ {'<', '<', '<', '<', 'E', '<', '>', '<', '>', '>', '>'},  // ok
+      /* (               */ {'<', '<', '<', '<', '<', '<', '=', '<', 'E', '<', '<'},  // ok
+      /* )               */ {'>', '>', 'E', '>', '>', 'E', '>', 'E', '>', '>', '>'},  // ok
+      /* i               */ {'>', '>', 'E', '>', '>', 'E', '>', 'E', '>', '>', '>'},  // ok
+      /* $               */ {'<', '<', '<', '<', '<', '<', 'E', '<', 'E', '<', '<'},  // ok
+      /* AND             */ {'<', '<', '<', '<', '<', '<', '>', '<', '>', '>', '>'},  // ok
+      /* OR              */ {'<', '<', '<', '<', '<', '<', '>', '<', '>', '<', '>'}   // ok
 
   };
   // `()` is the Unit literal; the precedence grammar has no rule for an empty pair of parentheses
-  Token *first = lookAheadToken(tokenList, 0);
-  Token *second = lookAheadToken(tokenList, 1);
+  const Token *first = lookAheadToken(tokenList, 0);
+  const Token *second = lookAheadToken(tokenList, 1);
   if (first != NULL && second != NULL && getTkType(first) == TK_LPAREN &&
       getTkType(second) == TK_RPAREN) {
     popToken(tokenList);
@@ -325,20 +367,20 @@ AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: spec
 
   PrecStack stack;
   stackInit(&stack, 3);
-  PrecStackItem item = makeTerminalItem(PREC_DOLLAR, NULL, false);
-  pushItem(item, &stack);                       // default settings - I pushed $ on stack
+  PrecStackItem termItem = makeTerminalItem(PREC_DOLLAR, NULL, false);
+  pushItem(termItem, &stack);                   // default settings - I pushed $ on stack
   Token *token = lookAheadToken(tokenList, 0);  // guaranteed token
   Token *prevToken = token;
   PrecSymbol sym = tokenToPrecSymbol(token, prevToken);
   if (sym == PREC_UNKNOWN) {
-    die(ERR_SYNTAX, getLine(token), "Unexpected token on input");
+    die(ERR_SYNTAX, lineOf(token), "Unexpected token on input");
   }
 
-  PrecStackItem b, *a;
+  PrecStackItem b;
   AstExpression *expr;
 
   do {
-    a = getTopItem(&stack);
+    PrecStackItem *a = getTopItem(&stack);
     b = makeTerminalItem(sym, token, false);
     switch (precTable[a->symbol][b.symbol]) {
       case '<':
@@ -350,11 +392,11 @@ AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: spec
         prevToken = popToken(tokenList);
         token = lookAheadToken(tokenList, 0);
         if (token == NULL) {
-          die(ERR_SYNTAX, getLine(prevToken), "Missing other tokens");
+          die(ERR_SYNTAX, lineOf(prevToken), "Missing other tokens");
         }
         sym = tokenToPrecSymbol(token, prevToken);
         if (sym == PREC_UNKNOWN) {
-          die(ERR_SYNTAX, getLine(token), "Unexpected token on input");
+          die(ERR_SYNTAX, lineOf(token), "Unexpected token on input");
         }
         b = makeTerminalItem(sym, token, false);
         break;
@@ -362,7 +404,7 @@ AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: spec
       case '>':
         expr = executeReduce(&stack);
         if (expr == NULL) {
-          die(ERR_SYNTAX, getLine(prevToken), "No suitable grammar rule!");
+          die(ERR_SYNTAX, lineOf(prevToken), "No suitable grammar rule!");
         }
         PrecStackItem item;
         item.symbol = PREC_UNKNOWN;
@@ -373,7 +415,7 @@ AstExpression *expression(LinkedTlist *tokenList) {  // TODO: Add parametr: spec
         pushItem(item, &stack);
         break;
       default:
-        die(ERR_SYNTAX, getLine(token), "Invalid expression");
+        die(ERR_SYNTAX, lineOf(token), "Invalid expression");
         break;
     }
   } while (!(b.symbol == PREC_DOLLAR && stackCorrect(stack)));

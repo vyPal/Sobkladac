@@ -19,16 +19,18 @@
 typedef enum {
   // The order of the symbols up to PREC_DOLLAR must match the rows/columns of precTable
   // in expression() (src/syn_analyzator_bottom_up.c).
-  PREC_PLUS_MINUS,   // + a binární -
-  PREC_MUL_DIV,      // * a /
-  PREC_UNARY_MINUS,  // unární -
-  PREC_RELATIONAL,   // <, <=, >, >=
-  PREC_EQUAL,        // ==, !=
-  PREC_LPAREN,       // (
-  PREC_RPAREN,       // )
-  PREC_OPERAND,      // i (TK_IDENT, TK_NUMBER, TK_DECIMAL, TK_STRING)
-  PREC_DOLLAR,       // $ (konec výrazu - newline, then, do, čárka, EOF...)
-  PREC_UNKNOWN       // neplatný symbol ve výrazu
+  PREC_PLUS_MINUS,  // binary + and -
+  PREC_MUL_DIV,     // * a /
+  PREC_UNARY,       // unary - and !
+  PREC_RELATIONAL,  // <, <=, >, >=
+  PREC_EQUAL,       // ==, !=
+  PREC_LPAREN,      // (
+  PREC_RPAREN,      // )
+  PREC_OPERAND,     // i (TK_IDENT, TK_NUMBER, TK_DECIMAL, TK_STRING, TK_BOOL)
+  PREC_DOLLAR,      // $ (end-of-expression markers: newline, then, do, comma, EOF...)
+  PREC_AND,         // '||'
+  PREC_OR,          // '&&'
+  PREC_UNKNOWN      // invalid symbol in expression
 } PrecSymbol;
 
 /**
@@ -106,7 +108,7 @@ PrecStackItem makeTerminalItem(PrecSymbol symbol, Token *token, bool isBreakpoin
  * @param token Token to retrieve the location from.
  * @return The token's AST source location.
  */
-AstLocation getLocation(Token *token);
+AstLocation getLocation(const Token *token);
 
 /**
  * @brief Maps a token to its precedence class.
@@ -114,7 +116,7 @@ AstLocation getLocation(Token *token);
  * @param prevToken Previous token, used to distinguish unary and binary minus.
  * @return The token's precedence class.
  */
-PrecSymbol tokenToPrecSymbol(struct Token *token, struct Token *prevToken);
+PrecSymbol tokenToPrecSymbol(const struct Token *token, const struct Token *prevToken);
 
 /**
  * @brief Checks whether the stack contains one complete reduced expression.
@@ -136,13 +138,13 @@ AstExpression *expression(LinkedTlist *tokenList);
  * @param token Token to get Binary operator from
  * @return correct operator on success, NEGATION Operator when token is not operator
  */
-AstOperator tokenToOperator(Token *token);
+AstOperator tokenToOperator(const Token *token);
 
 /**
  * @brief Decides if expression type is literal or binary from token
  * @param token Token to get Expression type from
  * @return type - literal/binary on success, UNIT_LITERAL ExpType when token is different
  */
-AstExpressionType tokenToExpressionType(Token *token);
+AstExpressionType tokenToExpressionType(const Token *token);
 
 #endif  // SA_BOTTOM_UP_H

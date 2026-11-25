@@ -7,7 +7,6 @@
 
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "ast.h"
@@ -15,52 +14,48 @@
 #include "layout.h"
 #include "syn_analyzator_bottom_up.h"
 
-bool prolog(LinkedTlist *tokenList);                             // DONE
-bool funDefs(LinkedTlist *tokenList, AstProgram *asTree);        // DONE
-bool funDefsTail(LinkedTlist *tokenList, AstProgram *asTree);    // DONE
-bool funDef(LinkedTlist *tokenList, AstProgram *asTree);         // DONE
-bool mainAnnot(LinkedTlist *tokenList);                          // DONE
-void mainNL(LinkedTlist *tokenList);                             // DONE
-bool funBody(AstFunction *function, LinkedTlist *tokenList);     // DONE
-bool params(AstFunction *function, LinkedTlist *tokenList);      // DONE
-bool paramsTail(AstFunction *function, LinkedTlist *tokenList);  // DONE
-bool param(AstFunction *function, LinkedTlist *tokenList);       // DONE
-AstDataType optType(LinkedTlist *tokenList);                     // DONE
-AstDataType dType(LinkedTlist *tokenList);                       // DONE
+// bool prolog(LinkedTlist *tokenList);                             // DONE
+// bool funDefs(LinkedTlist *tokenList, AstProgram *asTree);        // DONE
+// bool funDefsTail(LinkedTlist *tokenList, AstProgram *asTree);    // DONE
+// bool funDef(LinkedTlist *tokenList, AstProgram *asTree);         // DONE
+// bool mainAnnot(LinkedTlist *tokenList);                          // DONE
+// void mainNL(LinkedTlist *tokenList);                             // DONE
+// bool funBody(AstFunction *function, LinkedTlist *tokenList);     // DONE
+// bool params(AstFunction *function, LinkedTlist *tokenList);      // DONE
+// bool paramsTail(AstFunction *function, LinkedTlist *tokenList);  // DONE
+// bool param(AstFunction *function, LinkedTlist *tokenList);       // DONE
+// AstDataType optType(LinkedTlist *tokenList);                     // DONE
+// AstDataType dType(LinkedTlist *tokenList);                       // DONE
 
-bool codeBlock(AstCodeBlock *block, LinkedTlist *tokenList);  // DONE
-bool linesTail(AstCodeBlock *block, LinkedTlist *tokenList);  // DONE
-bool line(AstCodeBlock *block, LinkedTlist *tokenList);       // DONE
+// bool codeBlock(AstCodeBlock *block, LinkedTlist *tokenList);  // DONE
+// bool linesTail(AstCodeBlock *block, LinkedTlist *tokenList);  // DONE
+// bool line(AstCodeBlock *block, LinkedTlist *tokenList);       // DONE
 
-bool simpleTail(AstCodeBlock *block, LinkedTlist *tokenList);       // DONE
-bool simpleStatement(AstCodeBlock *block, LinkedTlist *tokenList);  // DONE
-bool assignment(AstCommand *cmd, LinkedTlist *tokenList);           // DONE
-AstFunctionCall *functionCall(LinkedTlist *tokenList);              // DONE
-bool variableDeclaration(AstCommand *cmd, LinkedTlist *tokenList);  // DONE
-bool varKW(LinkedTlist *tokenList, bool *isMutable);                // DONE
-bool returnStatement(AstCommand *cmd, LinkedTlist *tokenList);      // DONE
-bool returnTail(AstCommand *cmd, LinkedTlist *tokenList);           // DONE
-AstValue *rValue(LinkedTlist *tokenList);                           // DONE
-bool args(AstFunctionCall *funCall, LinkedTlist *tokenList);        // DONE
-bool argsTail(AstFunctionCall *funCall, LinkedTlist *tokenList);    // DONE
-AstExpression *term(LinkedTlist *tokenList);                        // DONE
-bool ifStatement(AstCodeBlock *block, LinkedTlist *tokenList);      // DONE
-bool whileStatement(AstCodeBlock *block, LinkedTlist *tokenList);   // DONE
-
-static int lineOf(Token *token) {
-  return token ? getLine(token) : 999;
-}
+// bool simpleTail(AstCodeBlock *block, LinkedTlist *tokenList);       // DONE
+// bool simpleStatement(AstCodeBlock *block, LinkedTlist *tokenList);  // DONE
+// bool assignment(AstCommand *cmd, LinkedTlist *tokenList);           // DONE
+// AstFunctionCall *functionCall(LinkedTlist *tokenList);              // DONE
+// bool variableDeclaration(AstCommand *cmd, LinkedTlist *tokenList);  // DONE
+// bool varKW(LinkedTlist *tokenList, bool *isMutable);                // DONE
+// bool returnStatement(AstCommand *cmd, LinkedTlist *tokenList);      // DONE
+// bool returnTail(AstCommand *cmd, LinkedTlist *tokenList);           // DONE
+// AstValue *rValue(LinkedTlist *tokenList);                           // DONE
+// bool args(AstFunctionCall *funCall, LinkedTlist *tokenList);        // DONE
+// bool argsTail(AstFunctionCall *funCall, LinkedTlist *tokenList);    // DONE
+// AstExpression *term(LinkedTlist *tokenList);                        // DONE
+// bool ifStatement(AstCodeBlock *block, LinkedTlist *tokenList);      // DONE
+// bool whileStatement(AstCodeBlock *block, LinkedTlist *tokenList);   // DONE
 
 bool prolog(LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 4);
+  const Token *token = lookAheadToken(tokenList, 4);
   if (token == NULL) {
     die(ERR_SYNTAX, 0, "Missing prolog");
   }
-  Token *importT = popToken(tokenList);
-  Token *identT = popToken(tokenList);
-  Token *dotT = popToken(tokenList);
-  Token *multiplyT = popToken(tokenList);
-  Token *newlineT = popToken(tokenList);
+  const Token *importT = popToken(tokenList);
+  const Token *identT = popToken(tokenList);
+  const Token *dotT = popToken(tokenList);
+  const Token *multiplyT = popToken(tokenList);
+  const Token *newlineT = popToken(tokenList);
   if (getTkType(importT) == TK_KW_IMPORT &&  // import
       getTkType(identT) == TK_IDENT &&
       strcmp(getValue(identT)->s->string, "ifj26") == 0 &&  // ifj26
@@ -89,43 +84,43 @@ bool funDefsTail(LinkedTlist *tokenList, AstProgram *asTree) {
 
 bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {
   // skip blank lines before a function if your layout filter leaves them
-  Token *peek = lookAheadToken(tokenList, 0);
+  const Token *peek = lookAheadToken(tokenList, 0);
   if (peek == NULL || getTkType(peek) == TK_EOF)
     return false;
 
   bool isMain = mainAnnot(tokenList);
 
-  Token *defTK = popToken(tokenList);
+  const Token *defTK = popToken(tokenList);
   if (defTK == NULL || getTkType(defTK) != TK_KW_DEF) {
-    die(ERR_SYNTAX, defTK ? getLine(defTK) : 999, "Expected 'def'");
+    die(ERR_SYNTAX, lineOf(defTK), "Expected 'def'");
     return false;
   }
-  Token *idTK = popToken(tokenList);
+  const Token *idTK = popToken(tokenList);
   if (idTK == NULL || getTkType(idTK) != TK_IDENT)
-    die(ERR_SYNTAX, getLine(defTK), "Missing function name");
+    die(ERR_SYNTAX, lineOf(defTK), "Missing function name");
 
   AstFunction *fun = astFunctionNew(getString(getValue(idTK)->s), getLocation(idTK));
   fun->isMain = isMain;
 
-  Token *t = popToken(tokenList);
+  const Token *t = popToken(tokenList);
   if (t == NULL || getTkType(t) != TK_LPAREN)
-    die(ERR_SYNTAX, getLine(idTK), "Missing '(' in function definition");
+    die(ERR_SYNTAX, lineOf(idTK), "Missing '(' in function definition");
 
   if (!params(fun, tokenList))
-    die(ERR_SYNTAX, getLine(idTK), "Invalid parameters");
+    die(ERR_SYNTAX, lineOf(idTK), "Invalid parameters");
 
   t = popToken(tokenList);
   if (t == NULL || getTkType(t) != TK_RPAREN)
-    die(ERR_SYNTAX, getLine(idTK), "Missing ')' in function definition");
+    die(ERR_SYNTAX, lineOf(idTK), "Missing ')' in function definition");
 
   fun->declaredReturnType = optType(tokenList);
 
   t = popToken(tokenList);
   if (t == NULL || getTkType(t) != TK_ASSIGN)
-    die(ERR_SYNTAX, getLine(idTK), "Missing '=' in function definition");
+    die(ERR_SYNTAX, lineOf(idTK), "Missing '=' in function definition");
 
   if (!funBody(fun, tokenList))
-    die(ERR_SYNTAX, getLine(idTK), "Invalid function body");
+    die(ERR_SYNTAX, lineOf(idTK) + 1, "Invalid function body");
 
   astProgramAppendFunction(asTree, fun);
   return true;
@@ -135,7 +130,7 @@ bool funDef(LinkedTlist *tokenList, AstProgram *asTree) {
 /// @param tokenList
 /// @return result of search
 bool mainAnnot(LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token != NULL && getTkType(token) == TK_ATMAIN) {  // AI [gpt-6-luna]: "Can you add token !=
                                                          // NULL && to all getTkType(token) in ifs"
     popToken(tokenList);
@@ -149,7 +144,7 @@ bool mainAnnot(LinkedTlist *tokenList) {
 /// @brief If anotation @main is on another line, it takes newline, otherwise does nothing
 /// @param tokenList
 void mainNL(LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token != NULL &&
       getTkType(token) == TK_NEWLINE) {  // AI [gpt-6-luna]: NULL && to all getTkType(token) in ifs"
     popToken(tokenList);
@@ -158,7 +153,7 @@ void mainNL(LinkedTlist *tokenList) {
 }
 
 bool funBody(AstFunction *function, LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token != NULL && getTkType(token) == TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token !=
                                                           // NULL && to all getTkType(token) in ifs"
     popToken(tokenList);                                  // pop newline
@@ -191,7 +186,7 @@ bool funBody(AstFunction *function, LinkedTlist *tokenList) {
 }
 
 bool params(AstFunction *function, LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token != NULL && getTkType(token) == TK_IDENT) {
     if (param(function, tokenList)) {
       return paramsTail(function, tokenList);
@@ -205,13 +200,13 @@ bool params(AstFunction *function, LinkedTlist *tokenList) {
 }
 
 bool paramsTail(AstFunction *function, LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL || getTkType(token) == TK_EOF) {
-    die(ERR_SYNTAX, 999, "Unexpected EOF");
+    die(ERR_SYNTAX, lineOf(token), "Unexpected EOF");
   }
-  if (token != NULL && getTkType(token) == TK_COMMA) {  // AI [gpt-6-luna]: "Can you add token !=
-                                                        // NULL && to all getTkType(token) in ifs"
-    popToken((tokenList));                              // pop comma
+  if (getTkType(token) == TK_COMMA) {  // AI [gpt-6-luna]: "Can you add token !=
+                                       // NULL && to all getTkType(token) in ifs"
+    popToken((tokenList));             // pop comma
     if (param(function, tokenList)) {
       return paramsTail(function, tokenList);
     } else {
@@ -224,13 +219,13 @@ bool paramsTail(AstFunction *function, LinkedTlist *tokenList) {
 }
 
 bool param(AstFunction *function, LinkedTlist *tokenList) {
-  Token *token = popToken(tokenList);
+  const Token *token = popToken(tokenList);
   if (token == NULL || getTkType(token) == TK_EOF) {
-    die(ERR_SYNTAX, 999, "Unexpected EOF");
+    die(ERR_SYNTAX, lineOf(token), "Unexpected EOF");
   }
-  if (token != NULL && getTkType(token) == TK_IDENT) {  // AI [gpt-6-luna]: "Can you add token !=
-                                                        // NULL && to all getTkType(token) in ifs"
-    char *name = getString(getValue(token)->s);
+  if (getTkType(token) == TK_IDENT) {  // AI [gpt-6-luna]: "Can you add token !=
+                                       // NULL && to all getTkType(token) in ifs"
+    const char *name = getString(getValue(token)->s);
     token = popToken(tokenList);
     if (token != NULL && getTkType(token) == TK_COLON) {  // AI [gpt-6-luna]: "Can you add token !=
                                                           // NULL && to all getTkType(token) in ifs"
@@ -257,13 +252,13 @@ bool param(AstFunction *function, LinkedTlist *tokenList) {
 }
 
 AstDataType optType(LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
 
   if (token != NULL && getTkType(token) == TK_COLON) {
     popToken(tokenList);
     AstDataType type = dType(tokenList);
     if (type == UNKNOWN) {
-      die(ERR_SYNTAX, getLine(token), "Incorrect type after ':'");
+      die(ERR_SYNTAX, lineOf(token), "Incorrect type after ':'");
     }
     return type;
   }
@@ -272,7 +267,7 @@ AstDataType optType(LinkedTlist *tokenList) {
 }
 
 AstDataType dType(LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL) {
     return UNKNOWN;
   }
@@ -290,6 +285,9 @@ AstDataType dType(LinkedTlist *tokenList) {
       break;
     case TK_KW_UNIT:
       type = UNIT;
+      break;
+    case TK_KW_BOOLEAN:
+      type = BOOL;
       break;
     default:
       return UNKNOWN;  // leave the token in the list
@@ -309,7 +307,7 @@ bool codeBlock(AstCodeBlock *block, LinkedTlist *tokenList) {
 }
 
 bool linesTail(AstCodeBlock *block, LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
 
   // The block ends when its indentation ends.
   if (token == NULL || getTkType(token) == TK_DEDENT) {
@@ -323,9 +321,9 @@ bool linesTail(AstCodeBlock *block, LinkedTlist *tokenList) {
   return false;
 }
 bool line(AstCodeBlock *block, LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL) {
-    die(ERR_SYNTAX, 999, "Unexpected end of file");
+    die(ERR_SYNTAX, lineOf(token), "Unexpected end of file");
     return false;
   }
 
@@ -348,7 +346,7 @@ bool line(AstCodeBlock *block, LinkedTlist *tokenList) {
 }
 
 bool simpleTail(AstCodeBlock *block, LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
 
   if (token != NULL && getTkType(token) == TK_SEMICOLON) {
     popToken(tokenList);
@@ -363,14 +361,14 @@ bool simpleTail(AstCodeBlock *block, LinkedTlist *tokenList) {
 
 bool simpleStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
   AstCommand *cmd;
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL || getTkType(token) == TK_EOF) {
     fprintf(stderr, "Unexpected end of file");
     return false;
   }
   int tokenType = getTkType(token);
   if (tokenType == TK_IDENT) {
-    Token *nextToken = lookAheadToken(tokenList, 1);
+    const Token *nextToken = lookAheadToken(tokenList, 1);
     if (nextToken != NULL && getTkType(nextToken) == TK_ASSIGN) {
       cmd = astCodeCommandNew(ASSIGNMENT, getLocation(token));
       if (!assignment(cmd, tokenList)) {
@@ -413,9 +411,9 @@ bool simpleStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
 }
 
 bool assignment(AstCommand *cmd, LinkedTlist *tokenList) {
-  Token *prevToken, *token = lookAheadToken(tokenList, 0);
+  const Token *prevToken, *token = lookAheadToken(tokenList, 0);
   if (token == NULL || getTkType(token) == TK_EOF) {
-    die(ERR_SYNTAX, 999, "Unexpected EOF");
+    die(ERR_SYNTAX, lineOf(token), "Unexpected EOF");
   }
   if (getTkType(token) == TK_IDENT) {
     prevToken = popToken(tokenList);  // ident
@@ -428,17 +426,16 @@ bool assignment(AstCommand *cmd, LinkedTlist *tokenList) {
       cmd->data.assignment.value = rValue(tokenList);
       return true;
     } else {
-      die(ERR_SYNTAX, getLine(prevToken), "Missing '=' in assignment");
+      die(ERR_SYNTAX, lineOf(prevToken), "Missing '=' in assignment");
       return false;
     }
   }
-  die(ERR_SYNTAX, getLine(token), "Incorect input for assignment");
+  die(ERR_SYNTAX, lineOf(token), "Incorect input for assignment");
   return false;
 }
 
 AstFunctionCall *functionCall(LinkedTlist *tokenList) {
-  AstFunctionCall *funCall;
-  Token *prevToken, *token = lookAheadToken(tokenList, 0);  // ident
+  const Token *prevToken, *token = lookAheadToken(tokenList, 0);  // ident
   if (token != NULL && getTkType(token) == TK_IDENT) {  // AI [gpt-6-luna]: "Can you add token !=
                                                         // NULL && to all getTkType(token) in ifs"
     prevToken = popToken(tokenList);
@@ -447,8 +444,9 @@ AstFunctionCall *functionCall(LinkedTlist *tokenList) {
         getTkType(token) == TK_LPAREN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
                                           // getTkType(token) in ifs"
       popToken(tokenList);
-      funCall = astFunctionCallNew(getString(getValue(prevToken)->s), getLocation(prevToken));
-      Token *nextToken = lookAheadToken(tokenList, 0);
+      AstFunctionCall *funCall =
+          astFunctionCallNew(getString(getValue(prevToken)->s), getLocation(prevToken));
+      const Token *nextToken = lookAheadToken(tokenList, 0);
       if ((nextToken != NULL && getTkType(nextToken) == TK_RPAREN) ||
           args(funCall, tokenList)) {  // It skips args if there are none
         token = popToken(tokenList);   // rparen
@@ -457,23 +455,23 @@ AstFunctionCall *functionCall(LinkedTlist *tokenList) {
                                               // all getTkType(token) in ifs"
           return funCall;
         } else {
-          die(ERR_SYNTAX, getLine(prevToken), "Missing ')' in function call");
+          die(ERR_SYNTAX, lineOf(prevToken), "Missing ')' in function call");
           return NULL;
         }
       }
     } else {
-      die(ERR_SYNTAX, getLine(prevToken), "Missing '(' in function call");
+      die(ERR_SYNTAX, lineOf(prevToken), "Missing '(' in function call");
       return NULL;
     }
   }
-  die(ERR_SYNTAX, 999, "Unexpected EOF");
+  die(ERR_SYNTAX, lineOf(token), "Unexpected EOF");
   return NULL;
 }
 
 bool variableDeclaration(AstCommand *cmd, LinkedTlist *tokenList) {
   bool isMutable = false;
   if (varKW(tokenList, &isMutable)) {
-    Token *token = popToken(tokenList);
+    const Token *token = popToken(tokenList);
     if (token != NULL && getTkType(token) == TK_IDENT) {
       cmd->data.variableDeclaration.variableName = getString(getValue(token)->s);
 
@@ -491,21 +489,19 @@ bool variableDeclaration(AstCommand *cmd, LinkedTlist *tokenList) {
         }
         return false;
       } else {
-        die(ERR_SYNTAX, token != NULL ? getLine(token) : 999,
-            "Missing '=' in variable declaration");
+        die(ERR_SYNTAX, lineOf(token), "Missing '=' in variable declaration");
       }
     } else {
-      die(ERR_SYNTAX, token != NULL ? getLine(token) : 999,
-          "Missing identifier in variable declaration");
+      die(ERR_SYNTAX, lineOf(token), "Missing identifier in variable declaration");
     }
   }
   return false;  // it didn't start with var/val
 }
 
 bool varKW(LinkedTlist *tokenList, bool *isMutable) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL || getTkType(token) == TK_EOF) {
-    die(ERR_SYNTAX, 999, "Unexpected EOF");
+    die(ERR_SYNTAX, lineOf(token), "Unexpected EOF");
   }
   int tkType = getTkType(token);
   if (tkType == TK_KW_VAR)
@@ -519,7 +515,7 @@ bool varKW(LinkedTlist *tokenList, bool *isMutable) {
 }
 
 bool returnStatement(AstCommand *cmd, LinkedTlist *tokenList) {
-  Token *token = popToken(tokenList);
+  const Token *token = popToken(tokenList);
   if (token != NULL &&
       getTkType(token) == TK_KW_RETURN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
                                            // getTkType(token) in ifs"
@@ -529,7 +525,7 @@ bool returnStatement(AstCommand *cmd, LinkedTlist *tokenList) {
 }
 
 bool returnTail(AstCommand *cmd, LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
 
   if (token == NULL || getTkType(token) == TK_NEWLINE || getTkType(token) == TK_SEMICOLON ||
       getTkType(token) == TK_DEDENT || getTkType(token) == TK_EOF) {
@@ -544,14 +540,14 @@ bool returnTail(AstCommand *cmd, LinkedTlist *tokenList) {
 
 // DONE
 AstValue *rValue(LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL) {
-    die(ERR_SYNTAX, 999, "Unexpected end of file");
+    die(ERR_SYNTAX, lineOf(token), "Unexpected end of file");
     return NULL;
   }
   int tokenType = getTkType(token);
   if (tokenType == TK_IDENT) {
-    Token *nextToken = lookAheadToken(tokenList, 1);
+    const Token *nextToken = lookAheadToken(tokenList, 1);
     if (nextToken != NULL && getTkType(nextToken) == TK_LPAREN) {
       return astValueFromFunctionCall(functionCall(tokenList));
     }
@@ -571,7 +567,7 @@ bool args(AstFunctionCall *funCall, LinkedTlist *tokenList) {  // there must be 
 }
 
 bool argsTail(AstFunctionCall *funCall, LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token != NULL && getTkType(token) == TK_COMMA) {  // AI [gpt-6-luna]: "Can you add token !=
                                                         // NULL && to all getTkType(token) in ifs"
     popToken(tokenList);
@@ -588,9 +584,9 @@ bool argsTail(AstFunctionCall *funCall, LinkedTlist *tokenList) {
 
 AstExpression *term(LinkedTlist *tokenList) {
   AstExpression *term;
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL || getTkType(token) == TK_EOF) {
-    die(ERR_SYNTAX, 999, "Unexpected end of file");
+    die(ERR_SYNTAX, lineOf(token), "Unexpected end of file");
   }
   int tkType = getTkType(token);
   if (tkType == TK_IDENT) {  // it is variable
@@ -620,6 +616,13 @@ AstExpression *term(LinkedTlist *tokenList) {
     term->data.stringValue = getString(getValue(token)->s);
     return term;
 
+    // it is BOOL_LITERAL
+  } else if (tkType == TK_KW_TRUE || tkType == TK_KW_FALSE) {
+    popToken(tokenList);
+    term = astExpressionNew(BOOL_LITERAL, getLocation(token));
+    term->data.boolValue = tkType == TK_KW_TRUE;
+    return term;
+
   } else if (tkType == TK_LPAREN) {
     popToken(tokenList);
     token = lookAheadToken(tokenList, 0);
@@ -629,84 +632,93 @@ AstExpression *term(LinkedTlist *tokenList) {
       popToken(tokenList);
       term = astExpressionNew(UNIT_LITERAL, getLocation(token));
       return term;
-    } else {  // missing )
-      die(ERR_SYNTAX, getLine(token), "Missing ')' for UNIT_LITERAL");
-    }
+    } else if (token != NULL)  // missing )
+      die(ERR_SYNTAX, lineOf(token), "Missing ')' for UNIT_LITERAL");
+    else
+      die(ERR_SYNTAX, 0, "Missing ')' for UNIT_LITERAL");
   }
   // it is not variable nor term -> Error
   else {
-    die(ERR_SYNTAX, getLine(token), "Incorrect input");
+    die(ERR_SYNTAX, lineOf(token), "Incorrect input");
   }
   return NULL;
 }
 
 bool ifStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL || getTkType(token) == TK_EOF) {
-    die(ERR_SYNTAX, 999, "Unexpected end of file");
+    die(ERR_SYNTAX, lineOf(token), "Unexpected end of file");
     return NULL;
   }
 
   int tkType = getTkType(token);
+  // token if
   if (tkType != TK_KW_IF) {
-    die(ERR_SYNTAX, getLine(token), "Missing 'if' in if statement");
+    die(ERR_SYNTAX, lineOf(token), "Missing 'if' in if statement");
   }
   AstCommand *cmd = astCodeCommandNew(IF, getLocation(token));
   popToken(tokenList);
   AstExpression *condition = expression(tokenList);
+  // after expression
   if (condition != NULL) {
     cmd->data.ifAst.condition = condition;
-    token = popToken(tokenList);
-    if (token == NULL ||
-        getTkType(token) != TK_KW_THEN) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                           // getTkType(token) in ifs"
-      die(ERR_SYNTAX, getLine(token), "Missing 'then' in if statement");
+
+    token = popToken(tokenList);  // pop TK_KW_THEN
+    if (token == NULL || getTkType(token) != TK_KW_THEN) {
+      die(ERR_SYNTAX, lineOf(token), "Missing 'then' in if statement");
     }
-    token = popToken(tokenList);
-    if (token == NULL ||
-        getTkType(token) != TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                           // getTkType(token) in ifs"
-      die(ERR_SYNTAX, getLine(token), "Missing '\\n' in if statement");
+
+    token = popToken(tokenList);  // pop TK_NEWLINE
+    if (token == NULL || getTkType(token) != TK_NEWLINE) {
+      die(ERR_SYNTAX, lineOf(token), "Missing '\\n' in if statement");
     }
-    token = popToken(tokenList);
-    if (token == NULL ||
-        getTkType(token) != TK_INDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                          // getTkType(token) in ifs"
-      die(ERR_SYNTAX, getLine(token), "Missing indentation in if statement");
+    token = popToken(tokenList);  // pop TK_INDENT
+    if (token == NULL || getTkType(token) != TK_INDENT) {
+      die(ERR_SYNTAX, lineOf(token), "Missing indentation in if statement");
     }
     cmd->data.ifAst.thenBlock = astCodeBlockNew();
     if (codeBlock(cmd->data.ifAst.thenBlock, tokenList)) {
-      token = popToken(tokenList);
-      if (token == NULL ||
-          getTkType(token) != TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                            // getTkType(token) in ifs"
-        die(ERR_SYNTAX, getLine(token),
+      // we created a block -> token after:
+      token = popToken(tokenList);  // TK_DEDENT
+      if (token == NULL || getTkType(token) != TK_DEDENT) {
+        die(ERR_SYNTAX, lineOf(token),
             "Missing dedentation (inversion of indentation) in if statement");
       }
-      token = popToken(tokenList);
-      if (token == NULL ||
-          getTkType(token) != TK_KW_ELSE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
-                                             // all getTkType(token) in ifs"
-        die(ERR_SYNTAX, getLine(token), "Missing 'else' in if statement");
+
+      token = lookAheadToken(tokenList, 0);
+      if (token == NULL) {
+        die(ERR_SYNTAX, lineOf(token), "Unexpected EOF");
       }
-      token = popToken(tokenList);
-      if (token == NULL ||
-          getTkType(token) != TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
-                                             // all getTkType(token) in ifs"
-        die(ERR_SYNTAX, getLine(token), "Missing '\\n' in else branch");
+      if (getTkType(token) != TK_KW_ELSE) {  // missing else block
+        cmd->data.ifAst.elseBlock = NULL;
+        astBlockAppendCommand(block, cmd);
+        return true;
       }
+      popToken(tokenList);  // pop TK_KW_ELSE
+      token = lookAheadToken(tokenList, 0);
+      if (token == NULL)
+        die(ERR_SYNTAX, lineOf(token), "Unexpected EOF");
+
+      // else if command
+      else if (getTkType(token) == TK_KW_IF) {
+        cmd->data.ifAst.elseBlock = astCodeBlockNew();
+        if (!ifStatement(cmd->data.ifAst.elseBlock, tokenList))
+          die(ERR_SYNTAX, lineOf(token), "Wrong syntax else if command");
+        astBlockAppendCommand(block, cmd);
+        return true;
+      } else if (getTkType(token) != TK_NEWLINE) {
+        die(ERR_SYNTAX, lineOf(token), "Missing '\\n' in else branch");
+      }
+      popToken(tokenList);  // pop TK_NEWLINE
+      /* expected normal else block */
       token = popToken(tokenList);
-      if (token == NULL ||
-          getTkType(token) != TK_INDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                            // getTkType(token) in ifs"
-        die(ERR_SYNTAX, getLine(token), "Missing indentation in else branch");
+      if (token == NULL || getTkType(token) != TK_INDENT) {
+        die(ERR_SYNTAX, lineOf(token), "Missing indentation in else branch");
       }
       cmd->data.ifAst.elseBlock = astCodeBlockNew();
       if (codeBlock(cmd->data.ifAst.elseBlock, tokenList)) {
         token = popToken(tokenList);
-        if (token == NULL ||
-            getTkType(token) != TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
-                                              // all getTkType(token) in ifs"
+        if (token == NULL || getTkType(token) != TK_DEDENT) {
           die(ERR_SYNTAX, lineOf(token), "Missing dedentation in else branch");
         }
         astBlockAppendCommand(block, cmd);
@@ -718,14 +730,14 @@ bool ifStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
 }
 
 bool whileStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
-  Token *token = lookAheadToken(tokenList, 0);
+  const Token *token = lookAheadToken(tokenList, 0);
   if (token == NULL || getTkType(token) == TK_EOF) {
-    die(ERR_SYNTAX, 999, "Unexpected end of file");
+    die(ERR_SYNTAX, lineOf(token), "Unexpected end of file");
     return NULL;
   }
   int tkType = getTkType(token);
   if (tkType != TK_KW_WHILE) {
-    die(ERR_SYNTAX, getLine(token), "Missing 'while' in while statement");
+    die(ERR_SYNTAX, lineOf(token), "Missing 'while' in while statement");
   }
   AstCommand *cmd = astCodeCommandNew(WHILE, getLocation(token));
   popToken(tokenList);  // pop 'while'
@@ -733,28 +745,21 @@ bool whileStatement(AstCodeBlock *block, LinkedTlist *tokenList) {
   if (condition != NULL) {
     cmd->data.whileAst.condition = condition;
     token = popToken(tokenList);
-    if (token == NULL || getTkType(token) != TK_KW_DO) {  // AI [gpt-6-luna]: "Can you add token !=
-                                                          // NULL && to all getTkType(token) in ifs"
-      die(ERR_SYNTAX, getLine(token), "Missing 'do' in while statement");
+    if (token == NULL || getTkType(token) != TK_KW_DO) {
+      die(ERR_SYNTAX, lineOf(token), "Missing 'do' in while statement");
     }
     token = popToken(tokenList);
-    if (token == NULL ||
-        getTkType(token) != TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                           // getTkType(token) in ifs"
-      die(ERR_SYNTAX, getLine(token), "Missing '\\n' in while statement");
+    if (token == NULL || getTkType(token) != TK_NEWLINE) {
+      die(ERR_SYNTAX, lineOf(token), "Missing '\\n' in while statement");
     }
     token = popToken(tokenList);
-    if (token == NULL ||
-        getTkType(token) != TK_INDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                          // getTkType(token) in ifs"
-      die(ERR_SYNTAX, getLine(token), "Missing indentation in while statement");
+    if (token == NULL || getTkType(token) != TK_INDENT) {
+      die(ERR_SYNTAX, lineOf(token), "Missing indentation in while statement");
     }
     cmd->data.whileAst.codeBlock = astCodeBlockNew();
     if (codeBlock(cmd->data.whileAst.codeBlock, tokenList)) {
       token = popToken(tokenList);
-      if (token == NULL ||
-          getTkType(token) != TK_DEDENT) {  // AI [gpt-6-luna]: "Can you add token != NULL && to all
-                                            // getTkType(token) in ifs"
+      if (token == NULL || getTkType(token) != TK_DEDENT) {
         die(ERR_SYNTAX, lineOf(token),
             "Missing dedentation (inversion of indentation) in while statement");
       }
@@ -771,7 +776,7 @@ AstProgram *topDown(struct LinkedTlist *tokenList) {
 
   AstProgram *asTree = astProgramNew();
   bool result = prolog(tokenList) && funDefs(tokenList, asTree);
-  Token *lastToken = popToken(tokenList);
+  const Token *lastToken = popToken(tokenList);
   result = result && (lastToken != NULL && getTkType(lastToken) == TK_EOF);
   if (!result) {
     die(ERR_SYNTAX, 0, "Invalid code");

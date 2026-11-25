@@ -349,15 +349,30 @@ LinkedTlist *lexerMain(void) {
 
           if (nextChar == ' ') {
             indentCount++;
-          } else {
-            preloadedChar = true;
-            Token *tk = newToken(TK_INDENT, line);
-            int indent = indentCount;
-            union Value *value = arenaAlloc(sizeof(union Value));
-            (*value).i = indent;
-            setValue(tk, value);
-            lastToken = pushToken(tk, lastToken);
+            continue;
           }
+
+          if (nextChar == '\t') {
+            // tabulátor je chyba jen na neprázdném řádku
+            int c = nextCharInt;
+            while (c == ' ' || c == '\t' || c == '\r' || c == '\f' || c == '\v') {
+              c = fgetc(stdin);
+              position++;
+            }
+            if (c != '\n' && c != EOF)
+              die(1, line, "Tab in indentation at line %d column %d", line, position);
+            // prázdný řádek: pokračuje se od \n / EOF
+            nextCharInt = c;
+            nextChar = (char)c;
+            indentCount = 0;
+          }
+
+          preloadedChar = true;
+          Token *tk = newToken(TK_INDENT, line);
+          union Value *value = arenaAlloc(sizeof(union Value));
+          (*value).i = indentCount;
+          setValue(tk, value);
+          lastToken = pushToken(tk, lastToken);
         }
         break;
       case '@':
@@ -434,10 +449,11 @@ LinkedTlist *lexerMain(void) {
         nextCharInt = fgetc(stdin);
         nextChar = (char)nextCharInt;
         position++;
-        if (nextChar != '=') {
-          die(1, line, "Unexpected character at line %d colum %d, expected \"!=\"", line, position);
-        } else {
+        if (nextChar == '=') {
           lastToken = pushToken(newToken(TK_NOT_EQUAL, line), lastToken);
+        } else {
+          lastToken = pushToken(newToken(TK_NOT, line), lastToken);
+          preloadedChar = true;
         }
         break;
 
@@ -528,9 +544,45 @@ LinkedTlist *lexerMain(void) {
         lastToken = pushToken(newToken(TK_COMMA, line), lastToken);
         break;
       case '|':
-        lastToken = pushToken(newToken(TK_PIPE, line), lastToken);
+        nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar == '|') {
+          lastToken = pushToken(newToken(TK_OR, line), lastToken);
+        } else {
+          preloadedChar = true;
+          lastToken = pushToken(newToken(TK_PIPE, line), lastToken);
+        }
+        break;
+      case '&':
+        nextCharInt = fgetc(stdin);
+        nextChar = (char)nextCharInt;
+        position++;
+        if (nextChar == '&')
+          lastToken = pushToken(newToken(TK_AND, line), lastToken);
+        else
+          die(1, line, "Unexpected character at line %d colum %d, expected \"&&\"", line, position);
+        break;
+      case '\t':
+        if (line == 1 && lastToken->token == NULL) {
+          int c = nextCharInt;
+          while (c == ' ' || c == '\t' || c == '\r' || c == '\f' || c == '\v') {
+            c = fgetc(stdin);
+            position++;
+          }
+
+          if (c != '\n' && c != EOF)
+            die(1, line, "Tab in indentation at line %d column %d", line, position);
+
+          nextCharInt = c;
+          nextChar = (char)c;
+          preloadedChar = true;
+        }
         break;
       case ' ':
+      case '\r':
+      case '\f':
+      case '\v':
         break;
       default:
         // identifier

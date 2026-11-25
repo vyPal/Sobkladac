@@ -1,0 +1,11 @@
+{
+  "compiler": {
+    "status": 0,
+    "stderr": ""
+  },
+  "interpreter": {
+    "status": 0,
+    "stdout": "1000 0x1.9p+4\n",
+    "stderr": ""
+  }
+}

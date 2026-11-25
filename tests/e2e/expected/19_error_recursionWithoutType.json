@@ -1,0 +1,7 @@
+{
+  "compiler": {
+    "status": 6,
+    "stderr": "error (line 2): recursive function with an implicit return type\n"
+  },
+  "interpreter": null
+}

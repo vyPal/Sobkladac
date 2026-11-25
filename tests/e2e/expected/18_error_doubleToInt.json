@@ -1,0 +1,7 @@
+{
+  "compiler": {
+    "status": 6,
+    "stderr": "error (line 3): wrong initialization type\n"
+  },
+  "interpreter": null
+}

@@ -9,10 +9,10 @@
  *  a new list of tokens with proper indentation and dedentation.
  */
 
+#include <stdbool.h>
 #include <string.h>
 
 #include "common.h"
-#include "syn_analyzator_top_down.h"
 #include "token.h"
 
 /// @brief Checks if a comma is trailing
@@ -20,7 +20,7 @@
 /// @return true if the comma is trailing, false otherwise
 bool isTrailingComma(const LinkedTlist *in) {
   bool sawNewline = false;
-  Token *token;
+  const Token *token;
   for (int i = 0; (token = lookAheadToken(in, i)) != NULL; i++) {
     enum TkType type = getTkType(token);
     if (type == TK_NEWLINE) {
@@ -38,7 +38,7 @@ bool isTrailingComma(const LinkedTlist *in) {
 /// @param tk The token to convert
 /// @return The converted token
 Token *toKeyword(Token *tk) {
-  char *value = getValue(tk)->s->string;
+  const char *value = getValue(tk)->s->string;
   int line = getLine(tk);
   if (strcmp(value, "import") == 0)
     tk = newToken(TK_KW_IMPORT, line);
@@ -68,6 +68,13 @@ Token *toKeyword(Token *tk) {
     tk = newToken(TK_KW_VAL, line);
   else if (strcmp(value, "var") == 0)
     tk = newToken(TK_KW_VAR, line);
+  // boolthen extension
+  else if (strcmp(value, "true") == 0)
+    tk = newToken(TK_KW_TRUE, line);
+  else if (strcmp(value, "false") == 0)
+    tk = newToken(TK_KW_FALSE, line);
+  else if (strcmp(value, "Boolean") == 0)
+    tk = newToken(TK_KW_BOOLEAN, line);
   return tk;
 }
 

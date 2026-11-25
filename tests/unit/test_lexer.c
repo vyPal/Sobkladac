@@ -62,12 +62,12 @@ static void feed(const char *text) {
 }
 
 /**
- * Lexes `text` in a child process and returns how it ended:
+ * Lexes `text` in a child process (without the error message if `quiet`) and returns how it ended:
  *   0          lexing succeeded
  *   LEX_ERROR  the lexer called die(1, ...), i.e. reported a lexical error
  *   >= 128     the child crashed (128 + signal number)
  */
-static int lexStatus(const char *text) {
+static int lexRun(const char *text, int quiet) {
   feed(text);
   fflush(NULL);
   pid_t pid = fork();
@@ -76,8 +76,9 @@ static int lexStatus(const char *text) {
     exit(2);
   }
   if (pid == 0) {
-    // hide the error message that die() prints
-    if (freopen("/dev/null", "w", stderr) == NULL || freopen("/dev/null", "w", stdout) == NULL)
+    // hide the error message that die() prints, unless the caller wants to see it
+    if (freopen("/dev/null", "w", stdout) == NULL ||
+        (quiet && freopen("/dev/null", "w", stderr) == NULL))
       _exit(3);
     lexerMain();
     _exit(0);
@@ -87,6 +88,11 @@ static int lexStatus(const char *text) {
   if (WIFEXITED(status))
     return WEXITSTATUS(status);
   return 128 + (WIFSIGNALED(status) ? WTERMSIG(status) : 0);
+}
+
+/// Same as lexRun(), without the error message of the lexer.
+static int lexStatus(const char *text) {
+  return lexRun(text, 1);
 }
 
 /// Returns a printable version of `s` (newline -> \n, tab -> \t, ...) for test messages.
@@ -131,6 +137,9 @@ static LinkedTlist *lex(const char *text) {
   int status = lexStatus(text);
   if (status != 0) {
     fprintf(stderr, "      lexer failed (exit status %d) on: %s\n", status, esc(text));
+    fprintf(stderr, "      lexer says: ");
+    fflush(stderr);
+    lexRun(text, 0);  // run it once more to show the message that die() prints
     return NULL;
   }
   feed(text);
@@ -151,6 +160,24 @@ static const char *tokName(int type) {
   if (type < 0 || type >= (int)(sizeof TK_NAMES / sizeof TK_NAMES[0]))
     return "?";
   return TK_NAMES[type];
+}
+
+/// Number of tokens in the list.
+static int tokCount(LinkedTlist *l) {
+  int n = 0;
+  while (lookAheadToken(l, n) != NULL) n++;
+  return n;
+}
+
+/// Type of token n, or -1 if there is no such token.
+static int tokType(LinkedTlist *l, int n) {
+  Token *k = lookAheadToken(l, n);
+  return k == NULL ? -1 : (int)getTkType(k);
+}
+
+/// Token n has the given type.
+static int tokIs(LinkedTlist *l, int n, enum TkType type) {
+  return tokType(l, n) == (int)type;
 }
 
 /// Token n is on the given line.
@@ -617,12 +644,43 @@ tstsuite("lexer", ) {
 
   tstcase("unknown characters are a lexical error with exit status 1", ) {
     // braces are not part of IFJ26, nor are backticks (quoted identifiers)
-    static const char *const bad[] = {"#", "$", "?", "&", "~", "`",  "\\",
-                                      "^", "'", "{", "}", "!", "!a", "a ! b"};
+    static const char *const bad[] = {"#", "$", "?", "&", "~", "`", "\\", "^", "'", "{", "}"};
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
       tstexpect(lexStatus(bad[i]) == 1, "'%s' ends with exit status 1", bad[i]);
     }
     tstcheck(lexStatus("a + b") == 0, "valid input ends normally");
+  }
+
+  // ----- extension BOOLTHEN ----------------------------------------------------------------
+
+  tstcase("BOOLTHEN: !, && and || are single tokens", ) {
+    // Specification, section 5.2. The names of the token types of the extension are not used
+    // here: the tests only check that each of them is one token that differs from the others
+    // and from the tokens of the base language.
+    static const char *const one[] = {"!", "&&", "||", "true", "false"};
+    for (size_t i = 0; i < sizeof one / sizeof one[0]; i++) {
+      LinkedTlist *l = lex(one[i]);
+      tstexpect(tokCount(l) == 2 && tokIs(l, 1, TK_EOF), "'%s' is one token", one[i]);
+    }
+
+    tstcheck(TK_NOT >= 0 && TK_AND >= 0 && TK_OR >= 0 && TK_NOT != TK_AND && TK_NOT != TK_OR &&
+                 TK_AND != TK_OR,
+             "!, && and || are three different tokens");
+    tstcheck(TK_OR != (int)TK_PIPE && TK_NOT != (int)TK_NOT_EQUAL, "|| is not a pipe, ! is not !=");
+
+    // the tokens of the base language are not affected
+    tstcheck(tokSeq(lex("!="), TK_NOT_EQUAL, TK_EOF), "!= is still one token");
+    tstcheck(tokSeq(lex("|"), TK_PIPE, TK_EOF), "a single | is still a pipe");
+    tstcheck(lexStatus("a & b") == LEX_ERROR, "a single & is still an unknown character");
+
+    // in expressions, with and without spaces
+    tstcheck(
+        tokSeq(lex("!a && b || c"), TK_NOT, TK_IDENT, TK_AND, TK_IDENT, TK_OR, TK_IDENT, TK_EOF),
+        "!a && b || c");
+    tstcheck(tokSeq(lex("x&&y"), TK_IDENT, TK_AND, TK_IDENT, TK_EOF), "x&&y");
+    tstcheck(
+        tokSeq(lex("!(a<b)"), TK_NOT, TK_LPAREN, TK_IDENT, TK_SMALLER, TK_IDENT, TK_RPAREN, TK_EOF),
+        "!(a<b)");
   }
 
   // ----- larger inputs and a whole program --------------------------------------------------
