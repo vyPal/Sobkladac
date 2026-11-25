@@ -39,6 +39,10 @@ int getLine(const struct Token *token) {
   return token->line;
 }
 
+int lineOf(const struct Token *token) {
+  return token == NULL ? 0 : getLine(token);
+}
+
 void printToken(const struct Token *token) {
   if (token == NULL)
     return;

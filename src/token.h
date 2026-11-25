@@ -46,18 +46,21 @@ enum TkType {
   TK_ATMAIN,     // @main
   TK_EOF,        // end of file
   // boolthen
-  TK_NOT,  // !
-  TK_AND,  // &&
-  TK_OR,   // ||
+  TK_NOT,         // !
+  TK_AND,         // &&
+  TK_OR,          // ||
+  TK_KW_TRUE,     // true
+  TK_KW_FALSE,    // false
+  TK_KW_BOOLEAN,  // Data type Boolean
 
   // for layout.c - extra + keywords
-  TK_KW_IMPORT,
-  TK_DEDENT,  // oposite of TK_INDENT
+  TK_KW_IMPORT,  // beginning word of prolog
+  TK_DEDENT,     // oposite of TK_INDENT
 
-  TK_KW_INT,
-  TK_KW_DOUBLE,
-  TK_KW_STRING,
-  TK_KW_UNIT,
+  TK_KW_INT,     // Data type Int
+  TK_KW_DOUBLE,  // Data type Double
+  TK_KW_STRING,  // Data type String
+  TK_KW_UNIT,    // Data type Unit
 
   TK_KW_WHILE,
   TK_KW_DO,
@@ -66,11 +69,13 @@ enum TkType {
   TK_KW_THEN,
   TK_KW_ELSE,
 
+  // VVVV for funDef VVVV
   TK_KW_DEF,
   TK_KW_RETURN,
 
   TK_KW_VAL,
   TK_KW_VAR,
+  //^^^^^^^^^^^^^^^^^^^^
 
   TK_KW_RESERVED
 };
@@ -149,6 +154,13 @@ union Value *getValue(const struct Token *token);
  * @return Line number of the token.
  */
 int getLine(const struct Token *token);
+
+/**
+ * @brief Gets the source line for a token, or 999 when the token is NULL.
+ * @param token Token to retrieve the line from.
+ * @return The token's line, or 999 if token is NULL.
+ */
+int lineOf(const struct Token *token);
 
 void printToken(const struct Token *token);
 

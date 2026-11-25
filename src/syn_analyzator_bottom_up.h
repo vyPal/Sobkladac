@@ -19,16 +19,18 @@
 typedef enum {
   // The order of the symbols up to PREC_DOLLAR must match the rows/columns of precTable
   // in expression() (src/syn_analyzator_bottom_up.c).
-  PREC_PLUS_MINUS,   // + a binární -
-  PREC_MUL_DIV,      // * a /
-  PREC_UNARY_MINUS,  // unární -
-  PREC_RELATIONAL,   // <, <=, >, >=
-  PREC_EQUAL,        // ==, !=
-  PREC_LPAREN,       // (
-  PREC_RPAREN,       // )
-  PREC_OPERAND,      // i (TK_IDENT, TK_NUMBER, TK_DECIMAL, TK_STRING)
-  PREC_DOLLAR,       // $ (konec výrazu - newline, then, do, čárka, EOF...)
-  PREC_UNKNOWN       // neplatný symbol ve výrazu
+  PREC_PLUS_MINUS,  // binary + and -
+  PREC_MUL_DIV,     // * a /
+  PREC_UNARY,       // unary - and !
+  PREC_RELATIONAL,  // <, <=, >, >=
+  PREC_EQUAL,       // ==, !=
+  PREC_LPAREN,      // (
+  PREC_RPAREN,      // )
+  PREC_OPERAND,     // i (TK_IDENT, TK_NUMBER, TK_DECIMAL, TK_STRING, TK_BOOL)
+  PREC_DOLLAR,      // $ (end-of-expression markers: newline, then, do, comma, EOF...)
+  PREC_AND,         // '||'
+  PREC_OR,          // '&&'
+  PREC_UNKNOWN      // invalid symbol in expression
 } PrecSymbol;
 
 /**
