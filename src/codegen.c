@@ -1063,7 +1063,7 @@ void lowerCommand(StringBuilder *code, AstCommand *cmd, SymTable *table) {
         else
           EMIT(code, JUMPIFEQ, end, ifcond.val, boolOp(false));
         lowerCodeBlock(code, cmd->data.ifAst.thenBlock);
-        EMIT(code, JUMP, end);
+        EMIT(code, LABEL, end);
       } else {
         Operand f = labelOp(newLabel(currentFunction->functionName, "if_false"));
         if (ifcond.negate)
