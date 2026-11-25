@@ -1,7 +1,0 @@
-{
-  "compiler": {
-    "status": 2,
-    "stderr": "error (line 6): Missing 'else' in if statement\n"
-  },
-  "interpreter": null
-}
