@@ -9,7 +9,7 @@
 - All code was tracked with Git and hosted on GitHub
 - Branch names were selected according to <https://conventionalbranch.org/>
 - PRs were required to have at least 1 approval from another team member (not the PR author)
-- AI was used as a co-reviewer at the beggining
+- AI was used as a co-reviewer at the beginning
 
 ## Code Quality and Testing
 
