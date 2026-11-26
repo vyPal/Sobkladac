@@ -14,9 +14,20 @@ The sub-automaton (Fig. \ref{fig:fsa-cisla}) has branches for the integer part, 
 
 After the opening quote, the sub-automaton (Fig. \ref{fig:fsa-retezce}) distinguishes three branches: the empty string, the multi-line string (`"""`) and the single-line string. The single-line branch has the state `ESC` for escape sequences, and the multi-line branch counts consecutive quotes with the states `ML"` and `ML""`.
 
+\newpage
+
 ## Comments
 
-After `/`, the sub-automaton (Fig. \ref{fig:fsa-komentare}) branches into division, a line comment and a block comment. For nested block comments it keeps a nesting counter $d$ and a flag $nl$ (the comment contained a line break), which decides after `*/` whether the comment acts as whitespace or as a line break. It is therefore a finite automaton extended with a counter and a flag.
+After `/`, the sub-automaton (Fig. \ref{fig:fsa-komentare}) branches into division, a line comment and a block comment. A line comment (`//`) ends at a line break or at the end of file, and the line break itself is then processed by the main automaton.
+
+A block comment (`/*`) may be nested, which cannot be expressed by a finite number of states alone. The automaton is therefore extended with two variables:
+
+- **$d$ (nesting depth)** is an integer counter. It is set to 1 when the comment is opened by `/*`. Each nested `/*` increments it (transition `BLOCK/` $\to$ `BLOCK` on `*`), and each `*/` decrements it as long as $d>1$ (transition `BLOCK*` $\to$ `BLOCK` on `/`). The comment is closed by a `*/` read while $d=1$.
+- **$nl$ (line-break flag)** is a boolean. It is set to 0 when the comment is opened and to 1 as soon as a line break is read anywhere inside the comment, including nested parts.
+
+The states `BLOCK/` and `BLOCK*` remember the previous character: after `/`, a following `*` opens a nested comment, and after `*`, a following `/` closes one. Any other character returns the automaton to `BLOCK`. A block comment must be closed before the end of file; otherwise the automaton ends in `ERR`.
+
+After the closing `*/` the value of $nl$ decides how the comment is interpreted. If $nl=0$, the comment is equivalent to a single whitespace character (`SPACE`) and merely separates tokens. If $nl=1$, it is equivalent to a line break: the state `LF?` accepts only whitespace until a line break, end of file or the start of another comment, and any other character is an error. In both cases the character that follows is returned to the input.
 
 ```{=latex}
 \tikzset{
@@ -53,13 +64,13 @@ After `/`, the sub-automaton (Fig. \ref{fig:fsa-komentare}) branches into divisi
 
   % --- cisla, retezce
   \node[ref] (NUM) at (-2.4,3.8) {numbers (Fig.~\ref{fig:fsa-cisla})};
-  \node[ref] (STR) at (-2.4,5.3) {strings (Fig.~\ref{fig:fsa-retezce})};
+  \node[ref] (STR) at (-0.5,5.3) {strings (Fig.~\ref{fig:fsa-retezce})};
   \path (S) edge node[lbl, right] {\texttt{[0-9]}, \texttt{.}} (NUM)
         (S) edge node[lbl, left] {\texttt{"}} (STR);
 
   % --- komentare / deleni
   \node[state, accepting] (DIV) at (2.8,3.7) {\texttt{/}$^{*}$};
-  \node[ref] (COM) at (2.8,5.4) {comments (Fig.~\ref{fig:fsa-komentare})};
+  \node[ref] (COM) at (3.2,5.4) {comments (Fig.~\ref{fig:fsa-komentare})};
   \path (S) edge[bend right=8] node[lbl, pos=.55, above left] {\texttt{/}} (DIV)
         (DIV) edge node[lbl, right] {\texttt{/}, \texttt{*}} (COM);
 
@@ -92,24 +103,24 @@ After `/`, the sub-automaton (Fig. \ref{fig:fsa-komentare}) branches into divisi
 
   % --- @main
   \node[state] (A1) at (-6.6,0.6) {\texttt{@}};
-  \node[state] (A2) at (-6.6,-1.3) {\texttt{@m}};
-  \node[state] (A3) at (-6.6,-3.2) {\texttt{@ma}};
-  \node[state] (A4) at (-6.6,-5.1) {\texttt{@mai}};
-  \node[state, accepting] (AMN) at (-6.6,-7) {\texttt{@main}$^{*}$};
+  \node[state] (A2) at (-6.6,2.5) {\texttt{@m}};
+  \node[state] (A3) at (-6.6,4.4) {\texttt{@ma}};
+  \node[state] (A4) at (-6.6,6.3) {\texttt{@mai}};
+  \node[state, accepting] (AMN) at (-6.6,8.2) {\texttt{@main}$^{*}$};
   \path (S) edge[bend right=10] node[lbl, pos=.6, above] {\texttt{@}} (A1)
         (A1) edge node[lbl, above] {m} (A2)
         (A2) edge node[lbl, above] {a} (A3)
         (A3) edge node[lbl, below] {i} (A4)
         (A4) edge node[lbl, below left] {n} (AMN);
-  \node[note, anchor=north, align=left] at (-8.3,-8.1) {\texttt{@main} must not be followed\\by a letter, digit or \_};
+  \node[note, anchor=north, align=left] at (-3.8,8.2) {\texttt{@main} must not be followed\\by a letter, digit or \_};
 
   % --- novy radek a odsazeni
-  \node[state, accepting] (NL) at (-3.4,-1.5) {NL};
-  \node[state, accepting] (IND) at (-3.4,-3.6) {INDENT$^{*}$};
+  \node[state, accepting] (NL) at (-4.5,-1.5) {NL};
+  \node[state, accepting] (IND) at (-4.9,-3.6) {INDENT$^{*}$};
   \path (S) edge node[lbl, below, pos=.5] {\texttt{\textbackslash n}} (NL)
         (NL) edge node[lbl, below] {\textvisiblespace} (IND)
         (IND) edge[loop right] node[lbl] {\textvisiblespace\ ($n{+}{+}$)} (IND);
-  \node[note, anchor=north, align=center] at (-3.9,-4.6) {tab in indentation\\$\to$ ERR};
+  \node[note, anchor=north, align=center] at (-4.9,-4.6) {tab in indentation\\$\to$ ERR};
 \end{tikzpicture}}
 \caption{Main finite automaton of the lexical analyzer}
 \label{fig:fsa-hlavni}
@@ -217,7 +228,6 @@ After `/`, the sub-automaton (Fig. \ref{fig:fsa-komentare}) branches into divisi
         (M2) edge[bend left=25] node[lbl, left] {other} (ML)
         (M2) edge node[lbl, above] {\texttt{"}} (MEND);
 
-  \node[note] at (2.0,-9.6) {LF or EOF inside a single-line string $\to$ ERR};
   \node[note] at (2.0,-10.3) {other character after \texttt{\textbackslash} $\to$ ERR};
   \node[note] at (2.0,-11.0) {EOF inside a multi-line string $\to$ ERR};
 \end{tikzpicture}}
