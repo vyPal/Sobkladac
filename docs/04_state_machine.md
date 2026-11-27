@@ -51,7 +51,7 @@ After the closing `*/` the value of $nl$ decides how the comment is interpreted.
 
   % --- jednoznakove tokeny
   \node[state, accepting] (ONE) at (3.8,1.8) {1\,char};
-  \path (S) edge node[lbl, below, pos=.8] {$+\;-\;*\;(\;)\;:\;;\;,$} (ONE);
+  \path (S) edge node[lbl, below right, pos=.8] {$+\;-\;*\;(\;)\;:\;;\;,$} (ONE);
 
   % --- identifikator
   \node[state] (US) at (7.2,-1) {\_};
@@ -108,9 +108,9 @@ After the closing `*/` the value of $nl$ decides how the comment is interpreted.
   \node[state] (A4) at (-6.6,6.3) {\texttt{@mai}};
   \node[state, accepting] (AMN) at (-6.6,8.2) {\texttt{@main}$^{*}$};
   \path (S) edge[bend right=10] node[lbl, pos=.6, above] {\texttt{@}} (A1)
-        (A1) edge node[lbl, above] {m} (A2)
-        (A2) edge node[lbl, above] {a} (A3)
-        (A3) edge node[lbl, below] {i} (A4)
+        (A1) edge node[lbl, below left] {m} (A2)
+        (A2) edge node[lbl, below left] {a} (A3)
+        (A3) edge node[lbl, below left] {i} (A4)
         (A4) edge node[lbl, below left] {n} (AMN);
   \node[note, anchor=north, align=left] at (-3.8,8.2) {\texttt{@main} must not be followed\\by a letter, digit or \_};
 
