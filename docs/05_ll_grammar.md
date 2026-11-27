@@ -35,7 +35,8 @@ LinesTail   -> Line LinesTail | ε
 Line        -> Simple SimpleTail TK_NEWLINE
              | If
              | While
-SimpleTail  -> TK_SEMICOLON Simple SimpleTail | ε
+SimpleTail  -> TK_SEMICOLON SimpleRest | ε
+SimpleRest  -> Simple SimpleTail | ε               // trailing ';' before TK_NEWLINE
 
 Simple      -> VarDecl
              | Return

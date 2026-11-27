@@ -1,0 +1,6 @@
+import ifj26.*
+
+@main def main(): Unit =        // line 3, so the error says "line 4"
+  val b: Boolean = true
+  val c = isOk(b) && b          // also: f(1) || false, return f(1) == true, f(1) + 1
+  print(c)

@@ -19,17 +19,12 @@
 /// @param in
 /// @return true if the comma is trailing, false otherwise
 bool isTrailingComma(const LinkedTlist *in) {
-  bool sawNewline = false;
   const Token *token;
   for (int i = 0; (token = lookAheadToken(in, i)) != NULL; i++) {
     enum TkType type = getTkType(token);
-    if (type == TK_NEWLINE) {
-      sawNewline = true;
+    if (type == TK_NEWLINE || type == TK_INDENT)
       continue;
-    }
-    if (type == TK_INDENT)
-      continue;
-    return type == TK_RPAREN && sawNewline;
+    return type == TK_RPAREN;
   }
   return false;
 }

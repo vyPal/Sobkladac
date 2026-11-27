@@ -331,17 +331,14 @@ bool line(AstCodeBlock *block, LinkedTlist *tokenList) {
     return ifStatement(block, tokenList);
   } else if (getTkType(token) == TK_KW_WHILE) {
     return whileStatement(block, tokenList);
-  } else if (simpleStatement(block, tokenList)) {
-    if (simpleTail(block, tokenList)) {
-      token = popToken(tokenList);
-      if (token != NULL &&
-          getTkType(token) == TK_NEWLINE) {  // AI [gpt-6-luna]: "Can you add token != NULL && to
-                                             // all getTkType(token) in ifs"
-        return true;
-      }
+  } else if (simpleStatement(block, tokenList) && simpleTail(block, tokenList)) {
+    token = popToken(tokenList);
+    if (token != NULL && getTkType(token) == TK_NEWLINE) {
+      return true;
     }
+    die(ERR_SYNTAX, lineOf(token), "Unexpected token after statement");
   }
-  fprintf(stderr, "Invalid statement");
+  die(ERR_SYNTAX, lineOf(token), "Invalid statement");
   return false;
 }
 
@@ -350,6 +347,10 @@ bool simpleTail(AstCodeBlock *block, LinkedTlist *tokenList) {
 
   if (token != NULL && getTkType(token) == TK_SEMICOLON) {
     popToken(tokenList);
+    token = lookAheadToken(tokenList, 0);
+    if (token != NULL && getTkType(token) == TK_NEWLINE) {
+      return true;
+    }
     if (simpleStatement(block, tokenList)) {
       return simpleTail(block, tokenList);
     }

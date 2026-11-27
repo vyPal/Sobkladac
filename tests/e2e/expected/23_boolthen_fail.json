@@ -1,0 +1,7 @@
+{
+  "compiler": {
+    "status": 2,
+    "stderr": "error (line 5): Unexpected token after statement\n"
+  },
+  "interpreter": null
+}
