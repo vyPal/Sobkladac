@@ -11,10 +11,10 @@
 
 | Name | Login | Personal ID | Share |
 | :--- | :--- | :--- | :---: |
-| **Jakub Palacký** | xpalacj00 | 282025 | 25% |
-| David Sobek | xsobekd00 | 282391 | 25% |
-| Martin Šťovíček | xstovim00 | 270348 | 25% |
-| Vojtěch Vítek | xvitekv00 | 281829 | 25% |
+| **Jakub Palacký** | xpalacj00 | 282025 | 27% |
+| David Sobek | xsobekd00 | 282391 | 27% |
+| Martin Šťovíček | xstovim00 | 270348 | 27% |
+| Vojtěch Vítek | xvitekv00 | 281829 | 19% |
 
 - **Selected Variant:** `TRP-izp`
 - **Implemented Extensions:** `BOOLTHEN`

@@ -3,6 +3,13 @@
 ## Work distribution
 
 - **Jakub Palacký (`xpalacj00`):** Common utilities, AST helper methods, String Builder, Codegen
+- **Vojtěch Vítek (`xvitekv00`):** Lexer, Token structure, Documentation: Finite State Machine
+- **David Sobek (`xsobekd00`):** Hash table, symbol table, AST, semantic analysis, documentation: block diagram
+- **Martin Šťovíček (`xstovim00`):** Syntactical analysis
+
+## Reason for non-even point distribution
+
+Martin Šťovíček had a suboptimal work ethic, communicated infrequently, and left everything to the last minute (including his part in the documentation which was submitted as a pull request only 7 hours before final submission). Several fixes by other teammates to his work were also required before the test submissions.
 
 ## Version Control and Code Review
 
