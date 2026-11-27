@@ -28,8 +28,8 @@ typedef enum {
   PREC_RPAREN,      // )
   PREC_OPERAND,     // i (TK_IDENT, TK_NUMBER, TK_DECIMAL, TK_STRING, TK_BOOL)
   PREC_DOLLAR,      // $ (end-of-expression markers: newline, then, do, comma, EOF...)
-  PREC_AND,         // '||'
-  PREC_OR,          // '&&'
+  PREC_AND,         // '&&'
+  PREC_OR,          // '||'
   PREC_UNKNOWN      // invalid symbol in expression
 } PrecSymbol;
 
