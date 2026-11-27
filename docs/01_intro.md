@@ -13,8 +13,8 @@
 | :--- | :--- | :--- | :---: |
 | **Jakub Palacký** | xpalacj00 | 282025 | 27% |
 | David Sobek | xsobekd00 | 282391 | 27% |
-| Martin Šťovíček | xstovim00 | 270348 | 27% |
-| Vojtěch Vítek | xvitekv00 | 281829 | 19% |
+| Martin Šťovíček | xstovim00 | 270348 | 19% |
+| Vojtěch Vítek | xvitekv00 | 281829 | 27% |
 
 - **Selected Variant:** `TRP-izp`
 - **Implemented Extensions:** `BOOLTHEN`
