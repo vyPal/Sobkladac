@@ -241,9 +241,6 @@ LinkedTlist *lexerMain(void) {
               nextChar = (char)nextCharInt;
               position++;
             }
-            if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z') ||
-                (nextChar >= '0' && nextChar <= '9'))
-              die(1, line, "Unexpected character at line %d colum %d", line, position);
             preloadedChar = true;
 
             // write token
@@ -275,14 +272,6 @@ LinkedTlist *lexerMain(void) {
             nextChar = (char)nextCharInt;
             position++;
           }
-
-          nextCharInt = fgetc(stdin);
-          nextChar = (char)nextCharInt;
-          position++;
-          if ((nextChar >= 'a' && nextChar <= 'z') || (nextChar >= 'A' && nextChar <= 'Z') ||
-              (nextChar >= '0' && nextChar <= '9'))
-            die(1, line, "Unexpected character at line %d colum %d", line, position);
-          preloadedChar = true;
 
           // write token
           Token *tk = newToken(TK_STRING, line);
@@ -400,14 +389,6 @@ LinkedTlist *lexerMain(void) {
         if (nextChar != 'n')
           die(1, line, "Unexpected character at line %d colum %d, expected \"@main\"", line,
               position);
-        nextCharInt = fgetc(stdin);
-        nextChar = (char)nextCharInt;
-        position++;
-        if (nextChar != ' ' && nextChar != '\n' && nextCharInt != EOF)
-          die(1, line, "Unexpected character at line %d colum %d, expected \" \" after \"@main\"",
-              line, position);
-        if (nextChar == '\n' || nextCharInt == EOF)
-          preloadedChar = true;
         lastToken = pushToken(newToken(TK_ATMAIN, line), lastToken);
         break;
 

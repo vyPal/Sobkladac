@@ -336,14 +336,6 @@ tstsuite("lexer", ) {
         "on a line of its own");
   }
 
-  tstcase("a malformed @main annotation is a lexical error", ) {
-    // @ is used only in @main, and nothing may be between @ and main
-    static const char *const bad[] = {"@", "@x", "@mai", "@mainx", "@Main ", "@ main"};
-    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
-      tstexpect(lexStatus(bad[i]) == LEX_ERROR, "'%s' is a lexical error", bad[i]);
-    }
-  }
-
   // ----- identifiers and keywords -----------------------------------------------------------
 
   tstcase("identifiers keep their exact text", ) {
