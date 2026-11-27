@@ -20,4 +20,8 @@ header-includes:
   - \lhead{IFJ / IAL 2026 -- Project Documentation}
   - \rhead{Tým xpalacj00}
   - \cfoot{\thepage}
+  - \usepackage{tikz}
+  - \usetikzlibrary{automata,positioning,arrows.meta}
+  - \usepackage{graphicx}
+  - \usepackage{pdflscape}
 ---
